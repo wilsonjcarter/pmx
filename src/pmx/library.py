@@ -362,6 +362,8 @@ _dna_residues = set(['DA', 'DT', 'DC', 'DG', 'DA3', 'DT3', 'DC3', 'DG3', 'DA5',
 _rna_residues = set(['RA', 'RU', 'RC', 'RG', 'RA3', 'RU3', 'RC3', 'RG3', 'RA5',
                      'RU5', 'RC5', 'RG5'])
 
+_disulfide_hybrids = set(["C2CD", "D2DC"])
+
 # TODO: make nucleic acids the union of dna and rna
 _nucleic_acids = set([
     'G','T','A','C','DG','DT','DA','DC','DA5','DA3','DT5','DT3',

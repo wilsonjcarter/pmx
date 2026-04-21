@@ -16,6 +16,21 @@ the API is useful if you want to automate the setup for many calculations.
    analysis
 
 
+Worked examples
+---------------
+
+Complete worked examples with input files and thermodynamic cycle diagrams:
+
+.. toctree::
+   :maxdepth: 1
+
+   trpcage
+   protonation
+   disulfide
+   nterm_deletion
+   phosphorylation
+
+
 Another way to setup the files needed for the calculations is via the
 :ref:`command line tools<scripts>`, which may be more convenient to use for a
 small number of calculations.

@@ -59410,3 +59410,112 @@
   CA-CB HB1 HB2 CG ND1 HD1 CD2 HD2 CE1 HE1 NE2 HE2 DSG
   CB-CG ND1 HD1 CD2 HD2 CE1 HE1 NE2 HE2
 
+
+; Disulfide hybrid entries added 2026-04-21
+
+; C2CD/D2DC disulfide hybrids
+[ C2CD ] ; Cys -> Cys_disulfide (alchemical disulfide formation)
+
+
+ [ morphes ]
+     N        NH1 ->      N        NH1
+    HN          H ->     HN          H
+    CA        CT1 ->     CA        CT1
+    HA        HB1 ->     HA        HB1
+    CB        CT2 ->     CB        CT2
+   HB1        HA2 ->    HB1        HA2
+   HB2        HA2 ->    HB2        HA2
+    SG          S ->     SG         SM
+   HG1         HS -> HG.gone1     DUM_HS
+     C          C ->      C          C
+     O          O ->      O          O
+
+ [ atoms ]
+       N        NH1  -0.470000      1  14.007000        NH1  -0.470000  14.007000   ;  types == | charge == 
+      HN          H   0.310000      1   1.008000          H   0.310000   1.008000   ;  types == | charge == 
+      CA        CT1   0.070000      1  12.011000        CT1   0.070000  12.011000   ;  types == | charge == 
+      HA        HB1   0.090000      1   1.008000        HB1   0.090000   1.008000   ;  types == | charge == 
+      CB        CT2  -0.110000      1  12.011000        CT2  -0.100000  12.011000   ;  types == | charge != 
+     HB1        HA2   0.090000      1   1.008000        HA2   0.090000   1.008000   ;  types == | charge == 
+     HB2        HA2   0.090000      1   1.008000        HA2   0.090000   1.008000   ;  types == | charge == 
+      SG          S  -0.230000      1  32.060000         SM  -0.080000  32.060000   ;  types != | charge != 
+     HG1         HS   0.160000      1   1.008000     DUM_HS   0.000000   1.008000   ;  types != | charge != 
+       C          C   0.510000      1  12.011000          C   0.510000  12.011000   ;  types == | charge == 
+       O          O  -0.510000      1  15.999000          O  -0.510000  15.999000   ;  types == | charge == 
+
+ [ coords ]
+  -2.994   -4.470    6.993
+  -3.510   -5.332    7.063
+  -1.676   -4.415    7.600
+  -1.767   -4.903    8.571
+  -0.680   -5.185    6.708
+  -1.013   -6.213    6.554
+  -0.608   -4.724    5.722
+   0.972   -5.260    7.462
+   0.548   -5.313    8.730
+  -1.234   -2.969    7.858
+  -1.305   -2.106    6.983
+
+ [ impropers ]
+      N     -C     CA     HN     default-A                 default-B                  
+      C     CA     +N      O     default-A                 default-B                  
+
+ [ dihedrals ]
+
+ [ rotations ]
+  CA-CB HB1 HB2 SG HG1
+  CB-SG HG1
+
+
+[ D2DC ] ; Cys_disulfide -> Cys (alchemical disulfide breaking)
+
+
+ [ morphes ]
+     N        NH1 ->      N        NH1
+    HN          H ->     HN          H
+    CA        CT1 ->     CA        CT1
+    HA        HB1 ->     HA        HB1
+    CB        CT2 ->     CB        CT2
+   HB1        HA2 ->    HB1        HA2
+   HB2        HA2 ->    HB2        HA2
+    SG         SM ->     SG          S
+     C          C ->      C          C
+     O          O ->      O          O
+    HV     DUM_HS ->    HG1         HS
+
+ [ atoms ]
+       N        NH1  -0.470000      1  14.007000        NH1  -0.470000  14.007000   ;  types == | charge == 
+      HN          H   0.310000      1   1.008000          H   0.310000   1.008000   ;  types == | charge == 
+      CA        CT1   0.070000      1  12.011000        CT1   0.070000  12.011000   ;  types == | charge == 
+      HA        HB1   0.090000      1   1.008000        HB1   0.090000   1.008000   ;  types == | charge == 
+      CB        CT2  -0.100000      1  12.011000        CT2  -0.110000  12.011000   ;  types == | charge != 
+     HB1        HA2   0.090000      1   1.008000        HA2   0.090000   1.008000   ;  types == | charge == 
+     HB2        HA2   0.090000      1   1.008000        HA2   0.090000   1.008000   ;  types == | charge == 
+      SG         SM  -0.080000      1  32.060000          S  -0.230000  32.060000   ;  types != | charge != 
+       C          C   0.510000      1  12.011000          C   0.510000  12.011000   ;  types == | charge == 
+       O          O  -0.510000      1  15.999000          O  -0.510000  15.999000   ;  types == | charge == 
+      HV     DUM_HS   0.000000      1   1.008000         HS   0.160000   1.008000   ;  types != | charge != 
+
+ [ coords ]
+  -2.994   -4.470    6.993
+  -3.510   -5.332    7.063
+  -1.676   -4.415    7.600
+  -1.767   -4.903    8.571
+  -0.680   -5.185    6.708
+  -1.013   -6.213    6.554
+  -0.608   -4.724    5.722
+   0.972   -5.260    7.462
+  -1.234   -2.969    7.858
+  -1.305   -2.106    6.983
+   0.548   -5.313    8.730
+
+ [ impropers ]
+      N     -C     CA     HN     default-A                 default-B                  
+      C     CA     +N      O     default-A                 default-B                  
+
+ [ dihedrals ]
+
+ [ rotations ]
+  CA-CB HB1 HB2 SG HV
+  CB-SG HV
+

@@ -377,3 +377,65 @@ VAL     5
 1   5   HB  CB  CA  CG1 CG2
 3   4   HG1 CG1 CB  CA
 3   4   HG2 CG2 CB  CA
+
+; PTM HDB entries added from charmm36-jul2022.ff on 2026-04-21
+SEP        4
+1       1       HN      N       CA      -C     
+1       5       HA      CA      C       CB      N      
+2       6       HB      CB      CA      OG     
+1       2       H3T     O3P     P       O1P    
+TPO        5
+1       1       HN      N       CA      -C     
+1       5       HA      CA      C       CB      N      
+1       5       HB      CB      CA      CG2     OG1    
+1       2       H3T     O3P     P       O1P    
+3       4       HG2     CG2     CB      CA     
+PTR        8
+1       1       HN      N       CA      -C     
+1       5       HA      CA      C       CB      N      
+2       6       HB      CB      CA      CG     
+1       1       HD1     CD1     CE1     CG     
+1       1       HE1     CE1     CD1     CZ     
+1       2       H3T     O3P     P       O1P    
+1       1       HD2     CD2     CE2     CG     
+1       1       HE2     CE2     CD2     CZ     
+CSO        4
+1       1       HN      N       CA      -C     
+1       5       HA      CA      C       CB      N      
+2       6       HB      CB      CA      SG     
+1       2       HD      OD      SG      CB     
+CSS        4
+1       1       HN      N       CA      -C     
+1       5       HA      CA      C       CB      N      
+2       6       HB      CB      CA      SG     
+1       2       HD      SD      SG      CB     
+NEP        5
+1       1       HN      N       CA      -C     
+1       5       HA      CA      C       CB      N      
+2       6       HB      CB      CA      CG     
+1       1       HD2     CD2     CG      NE2    
+1       1       HE1     CE1     ND1     NE2    
+MLY        9
+1       1       HN      N       CA      -C     
+1       5       HA      CA      C       CB      N      
+2       6       HB      CB      CA      CG     
+2       6       HG      CG      CB      CD     
+2       6       HD      CD      CE      CG     
+2       6       HE      CE      CD      NZ     
+1       5       HZ      NZ      CE      CH1     CH2    
+3       4       HH1     CH1     NZ      CE     
+3       4       HH2     CH2     NZ      CE     
+M3L        9
+1       1       HN      N       CA      -C     
+1       5       HA      CA      C       CB      N      
+2       6       HB      CB      CA      CG     
+2       6       HG      CG      CB      CD     
+2       6       HD      CD      CE      CG     
+2       6       HE      CE      CD      NZ     
+3       4       HM1     CM1     NZ      CE     
+3       4       HM2     CM2     NZ      CE     
+3       4       HM3     CM3     NZ      CE     
+ASPM       3
+1       1       HN      N       CA      -C     
+3       4       HB      CB1     CA      C      
+2       6       HB      CB2     CA      CG     

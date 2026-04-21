@@ -41483,3 +41483,80 @@
 
  [ cmap ]
 -C     N    CA     C    +N  
+
+; Disulfide hybrid entries added 2026-04-21
+
+; C2CD/D2DC disulfide hybrids
+[ C2CD ] ; Cys -> Cys_disulfide (alchemical SS formation)
+
+ [ atoms ]
+     N   NH1              -0.47000  1
+    HN   H                 0.31000  2
+    CA   CT1               0.07000  3
+    HA   HB1               0.09000  4
+    CB   CT2              -0.11000  5
+   HB1   HA2               0.09000  6
+   HB2   HA2               0.09000  7
+    SG   S                -0.23000  8
+   HG1   HS                0.16000  9
+     C   C                 0.51000  10
+     O   O                -0.51000  11
+
+ [ bonds ]
+     N      HN ; (     N      HN)
+     N      CA ; (     N      CA)
+    CA      CB ; (    CA      CB)
+    CA       C ; (    CA       C)
+    CA      HA ; (    CA      HA)
+    CB      SG ; (    CB      SG)
+    CB     HB1 ; (    CB     HB1)
+    CB     HB2 ; (    CB     HB2)
+    SG     HG1 ; (    SG  HG.gone1)
+     C       O ; (     C       O)
+     C      +N  
+
+ [ impropers ]
+     N      -C      CA      HN 
+     C      CA      +N       O 
+
+ [ dihedrals ]
+
+ [ cmap ]
+-C     N    CA     C    +N
+
+[ D2DC ] ; Cys_disulfide -> Cys (alchemical SS breaking)
+
+ [ atoms ]
+     N   NH1              -0.47000  1
+    HN   H                 0.31000  2
+    CA   CT1               0.07000  3
+    HA   HB1               0.09000  4
+    CB   CT2              -0.10000  5
+   HB1   HA2               0.09000  6
+   HB2   HA2               0.09000  7
+    SG   SM               -0.08000  8
+     C   C                 0.51000  9
+     O   O                -0.51000  10
+    HV   DUM_HS            0.00000  11
+
+ [ bonds ]
+     N      HN ; (     N      HN)
+     N      CA ; (     N      CA)
+    CA      CB ; (    CA      CB)
+    CA       C ; (    CA       C)
+    CA      HA ; (    CA      HA)
+    CB      SG ; (    CB      SG)
+    CB     HB1 ; (    CB     HB1)
+    CB     HB2 ; (    CB     HB2)
+    SG      HV ; (    SG     HG1)
+     C       O ; (     C       O)
+     C      +N  
+
+ [ impropers ]
+     N      -C      CA      HN 
+     C      CA      +N       O 
+
+ [ dihedrals ]
+
+ [ cmap ]
+-C     N    CA     C    +N
