@@ -1,8 +1,41 @@
 # pmx Example Cases
 
+
+
 Six self-contained examples covering the main pmx mutation workflows.
 Each directory contains a `run.sh` (complete pipeline) and a `README.md`
 (unique highlights + detailed walkthrough).
+
+<table>
+<tr>
+<td align="center" width="33%">
+<img src="imgs/schematic_p1.png" width="100%"/><br/>
+<sub><b>01</b> &nbsp; amino acid substitution (W→F)</sub>
+</td>
+<td align="center" width="33%">
+<img src="imgs/schematic_p2.png" width="100%"/><br/>
+<sub><b>02</b> &nbsp; protonation state / pKa shift</sub>
+</td>
+<td align="center" width="33%">
+<img src="imgs/schematic_p3.png" width="100%"/><br/>
+<sub><b>03</b> &nbsp; disulfide bond formation</sub>
+</td>
+</tr>
+<tr>
+<td align="center" width="33%">
+<img src="imgs/schematic_p4.png" width="100%"/><br/>
+<sub><b>04</b> &nbsp; C-terminal residue deletion</sub>
+</td>
+<td align="center" width="33%">
+<img src="imgs/schematic_p5.png" width="100%"/><br/>
+<sub><b>05</b> &nbsp; tyrosine phosphorylation (pTyr)</sub>
+</td>
+<td align="center" width="33%">
+<br/><br/>
+<sub><b>06</b> &nbsp; non-standard AA (de novo ITP) &nbsp;🚧</sub>
+</td>
+</tr>
+</table>
 
 ## Examples
 
