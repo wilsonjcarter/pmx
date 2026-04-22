@@ -324,7 +324,7 @@ THR     5
 1   5   HB  CB  CA  OG1 CG2
 1   2   HG1 OG1 CB  CA
 3   4   HG2 CG2 CB  CA
-TP1     8       
+YP1     8
 1   1   HN  N   -C  CA
 1   5   HA  CA  N   C   CB
 2   6   HB  CB  CG  CA
@@ -333,7 +333,7 @@ TP1     8
 1   1   HE1 CE1 CD1 CZ
 1   1   HE2 CE2 CD2 CZ
 1   2   H2  O2  P1  OH
-TP2     7       
+YP2     7
 1   1   HN  N   -C  CA
 1   5   HA  CA  N   C   CB
 2   6   HB  CB  CG  CA
@@ -341,6 +341,17 @@ TP2     7
 1   1   HD2 CD2 CG  CE2
 1   1   HE1 CE1 CD1 CZ
 1   1   HE2 CE2 CD2 CZ
+TP1     6
+1   1   HN  N   -C  CA
+1   5   HA  CA  N   C   CB
+1   5   HB  CB  CA  OG1 CG2
+1   2   HT  OT  P   OG1
+3   4   HG2 CG2 CB  CA
+TP2     5
+1   1   HN  N   -C  CA
+1   5   HA  CA  N   C   CB
+1   5   HB  CB  CA  OG1 CG2
+3   4   HG2 CG2 CB  CA
 TRP     9       
 1   1   HN  N   -C  CA
 1   5   HA  CA  N   C   CB

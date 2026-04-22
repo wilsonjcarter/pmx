@@ -1,19 +1,39 @@
-# pmx: alchemistry in gromacs
+# pmx: alchemistry in gromacs — extended protein branch
 
 [![Build Status](https://travis-ci.org/deGrootLab/pmx.svg?branch=master)](https://travis-ci.org/deGrootLab/pmx)
 [![Code coverage](https://codecov.io/gh/deGrootLab/pmx/branch/develop/graph/badge.svg)](https://codecov.io/gh/deGrootLab/pmx)
 
-**Warning:** this is a development version of `pmx`, it is not stable or reliable yet. You are welcome to
-try/test it and provide feedback, but use at your own risk. The current stable version of `pmx` can
-be found in the master branch: https://github.com/deGrootLab/pmx
+> **This is a custom fork of [deGrootLab/pmx](https://github.com/deGrootLab/pmx) (`develop` branch) with
+> extended protein mutation support.** It adds hybrid residues and force-field parameters for post-translational
+> modifications and non-standard chemistries not present in the upstream release — see highlights below.
 
 <img src="examples/imgs/overview.png" alt="pmx FEP workflow overview" align="right" width="410"/>
 
-`pmx` is a python library that allows users to setup and analyse molecular
-dynamics simulations with the [Gromacs](http://gromacs.org) package.
-Among its main features are the setup and analysis of alchemical free energy
-calculations for protein, nucleic acid, and small molecule mutations.
+`pmx` is a Python library for setting up and analysing alchemical free-energy calculations in
+[GROMACS](http://gromacs.org). Starting from a crystal structure you can build hybrid (dual-topology)
+residues, generate perturbed force-field parameters, and compute ΔG via non-equilibrium switching or BAR.
 
+### What this fork adds (on top of upstream `develop`)
+
+| Feature | Hybrid code | Force field |
+|---------|------------|-------------|
+| Ser → phosphoSer (mono/dianionic) | S2P1 / S2P2 | SP1/SP2 in `charmm36m-mut` |
+| Thr → phosphoThr (mono/dianionic) | T2P1 / T2P2 | TP1/TP2 in `charmm36m-mut` |
+| Tyr → phosphoTyr (mono/dianionic) | Y2P1 / Y2P2 | YP1/YP2 in `charmm36m-mut` |
+| Cys–Cys disulfide formation / breaking | C2CD | — |
+| C-terminal residue deletion | *deC | — |
+| N-terminal residue deletion | *deN | — |
+
+All phosphorylation hybrids use the same user-facing target code (`P1` monoanionic, `P2` dianionic);
+pmx automatically picks the correct hybrid based on the source residue:
+
+```bash
+printf "63 P1\n" | pmx mutate -f wt.gro -o mutant.pdb -ff charmm36m-mut  # Tyr → YP1
+printf "42 P1\n" | pmx mutate -f wt.gro -o mutant.pdb -ff charmm36m-mut  # Ser → SP1
+printf "18 P1\n" | pmx mutate -f wt.gro -o mutant.pdb -ff charmm36m-mut  # Thr → TP1
+```
+
+See [`examples/`](examples/) for six worked end-to-end FEP pipelines.
 
 https://degrootlab.github.io/pmx/
 

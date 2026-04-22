@@ -43472,6 +43472,159 @@
   CB-CG2 HG21 HG22 HG23
 
 
+[ T2P1 ] ; Thr -> Phosphothreonine monoanionic (TP1)
+
+
+ [ morphes ]
+     N        NH1 ->      N        NH1
+    HN          H ->     HN          H
+    CA        CT1 ->     CA        CT1
+    HA        HB1 ->     HA        HB1
+    CB        CT1 ->     CB        CT1
+    HB        HA1 ->     HB        HA1
+   OG1        OH1 ->    OG1        ON2
+   HG1          H ->  HG1.gone    DUM_H
+   CG2        CT3 ->    CG2        CT3
+  HG21        HA3 ->   HG21        HA3
+  HG22        HA3 ->   HG22        HA3
+  HG23        HA3 ->   HG23        HA3
+     C          C ->      C          C
+     O          O ->      O          O
+    DP     DUM_P2 ->      P          P
+  DO1P    DUM_ON3 ->    O1P        ON3
+  DO2P    DUM_ON3 ->    O2P        ON3
+   DOT    DUM_ON3 ->     OT        ON4
+   DHT    DUM_HN1 ->     HT        HN4
+
+ [ atoms ]
+       N        NH1  -0.470000      1  14.007000        NH1  -0.470000  14.007000   ;  types == | charge ==
+      HN          H   0.310000      1   1.008000          H   0.310000   1.008000   ;  types == | charge ==
+      CA        CT1   0.070000      1  12.011000        CT1   0.070000  12.011000   ;  types == | charge ==
+      HA        HB1   0.090000      1   1.008000        HB1   0.090000   1.008000   ;  types == | charge ==
+      CB        CT1   0.140000      1  12.011000        CT1   0.010000  12.011000   ;  types == | charge !=
+      HB        HA1   0.090000      1   1.008000        HA1   0.090000   1.008000   ;  types == | charge ==
+     OG1        OH1  -0.660000      1  15.999000        ON2  -0.620000  15.999000   ;  types != | charge !=
+     HG1          H   0.430000      1   1.008000      DUM_H   0.000000   1.008000   ;  types != | charge !=
+     CG2        CT3  -0.270000      1  12.011000        CT3  -0.270000  12.011000   ;  types == | charge ==
+    HG21        HA3   0.090000      1   1.008000        HA3   0.090000   1.008000   ;  types == | charge ==
+    HG22        HA3   0.090000      1   1.008000        HA3   0.090000   1.008000   ;  types == | charge ==
+    HG23        HA3   0.090000      1   1.008000        HA3   0.090000   1.008000   ;  types == | charge ==
+       C          C   0.510000      1  12.011000          C   0.510000  12.011000   ;  types == | charge ==
+       O          O  -0.510000      1  15.999000          O  -0.510000  15.999000   ;  types == | charge ==
+      DP     DUM_P2   0.000000      1  30.974000          P   1.500000  30.974000   ;  types != | charge !=
+    DO1P    DUM_ON3   0.000000      1  15.999000        ON3  -0.820000  15.999000   ;  types != | charge !=
+    DO2P    DUM_ON3   0.000000      1  15.999000        ON3  -0.820000  15.999000   ;  types != | charge !=
+     DOT    DUM_ON3   0.000000      1  15.999000        ON4  -0.680000  15.999000   ;  types != | charge !=
+     DHT    DUM_HN1   0.000000      1   1.008000        HN4   0.340000   1.008000   ;  types != | charge !=
+
+ [ coords ]
+  -2.994   -4.470    6.993
+  -3.510   -5.332    7.063
+  -1.676   -4.415    7.600
+  -1.750   -4.894    8.576
+  -0.676   -5.206    6.716
+  -1.019   -6.236    6.604
+   0.584   -5.219    7.373
+   1.014   -4.389    7.221
+  -0.444   -4.593    5.324
+   0.325   -5.135    4.772
+  -1.349   -4.627    4.718
+  -0.128   -3.551    5.394
+  -1.234   -2.969    7.858
+  -1.305   -2.106    6.983
+   1.315   -3.807    7.114
+   1.542   -3.112    8.424
+   0.448   -2.950    6.236
+   2.635   -4.046    6.437
+   3.489   -4.200    5.999
+
+ [ impropers ]
+      N     -C     CA     HN     default-A                 default-B
+      C     CA     +N      O     default-A                 default-B
+
+ [ dihedrals ]
+
+ [ rotations ]
+  CA-CB HB OG1 HG1 CG2 HG21 HG22 HG23 DP DO1P DO2P DOT DHT
+  CB-OG1 HG1
+  CB-CG2 HG21 HG22 HG23
+
+
+[ T2P2 ] ; Thr -> Phosphothreonine dianionic (TP2)
+
+
+ [ morphes ]
+     N        NH1 ->      N        NH1
+    HN          H ->     HN          H
+    CA        CT1 ->     CA        CT1
+    HA        HB1 ->     HA        HB1
+    CB        CT1 ->     CB        CT1
+    HB        HA1 ->     HB        HA1
+   OG1        OH1 ->    OG1        ON2
+   HG1          H ->  HG1.gone    DUM_H
+   CG2        CT3 ->    CG2        CT3
+  HG21        HA3 ->   HG21        HA3
+  HG22        HA3 ->   HG22        HA3
+  HG23        HA3 ->   HG23        HA3
+     C          C ->      C          C
+     O          O ->      O          O
+    DP     DUM_P2 ->      P          P
+  DO1P    DUM_ON3 ->    O1P        ON3
+  DO2P    DUM_ON3 ->    O2P        ON3
+   DOT    DUM_ON3 ->     OT        ON3
+
+ [ atoms ]
+       N        NH1  -0.470000      1  14.007000        NH1  -0.470000  14.007000   ;  types == | charge ==
+      HN          H   0.310000      1   1.008000          H   0.310000   1.008000   ;  types == | charge ==
+      CA        CT1   0.070000      1  12.011000        CT1   0.070000  12.011000   ;  types == | charge ==
+      HA        HB1   0.090000      1   1.008000        HB1   0.090000   1.008000   ;  types == | charge ==
+      CB        CT1   0.140000      1  12.011000        CT1  -0.090000  12.011000   ;  types == | charge !=
+      HB        HA1   0.090000      1   1.008000        HA1   0.090000   1.008000   ;  types == | charge ==
+     OG1        OH1  -0.660000      1  15.999000        ON2  -0.400000  15.999000   ;  types != | charge !=
+     HG1          H   0.430000      1   1.008000      DUM_H   0.000000   1.008000   ;  types != | charge !=
+     CG2        CT3  -0.270000      1  12.011000        CT3  -0.270000  12.011000   ;  types == | charge ==
+    HG21        HA3   0.090000      1   1.008000        HA3   0.090000   1.008000   ;  types == | charge ==
+    HG22        HA3   0.090000      1   1.008000        HA3   0.090000   1.008000   ;  types == | charge ==
+    HG23        HA3   0.090000      1   1.008000        HA3   0.090000   1.008000   ;  types == | charge ==
+       C          C   0.510000      1  12.011000          C   0.510000  12.011000   ;  types == | charge ==
+       O          O  -0.510000      1  15.999000          O  -0.510000  15.999000   ;  types == | charge ==
+      DP     DUM_P2   0.000000      1  30.974000          P   1.100000  30.974000   ;  types != | charge !=
+    DO1P    DUM_ON3   0.000000      1  15.999000        ON3  -0.900000  15.999000   ;  types != | charge !=
+    DO2P    DUM_ON3   0.000000      1  15.999000        ON3  -0.900000  15.999000   ;  types != | charge !=
+     DOT    DUM_ON3   0.000000      1  15.999000        ON3  -0.900000  15.999000   ;  types != | charge !=
+
+ [ coords ]
+  -2.994   -4.470    6.993
+  -3.510   -5.332    7.063
+  -1.676   -4.415    7.600
+  -1.750   -4.894    8.576
+  -0.676   -5.206    6.716
+  -1.019   -6.236    6.604
+   0.584   -5.219    7.373
+   1.014   -4.389    7.221
+  -0.444   -4.593    5.324
+   0.325   -5.135    4.772
+  -1.349   -4.627    4.718
+  -0.128   -3.551    5.394
+  -1.234   -2.969    7.858
+  -1.305   -2.106    6.983
+   1.315   -3.807    7.114
+   1.542   -3.112    8.424
+   0.448   -2.950    6.236
+   2.635   -4.046    6.437
+
+ [ impropers ]
+      N     -C     CA     HN     default-A                 default-B
+      C     CA     +N      O     default-A                 default-B
+
+ [ dihedrals ]
+
+ [ rotations ]
+  CA-CB HB OG1 HG1 CG2 HG21 HG22 HG23 DP DO1P DO2P DOT
+  CB-OG1 HG1
+  CB-CG2 HG21 HG22 HG23
+
+
 [ T2Z ] ; Thr -> Hsp
 
 
@@ -53510,7 +53663,7 @@
   CZ-OH HH
 
 
-[ Y2P1 ] ; Tyr -> Phosphotyrosine monoanionic (TP1)
+[ Y2P1 ] ; Tyr -> Phosphotyrosine monoanionic (YP1)
 
 
  [ morphes ]
@@ -53609,7 +53762,7 @@
   CZ-OH HH DP DO2 DH2 DO3 DO4
 
 
-[ Y2P2 ] ; Tyr -> Phosphotyrosine dianionic (TP2)
+[ Y2P2 ] ; Tyr -> Phosphotyrosine dianionic (YP2)
 
 
  [ morphes ]

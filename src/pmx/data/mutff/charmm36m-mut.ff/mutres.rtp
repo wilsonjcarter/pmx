@@ -30280,7 +30280,111 @@
  [ dihedrals ]
 
  [ cmap ]
--C     N    CA     C    +N  
+-C     N    CA     C    +N
+
+[ T2P1 ] ; Thr -> Phosphothreonine monoanionic (TP1)
+
+ [ atoms ]
+     N   NH1              -0.47000  1
+    HN   H                 0.31000  2
+    CA   CT1               0.07000  3
+    HA   HB1               0.09000  4
+    CB   CT1               0.14000  5
+    HB   HA1               0.09000  6
+   OG1   OH1              -0.66000  7
+   HG1   H                 0.43000  8
+   CG2   CT3              -0.27000  9
+  HG21   HA3               0.09000  10
+  HG22   HA3               0.09000  11
+  HG23   HA3               0.09000  12
+     C   C                 0.51000  13
+     O   O                -0.51000  14
+    DP   DUM_P2            0.00000  15
+  DO1P   DUM_ON3           0.00000  16
+  DO2P   DUM_ON3           0.00000  17
+   DOT   DUM_ON3           0.00000  18
+   DHT   DUM_HN1           0.00000  19
+
+ [ bonds ]
+     N      HN ; (     N      HN)
+     N      CA ; (     N      CA)
+    CA      CB ; (    CA      CB)
+    CA       C ; (    CA       C)
+    CA      HA ; (    CA      HA)
+    CB     OG1 ; (    CB     OG1)
+    CB      HB ; (    CB      HB)
+    CB     CG2 ; (    CB     CG2)
+   OG1     HG1 ; (   OG1  HG1.gone)
+   OG1      DP ; (   OG1       P)
+   CG2    HG21 ; (   CG2    HG21)
+   CG2    HG22 ; (   CG2    HG22)
+   CG2    HG23 ; (   CG2    HG23)
+     C       O ; (     C       O)
+    DP    DO1P ; (     P     O1P)
+    DP    DO2P ; (     P     O2P)
+    DP     DOT ; (     P      OT)
+   DOT     DHT ; (    OT      HT)
+     C      +N
+
+ [ impropers ]
+     N      -C      CA      HN
+     C      CA      +N       O
+
+ [ dihedrals ]
+
+ [ cmap ]
+-C     N    CA     C    +N
+
+[ T2P2 ] ; Thr -> Phosphothreonine dianionic (TP2)
+
+ [ atoms ]
+     N   NH1              -0.47000  1
+    HN   H                 0.31000  2
+    CA   CT1               0.07000  3
+    HA   HB1               0.09000  4
+    CB   CT1               0.14000  5
+    HB   HA1               0.09000  6
+   OG1   OH1              -0.66000  7
+   HG1   H                 0.43000  8
+   CG2   CT3              -0.27000  9
+  HG21   HA3               0.09000  10
+  HG22   HA3               0.09000  11
+  HG23   HA3               0.09000  12
+     C   C                 0.51000  13
+     O   O                -0.51000  14
+    DP   DUM_P2            0.00000  15
+  DO1P   DUM_ON3           0.00000  16
+  DO2P   DUM_ON3           0.00000  17
+   DOT   DUM_ON3           0.00000  18
+
+ [ bonds ]
+     N      HN ; (     N      HN)
+     N      CA ; (     N      CA)
+    CA      CB ; (    CA      CB)
+    CA       C ; (    CA       C)
+    CA      HA ; (    CA      HA)
+    CB     OG1 ; (    CB     OG1)
+    CB      HB ; (    CB      HB)
+    CB     CG2 ; (    CB     CG2)
+   OG1     HG1 ; (   OG1  HG1.gone)
+   OG1      DP ; (   OG1       P)
+   CG2    HG21 ; (   CG2    HG21)
+   CG2    HG22 ; (   CG2    HG22)
+   CG2    HG23 ; (   CG2    HG23)
+     C       O ; (     C       O)
+    DP    DO1P ; (     P     O1P)
+    DP    DO2P ; (     P     O2P)
+    DP     DOT ; (     P      OT)
+     C      +N
+
+ [ impropers ]
+     N      -C      CA      HN
+     C      CA      +N       O
+
+ [ dihedrals ]
+
+ [ cmap ]
+-C     N    CA     C    +N
 
 [ T2Z ] ; Thr -> Hsp
 
@@ -37313,7 +37417,7 @@
  [ cmap ]
 -C     N    CA     C    +N
 
-[ Y2P1 ] ; Tyr -> Phosphotyrosine monoanionic (TP1)
+[ Y2P1 ] ; Tyr -> Phosphotyrosine monoanionic (YP1)
 
  [ atoms ]
      N   NH1              -0.47000  1
@@ -37381,7 +37485,7 @@
  [ cmap ]
 -C     N    CA     C    +N
 
-[ Y2P2 ] ; Tyr -> Phosphotyrosine dianionic (TP2)
+[ Y2P2 ] ; Tyr -> Phosphotyrosine dianionic (YP2)
 
  [ atoms ]
      N   NH1              -0.47000  1

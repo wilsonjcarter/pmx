@@ -6,31 +6,31 @@ Six self-contained examples covering the main pmx mutation workflows.
 Each directory contains a `run.sh` (complete pipeline) and a `README.md`
 (unique highlights + detailed walkthrough).
 
-<table>
+<table bgcolor="#ffffff" cellspacing="0" cellpadding="8" border="0">
 <tr>
-<td align="center" width="33%">
+<td align="center" width="33%" bgcolor="#ffffff">
 <img src="imgs/schematic_p1.png" width="100%"/><br/>
 <sub><b>01</b> &nbsp; amino acid substitution (W→F)</sub>
 </td>
-<td align="center" width="33%">
+<td align="center" width="33%" bgcolor="#ffffff">
 <img src="imgs/schematic_p2.png" width="100%"/><br/>
 <sub><b>02</b> &nbsp; protonation state / pKa shift</sub>
 </td>
-<td align="center" width="33%">
+<td align="center" width="33%" bgcolor="#ffffff">
 <img src="imgs/schematic_p3.png" width="100%"/><br/>
 <sub><b>03</b> &nbsp; disulfide bond formation</sub>
 </td>
 </tr>
 <tr>
-<td align="center" width="33%">
+<td align="center" width="33%" bgcolor="#ffffff">
 <img src="imgs/schematic_p4.png" width="100%"/><br/>
 <sub><b>04</b> &nbsp; C-terminal residue deletion</sub>
 </td>
-<td align="center" width="33%">
+<td align="center" width="33%" bgcolor="#ffffff">
 <img src="imgs/schematic_p5.png" width="100%"/><br/>
 <sub><b>05</b> &nbsp; tyrosine phosphorylation (pTyr)</sub>
 </td>
-<td align="center" width="33%">
+<td align="center" width="33%" bgcolor="#ffffff">
 <br/><br/>
 <sub><b>06</b> &nbsp; non-standard AA (de novo ITP) &nbsp;🚧</sub>
 </td>
@@ -42,9 +42,9 @@ Each directory contains a `run.sh` (complete pipeline) and a `README.md`
 | # | Directory | System | What is calculated | FF |
 |---|-----------|--------|-------------------|----|
 | 1 | `01_trpcage_W6F` | Trp Cage (1L2Y) | ΔΔG of W→F substitution | charmm36m-mut |
-| 2 | `02_protonation_C2CM` | Thioredoxin (1ERT) | pKa shift of Cys32 | charmm36m-mut |
-| 3 | `03_disulfide_C2CD` | Thioredoxin (1ERT) | ΔG of disulfide formation | charmm36m-mut |
-| 4 | `04_cterm_deletion` | HSP90 MEEVD peptide (1ELR) | ΔG of C-terminal truncation | charmm36m-mut |
+| 2 | `02_protonation_C2CM` | Thioredoxin (1ERT) | ΔpKa of Cys32 | charmm36m-mut |
+| 3 | `03_disulfide_C2CD` | Thioredoxin (1ERT) | ΔE of disulfide formation | charmm36m-mut |
+| 4 | `04_cterm_deletion` | HSP90 MEEVD peptide (1ELR) | ΔΔG of C-terminal truncation | charmm36m-mut |
 | 5 | `05_phosphorylation_pTyr` | Lck SH2 domain (1AOT) | ΔΔG of Tyr phosphorylation (TP1) | charmm36m-mut |
 | 6 | `06_nsaa_denovo` **(WIP)** | Protein with target Ser | ΔΔG of Ser→SEP via custom ITP | charmm36m-mut |
 

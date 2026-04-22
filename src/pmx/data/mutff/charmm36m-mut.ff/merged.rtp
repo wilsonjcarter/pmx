@@ -58565,7 +58565,7 @@
 
 
 ; monoanionic phosphotyrosine
-[ TP1 ]
+[ YP1 ]
   [ atoms ]
         N   NH1   -0.470  0
        HN     H    0.310  1
@@ -58628,7 +58628,7 @@
 
 
 ; dianionic phosphotyrosine
-[ TP2 ]
+[ YP2 ]
   [ atoms ]
         N   NH1   -0.470  0
        HN     H    0.310  1
@@ -58680,6 +58680,98 @@
       CD1    CG
       CE1    CZ
       CE2   CD2
+  [ impropers ]
+        N    -C    CA    HN
+        C    CA    +N     O
+  [ cmap ]
+       -C     N    CA     C    +N
+
+
+
+[ TP1 ] ; phosphoThreonine monoanionic
+  [ atoms ]
+        N   NH1   -0.470  0
+       HN     H    0.310  1
+       CA   CT1    0.070  2
+       HA   HB1    0.090  3
+       CB   CT1    0.010  4
+       HB   HA1    0.090  5
+      OG1   ON2   -0.620  6
+        P     P    1.500  7
+      O1P   ON3   -0.820  8
+      O2P   ON3   -0.820  9
+       OT   ON4   -0.680 10
+       HT   HN4    0.340 11
+      CG2   CT3   -0.270 12
+     HG21   HA3    0.090 13
+     HG22   HA3    0.090 14
+     HG23   HA3    0.090 15
+        C     C    0.510 16
+        O     O   -0.510 17
+  [ bonds ]
+       CB    CA
+      OG1    CB
+      CG2    CB
+        N    HN
+        N    CA
+        C    CA
+        C    +N
+       CA    HA
+       CB    HB
+      OG1     P
+        P   O1P
+        P   O2P
+        P    OT
+       OT    HT
+      CG2  HG21
+      CG2  HG22
+      CG2  HG23
+        O     C
+  [ impropers ]
+        N    -C    CA    HN
+        C    CA    +N     O
+  [ cmap ]
+       -C     N    CA     C    +N
+
+
+
+[ TP2 ] ; phosphoThreonine dianionic
+  [ atoms ]
+        N   NH1   -0.470  0
+       HN     H    0.310  1
+       CA   CT1    0.070  2
+       HA   HB1    0.090  3
+       CB   CT1   -0.090  4
+       HB   HA1    0.090  5
+      OG1   ON2   -0.400  6
+        P     P    1.100  7
+      O1P   ON3   -0.900  8
+      O2P   ON3   -0.900  9
+       OT   ON3   -0.900 10
+      CG2   CT3   -0.270 11
+     HG21   HA3    0.090 12
+     HG22   HA3    0.090 13
+     HG23   HA3    0.090 14
+        C     C    0.510 15
+        O     O   -0.510 16
+  [ bonds ]
+       CB    CA
+      OG1    CB
+      CG2    CB
+        N    HN
+        N    CA
+        C    CA
+        C    +N
+       CA    HA
+       CB    HB
+      OG1     P
+        P   O1P
+        P   O2P
+        P    OT
+      CG2  HG21
+      CG2  HG22
+      CG2  HG23
+        O     C
   [ impropers ]
         N    -C    CA    HN
         C    CA    +N     O
