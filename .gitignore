@@ -4,15 +4,36 @@
 .localhistory
 *cpython*
 
+# macOS metadata
+.DS_Store
+
+# Python build artifacts
+.eggs/
+__pycache__/
+
 # tests
 .coverage
 .pytest_cache/
-tests/__pycache__/
 
-# docs 
+# docs
 docs/build
 .vscode
 build
 dist
 *.egg-info
 *.ipynb_checkpoints
+
+# GROMACS runtime outputs generated inside example working directories
+# (input/ subdirs are tracked; loose files at the example root are not)
+examples/**/mutant.pdb
+examples/**/mutant_step*.pdb
+examples/**/processed.gro
+examples/**/wt.gro
+examples/**/wt.top
+examples/**/topol.top
+examples/**/pmxtop.top
+examples/**/posre.itp
+examples/**/mutres_term.rtp
+examples/**/mutres_term.mtp
+# GROMACS numbered backup files  (#file.ext.N#)
+\#*\#
