@@ -7,7 +7,7 @@
 > extended protein mutation support.** It adds hybrid residues and force-field parameters for post-translational
 > modifications and non-standard chemistries not present in the upstream release — see highlights below.
 
-<img src="examples/imgs/pmx_overview.png" alt="pmx FEP workflow overview" align="center" width="410"/>
+<img src="examples/imgs/pmx_overview.png" alt="pmx FEP workflow overview" align="center" width="820"/>
 
 `pmx` is a Python library for setting up and analysing alchemical free-energy calculations in
 [GROMACS](http://gromacs.org). Starting from a crystal structure you can build hybrid (dual-topology)
@@ -40,8 +40,6 @@ More features will be added as they become available
 
 ## Modified force force fields
 Over the past several years we've experimented with force field modifications, assessing their effect on free energy calculation accuracy. Two major developements have been the use of modified backbone partial charges in the Amber force field family, and charge-scaling in both the Amber and CHARMM families. Several modified force fields are available and can be used directly with `pmx` or to run plain molecular dynamics simulations.
-
-https://degrootlab.github.io/pmx/
 
 ## Citations
 
