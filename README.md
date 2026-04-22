@@ -7,7 +7,7 @@
 try/test it and provide feedback, but use at your own risk. The current stable version of `pmx` can
 be found in the master branch: https://github.com/deGrootLab/pmx
 
-<table>
+<table border="0" cellspacing="0" cellpadding="10">
 <tr>
 <td width="50%">
 
