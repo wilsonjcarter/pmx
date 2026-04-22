@@ -700,8 +700,8 @@ def _convert_aa_name(aa):
     # CM : deprotonated cysteine (CYM) target for C2CM hybrid
     # CD : disulfide cysteine target for C2CD hybrid (alchemical SS formation)
     # DC : reverse disulfide target for D2DC hybrid (alchemical SS breaking)
-    # P1 : monoanionic phosphoserine (SP1) target for S2P1 hybrid
-    # P2 : dianionic phosphoserine (SP2) target for S2P2 hybrid
+    # P1 : monoanionic phospho-amino acid target for S2P1 (SER) or Y2P1 (TYR)
+    # P2 : dianionic phospho-amino acid target for S2P2 (SER) or Y2P2 (TYR)
     _special = {'CM', 'CD', 'DC', 'P1', 'P2'}
     if aa.upper() in _special:
         return aa.upper()

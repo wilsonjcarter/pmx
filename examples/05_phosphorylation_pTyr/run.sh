@@ -1,34 +1,34 @@
 #!/usr/bin/env bash
 # =============================================================================
-# Example 5 — Serine phosphorylation: Ser → phosphoSer (SP1, monoanionic)
+# Example 5 — Tyrosine phosphorylation: Tyr → phosphoTyr (TP1, monoanionic)
 #
-# System  : Protein with a target Ser (adjust MUT_RESID below)
-# Mutation: Ser -> SP1 (monoanionic O-phosphoserine, charge -1)
-# FF      : charmm36m-mut  (SP1 is already parameterised in this FF)
+# System  : Lck SH2 domain (PDB 1AOT, chain A)
+# Mutation: Tyr -> TP1 (monoanionic O-phosphotyrosine, charge -1)
+# FF      : charmm36m-mut  (TP1 is already parameterised in this FF)
 #
-# State A: Ser  (-OH,    charge  0)
-# State B: SP1  (-OPO3H-, charge -1)
+# State A: Tyr  (-OH,      charge  0)
+# State B: TP1  (-OPO3H-,  charge -1)
 #
 # No RDKit, no ITP preparation, no FF patching required.
-# For SP2 (dianionic, charge -2): replace P1 with P2 throughout.
+# For TP2 (dianionic, charge -2): replace P1 with P2 throughout.
 #
 # Prerequisites:
-#   - input/protein.pdb   (protein structure)
-#   Run:  bash input/fetch_input.sh   to download the example structure.
+#   Run:  bash input/fetch_input.sh   to download 1AOT and extract chain A.
 # =============================================================================
 set -euo pipefail
 
 FF=charmm36m-mut
 WATER=tip3p
-INPUT=input/protein.pdb
+INPUT=input/1AOT_A.pdb
 
-# Set the residue ID to mutate — adjust for your structure!
-MUT_RESID=42       # pmx-renumbered position of the target Ser (1-based)
-MUT_CODE=P1        # P1 = monoanionic SP1; use P2 for dianionic SP2
+# Target Tyr residue in pmx 1-based sequential numbering.
+# Run `bash input/fetch_input.sh` to see the available tyrosines.
+MUT_RESID=63       # adjust to your target Tyr
+MUT_CODE=P1        # P1 = monoanionic TP1 (Y2P1); use P2 for dianionic TP2 (Y2P2)
 
 # ── 0. Fetch input if not present ──────────────────────────────────────────
 if [[ ! -f "$INPUT" ]]; then
-    echo ">>> Fetching structure from RCSB ..."
+    echo ">>> Fetching 1AOT from RCSB ..."
     bash input/fetch_input.sh
 fi
 
@@ -46,9 +46,9 @@ gmx pdb2gmx \
     -ignh
 
 # ── 3. Build hybrid structure ───────────────────────────────────────────────
-# Mutation code P1 selects the S2P1 hybrid (SER -> monoanionic phosphoSer).
-# P2 would select S2P2 (SER -> dianionic phosphoSer).
-echo ">>> pmx mutate: Ser${MUT_RESID} -> SP1 ..."
+# Mutation code P1 selects the Y2P1 hybrid (TYR -> monoanionic phosphoTyr).
+# P2 would select Y2P2 (TYR -> dianionic phosphoTyr).
+echo ">>> pmx mutate: Tyr${MUT_RESID} -> TP1 ..."
 printf "%s %s\n" "$MUT_RESID" "$MUT_CODE" | pmx mutate \
     -f      wt.gro \
     -o      mutant.pdb \
@@ -78,7 +78,7 @@ echo "=== Done ==="
 echo "Hybrid structure : mutant.pdb"
 echo "Hybrid topology  : pmxtop.top"
 echo ""
-echo "State A: Ser${MUT_RESID}  (neutral,      charge  0)"
-echo "State B: SP1${MUT_RESID}  (monoanionic,  charge -1)"
+echo "State A: Tyr${MUT_RESID}  (neutral,      charge  0)"
+echo "State B: TP1${MUT_RESID}  (monoanionic,  charge -1)"
 echo ""
 echo "Note: add 1 K+ counter-ion for the state B simulation leg."

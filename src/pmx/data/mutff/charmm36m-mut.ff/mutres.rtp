@@ -37311,7 +37311,141 @@
  [ dihedrals ]
 
  [ cmap ]
--C     N    CA     C    +N  
+-C     N    CA     C    +N
+
+[ Y2P1 ] ; Tyr -> Phosphotyrosine monoanionic (TP1)
+
+ [ atoms ]
+     N   NH1              -0.47000  1
+    HN   H                 0.31000  2
+    CA   CT1               0.07000  3
+    HA   HB1               0.09000  4
+    CB   CT2              -0.18000  5
+   HB1   HA2               0.09000  6
+   HB2   HA2               0.09000  7
+    CG   CA                0.00000  8
+   CD1   CA               -0.11500  9
+   HD1   HP                0.11500  10
+   CD2   CA               -0.11500  11
+   HD2   HP                0.11500  12
+   CE1   CA               -0.11500  13
+   HE1   HP                0.11500  14
+   CE2   CA               -0.11500  15
+   HE2   HP                0.11500  16
+    CZ   CA                0.11000  17
+    OH   OH1              -0.54000  18
+    HH   H                 0.43000  19
+     C   C                 0.51000  20
+     O   O                -0.51000  21
+    DP   DUM_P2            0.00000  22
+   DO2   DUM_ON3           0.00000  23
+   DH2   DUM_HN1           0.00000  24
+   DO3   DUM_ON3           0.00000  25
+   DO4   DUM_ON3           0.00000  26
+
+ [ bonds ]
+     N      HN ; (     N      HN)
+     N      CA ; (     N      CA)
+    CA      CB ; (    CA      CB)
+    CA       C ; (    CA       C)
+    CA      HA ; (    CA      HA)
+    CB      CG ; (    CB      CG)
+    CB     HB1 ; (    CB     HB1)
+    CB     HB2 ; (    CB     HB2)
+    CG     CD2 ; (    CG     CD2)
+    CG     CD1 ; (    CG     CD1)
+   CD1     CE1 ; (   CD1     CE1)
+   CD1     HD1 ; (   CD1     HD1)
+   CD2     HD2 ; (   CD2     HD2)
+   CD2     CE2 ; (   CD2     CE2)
+   CE1     HE1 ; (   CE1     HE1)
+   CE1      CZ ; (   CE1      CZ)
+   CE2      CZ ; (   CE2      CZ)
+   CE2     HE2 ; (   CE2     HE2)
+    CZ      OH ; (    CZ      OH)
+    OH      HH ; (    OH  HH.gone)
+    OH      DP ; (    OH      P1)
+     C       O ; (     C       O)
+     C      +N
+    DP     DO2 ; (    P1      O2)
+    DP     DO3 ; (    P1      O3)
+    DP     DO4 ; (    P1      O4)
+   DO2     DH2 ; (    O2      H2)
+
+ [ impropers ]
+     N      -C      CA      HN
+     C      CA      +N       O
+
+ [ dihedrals ]
+
+ [ cmap ]
+-C     N    CA     C    +N
+
+[ Y2P2 ] ; Tyr -> Phosphotyrosine dianionic (TP2)
+
+ [ atoms ]
+     N   NH1              -0.47000  1
+    HN   H                 0.31000  2
+    CA   CT1               0.07000  3
+    HA   HB1               0.09000  4
+    CB   CT2              -0.18000  5
+   HB1   HA2               0.09000  6
+   HB2   HA2               0.09000  7
+    CG   CA                0.00000  8
+   CD1   CA               -0.11500  9
+   HD1   HP                0.11500  10
+   CD2   CA               -0.11500  11
+   HD2   HP                0.11500  12
+   CE1   CA               -0.11500  13
+   HE1   HP                0.11500  14
+   CE2   CA               -0.11500  15
+   HE2   HP                0.11500  16
+    CZ   CA                0.11000  17
+    OH   OH1              -0.54000  18
+    HH   H                 0.43000  19
+     C   C                 0.51000  20
+     O   O                -0.51000  21
+    DP   DUM_P2            0.00000  22
+   DO2   DUM_ON3           0.00000  23
+   DO3   DUM_ON3           0.00000  24
+   DO4   DUM_ON3           0.00000  25
+
+ [ bonds ]
+     N      HN ; (     N      HN)
+     N      CA ; (     N      CA)
+    CA      CB ; (    CA      CB)
+    CA       C ; (    CA       C)
+    CA      HA ; (    CA      HA)
+    CB      CG ; (    CB      CG)
+    CB     HB1 ; (    CB     HB1)
+    CB     HB2 ; (    CB     HB2)
+    CG     CD2 ; (    CG     CD2)
+    CG     CD1 ; (    CG     CD1)
+   CD1     CE1 ; (   CD1     CE1)
+   CD1     HD1 ; (   CD1     HD1)
+   CD2     HD2 ; (   CD2     HD2)
+   CD2     CE2 ; (   CD2     CE2)
+   CE1     HE1 ; (   CE1     HE1)
+   CE1      CZ ; (   CE1      CZ)
+   CE2      CZ ; (   CE2      CZ)
+   CE2     HE2 ; (   CE2     HE2)
+    CZ      OH ; (    CZ      OH)
+    OH      HH ; (    OH  HH.gone)
+    OH      DP ; (    OH      P1)
+     C       O ; (     C       O)
+     C      +N
+    DP     DO2 ; (    P1      O2)
+    DP     DO3 ; (    P1      O3)
+    DP     DO4 ; (    P1      O4)
+
+ [ impropers ]
+     N      -C      CA      HN
+     C      CA      +N       O
+
+ [ dihedrals ]
+
+ [ cmap ]
+-C     N    CA     C    +N
 
 [ Z2A ] ; Hsp -> Ala
 

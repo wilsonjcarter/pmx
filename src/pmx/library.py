@@ -216,6 +216,8 @@ _ext_one_letter = {
     'SP1':  'P1',
     'SP2':  'P2',
     'THR':  'T',
+    'TP1':  'P1',
+    'TP2':  'P2',
     'TRP':  'W',
     'TYR':  'Y',
     'VAL':  'V',
@@ -278,6 +280,8 @@ _aacids_ext_charmm = {
     'P2':'SP2',
     'S':'SER',
     'T':'THR',
+    'TP1':'TP1',
+    'TP2':'TP2',
     'W':'TRP',
     'Y':'TYR',
     'V':'VAL'
