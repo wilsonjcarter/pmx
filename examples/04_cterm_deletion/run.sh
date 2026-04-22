@@ -1,18 +1,19 @@
 #!/usr/bin/env bash
 # =============================================================================
-# Example 4 — N-terminal deletion: MEEVD peptide (1ELR chain B)
+# Example 4 — C-terminal deletion: MEEVD peptide (1ELR chain B)
 #
 # System  : HSP90 C-terminal MEEVD pentapeptide
-# Mutation: delete Met1 from N-terminus  ->  EdeN hybrid placed on Glu2
+# Mutation: delete Asp5 from C-terminus  ->  VdeC hybrid placed on Val4
 # FF      : charmm36m-mut
 #
-# State A: M(1)-E(2)-E(3)-V(4)-D(5)   (full peptide, Met1 present)
-# State B:     [E(2)-E(3)-V(4)-D(5)]  (truncated peptide, Met1 = dummies)
+# State A: M(1)-E(2)-E(3)-V(4)-D(5)   (full peptide, Asp5 present)
+# State B: M(1)-E(2)-E(3)-V(4)         (truncated peptide, Asp5 = dummies)
 #
-# Call pmx mutate on Met1 (--resname DEL).  The code identifies Met1 as the
-# N-terminus and internally renames its neighbor Glu2 to EdeN, adding dummy
-# protons for the new N-terminus in state B.  Met1 stays physically present
-# and is fully dummified later by pmx gentop.
+# Call pmx mutate on Asp5 (--resname DEL).  The code identifies Asp5 as the
+# C-terminus and internally renames its neighbour Val4 to VdeC, adding a
+# dummy oxygen (DOT2) that represents OT2 of the new C-terminal carboxylate
+# in state B.  Asp5 stays physically present and is fully dummified later
+# by pmx gentop.
 # =============================================================================
 set -euo pipefail
 
@@ -29,7 +30,7 @@ fi
 # ── 1. Set GMXLIB ──────────────────────────────────────────────────────────
 eval "$(python3 -c 'from pmx.gmx import set_gmxlib; import os; set_gmxlib(); print("export GMXLIB="+os.environ["GMXLIB"])')"
 
-FFDIR=$(python3 -c "from pmx.utils import get_ff_path; print(get_ff_path('$FF'))")
+FFDIR=$(python3 -c "import os; from pmx.gmx import set_gmxlib; set_gmxlib(); print(os.environ['GMXLIB']+'/charmm36m-mut.ff')")
 echo "Force field directory: $FFDIR"
 
 # ── 2. Generate terminal-deletion parameters (once per FF) ─────────────────
@@ -41,7 +42,7 @@ if [[ ! -f mutres_term.mtp ]]; then
         --outdir .
 fi
 
-# Copy the RTP into the FF directory so pdb2gmx can find it.
+# Copy the RTP into the FF directory so pdb2gmx can find VdeC.
 cp mutres_term.rtp "$FFDIR/mutres_term.rtp"
 cp mutres_term.mtp "$FFDIR/mutres_term.mtp"
 echo "Copied mutres_term.rtp / .mtp into $FFDIR"
@@ -57,14 +58,14 @@ gmx pdb2gmx \
     -ignh
 
 # ── 4. Build hybrid structure ───────────────────────────────────────────────
-# Target the residue TO BE DELETED (Met1) with "1 DEL".
-# pmx mutate detects that Met1 is the N-terminus and calls
+# Target the residue TO BE DELETED (Asp5) with "5 DEL".
+# pmx mutate detects that Asp5 is the C-terminus and calls
 # apply_terminal_deletion(), which:
-#   - finds the next residue (Glu2) and renames it to EdeN
-#   - adds two dummy NH3 protons (DH2, DH3) to Glu2
-#   - leaves Met1 physically present (it is fully dummified later by gentop)
-echo ">>> pmx mutate: Met1 -> DEL (N-terminal deletion) ..."
-printf "1 DEL\n" > mut.txt
+#   - finds the previous residue (Val4) and renames it to VdeC
+#   - adds a dummy oxygen (DOT2) to Val4 for the future OT2 C-terminal carboxylate
+#   - leaves Asp5 physically present (it is fully dummified later by gentop)
+echo ">>> pmx mutate: Asp5 -> DEL (C-terminal deletion) ..."
+printf "5 DEL\n" > mut.txt
 pmx mutate \
     -f      wt.gro \
     -o      mutant.pdb \
@@ -73,9 +74,9 @@ pmx mutate \
 rm -f mut.txt wt.gro wt.top
 
 # ── 5. Generate GROMACS topology for the hybrid structure ──────────────────
-# mutres_term.rtp has been copied into FFDIR so pdb2gmx can find EdeN.
-# Do NOT pass -ignh: the dummy atoms DH2/DH3 placed by pmx mutate must be
-# preserved; pdb2gmx would not know how to re-add them from HDB.
+# mutres_term.rtp has been copied into FFDIR so pdb2gmx can find VdeC.
+# Do NOT pass -ignh: the dummy atom DOT2 placed by pmx mutate must be
+# preserved; pdb2gmx would not know how to re-add it from HDB.
 echo ">>> gmx pdb2gmx (mutant) ..."
 gmx pdb2gmx \
     -f      mutant.pdb \
@@ -85,7 +86,7 @@ gmx pdb2gmx \
     -water  "$WATER"
 
 # ── 6. Fill hybrid B states ─────────────────────────────────────────────────
-# Pass the term-deletion MTP file so gentop can resolve the EdeN residue.
+# Pass the term-deletion MTP file so gentop can resolve the VdeC residue.
 echo ">>> pmx gentop ..."
 pmx gentop \
     -p          topol.top \
@@ -99,4 +100,4 @@ echo "Hybrid structure : mutant.pdb"
 echo "Hybrid topology  : pmxtop.top"
 echo ""
 echo "State A: full MEEVD pentapeptide"
-echo "State B: truncated EEVD tetrapeptide (Met1 = non-interacting dummies)"
+echo "State B: truncated MEEV tetrapeptide (Asp5 = non-interacting dummies)"

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-# Example 7 [WIP] — De-novo NSAA: Ser → phosphoSer (SEP) via ITP→RTP patching
+# Example 6 [WIP] — De-novo NSAA: Ser → phosphoSer (SEP) via ITP→RTP patching
 #
 # System  : Protein with a target Ser
 # Mutation: Ser -> SEP (O-phosphoserine, dianionic, -2)
@@ -17,7 +17,7 @@
 #   See input/README_sep_params.md for how to prepare the ITP.
 #
 # For a simpler phosphorylation calculation using the built-in SP1 residue,
-# see examples/06_phosphorylation_SP1/run.sh (no ITP preparation required).
+# see examples/05_phosphorylation_SP1/run.sh (no ITP preparation required).
 # =============================================================================
 set -euo pipefail
 

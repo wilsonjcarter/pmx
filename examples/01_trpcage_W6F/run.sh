@@ -1,16 +1,16 @@
 #!/usr/bin/env bash
 # =============================================================================
-# Example 1 — Trp Cage W6A: standard pmx amino acid substitution
+# Example 1 — Trp Cage W6F: standard pmx amino acid substitution
 #
 # System  : 1L2Y Trp Cage miniprotein
-# Mutation: Trp6 -> Ala  (hybrid residue W2A)
+# Mutation: Trp→Phe  (hybrid residue W2F)
 # FF      : charmm36m-mut
 #
 # Workflow
 # --------
 # 1. gmx pdb2gmx on the raw PDB  ->  wt.gro  (standardises atom names)
-# 2. pmx mutate   on wt.gro      ->  mutant.pdb  (inserts W2A hybrid)
-# 3. gmx pdb2gmx  on mutant.pdb  ->  topol.top  (builds topology for W2A)
+# 2. pmx mutate   on wt.gro      ->  mutant.pdb  (inserts W2F hybrid)
+# 3. gmx pdb2gmx  on mutant.pdb  ->  topol.top  (builds topology for W2F)
 # 4. pmx gentop   on topol.top   ->  pmxtop.top  (fills B states)
 # =============================================================================
 set -euo pipefail
@@ -43,9 +43,9 @@ gmx pdb2gmx \
 
 # ── 3. Build hybrid structure ───────────────────────────────────────────────
 # pmx mutate uses a --script file: "residue_id target_one_letter" per line.
-# Residue 6 is Trp (pmx renumbers from 1); target is A (Ala).
+# Residue 6 is Trp→Phe).
 echo ">>> pmx mutate ..."
-printf "6 A\n" > mut.txt
+printf "6 F\n" > mut.txt
 pmx mutate \
     -f      wt.gro \
     -o      mutant.pdb \
@@ -55,7 +55,7 @@ rm -f mut.txt wt.gro wt.top
 
 # ── 4. Generate GROMACS topology for the hybrid structure ──────────────────
 # mutant.pdb already has all H atoms placed by pmx mutate; do NOT pass -ignh.
-# pdb2gmx recognises the W2A hybrid residue from mutres.rtp.
+# pdb2gmx recognises the W2F hybrid residue from mutres.rtp.
 echo ">>> gmx pdb2gmx (mutant) ..."
 gmx pdb2gmx \
     -f      mutant.pdb \

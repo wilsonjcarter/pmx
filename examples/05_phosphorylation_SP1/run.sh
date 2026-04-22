@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-# Example 6 — Serine phosphorylation: Ser → phosphoSer (SP1, monoanionic)
+# Example 5 — Serine phosphorylation: Ser → phosphoSer (SP1, monoanionic)
 #
 # System  : Protein with a target Ser (adjust MUT_RESID below)
 # Mutation: Ser -> SP1 (monoanionic O-phosphoserine, charge -1)

@@ -1,24 +1,24 @@
-# Alchemical pKa shift: Cys32 CYS→CYM in thioredoxin (1ERT)
+# Alchemical amino acid substitution: Trp6→Phe in Trp Cage (1L2Y)
 
 <p align="center">
-  <img src="../imgs/schematic_p2.png" alt="pka thermocycle" width="800"/>
+  <img src="../imgs/schematic_p1.png" alt="mutation thermocycle" width="800"/>
 </p>
 
 ## TLDR
 
-This example computes the pKa shift of an active-site cysteine by alchemically removing its thiol proton — the standard pmx approach for residue pKa predictions. Thioredoxin Cys32 has an anomalously low pKa (~6.3 vs the solution reference of 8.3), driven by local electrostatics and quantified here as ΔΔG ≈ −2.7 kcal/mol.
+This is a standard amino acid substitution (W6F) in the Trp Cage miniprotein — the simplest pmx workflow and the recommended starting point for learning non-equilibrium free energy calculations. Trp6 is the hydrophobic anchor of the Trp Cage core; W6F is charge-neutral and experimentally characterised, making it a clean benchmark.
 
 | Property | Value |
 |---|---|
-| Hybrid | C2CM |
-| State A | Protonated Cys (SG type S, HG1 present) |
-| State B | Deprotonated thiolate (SG→SM, HG1→DUM_HS) |
-| Charge shift | 0 → −1 (one K⁺ needed for state B leg) |
+| Hybrid | W2F |
+| State A | Trp (full indole side chain) |
+| State B | Phe (dummy Trp atoms + Phe ring) |
+| Charge shift | 0 → 0 (none) |
 | Special steps | None |
 
 ```bash
 # Unique mutation step for this example
-printf "32 CM\n" | pmx mutate -f wt.gro -o mutant.pdb -ff charmm36m-mut
+printf "6 F\n" | pmx mutate -f wt.gro -o mutant.pdb -ff charmm36m-mut
 
 # See run.sh for the complete workflow (Steps 1–9)
 ```
@@ -33,7 +33,7 @@ printf "32 CM\n" | pmx mutate -f wt.gro -o mutant.pdb -ff charmm36m-mut
 eval "$(python3 -c 'from pmx.gmx import set_gmxlib; import os; set_gmxlib(); print("export GMXLIB="+os.environ["GMXLIB"])')"
 
 gmx pdb2gmx \
-    -f      input/1ERT.pdb \
+    -f      input/1L2Y.pdb \
     -o      wt.gro \
     -p      wt.top \
     -ff     charmm36m-mut \
@@ -41,20 +41,20 @@ gmx pdb2gmx \
     -ignh
 ```
 
-`-ignh` strips all existing hydrogens so GROMACS rebuilds them consistently. The wildtype `.gro` is used only to normalise atom names before `pmx mutate`; the topology (`wt.top`) is discarded.
+`-ignh` strips all existing hydrogens so GROMACS rebuilds them consistently from the hydrogen database. The wildtype `.gro` is used only to normalise atom names before `pmx mutate`; the topology (`wt.top`) is discarded.
 
 ---
 
 ### Step 2 — Build the hybrid structure
 
 ```bash
-printf "32 CM\n" | pmx mutate \
+printf "6 F\n" | pmx mutate \
     -f      wt.gro \
     -o      mutant.pdb \
     -ff     charmm36m-mut
 ```
 
-`pmx mutate` replaces Cys32 with the `C2CM` hybrid using mutation code `CM` (pmx extended one-letter code for CYM). State A retains the full `SH` group; state B carries a dummy `HG1` (`DUM_HS`) so the topology has the same number of atoms throughout.
+`pmx mutate` replaces Trp6 with the `W2F` hybrid, keeping the full Trp side chain as state A atoms and adding dummy Phe atoms for state B. The mutation code `F` is the one-letter code of the target residue.
 
 ---
 
@@ -69,7 +69,7 @@ gmx pdb2gmx \
     -water  tip3p
 ```
 
-Do **not** pass `-ignh` — `pmx mutate` has already positioned all hydrogens and dummy atoms. Because Cys32 is renamed `C2CM` (not `CYS`), `pdb2gmx` will not attempt to form a disulfide involving it.
+Do **not** pass `-ignh` — `pmx mutate` has already positioned all hydrogens and dummy atoms. `pdb2gmx` reads the `W2F` entry from `mutres.rtp` and generates a standard topology that includes all hybrid atoms.
 
 ---
 
@@ -82,17 +82,15 @@ pmx gentop \
     -ff charmm36m-mut
 ```
 
-`pmx gentop` reads the `C2CM` entry from `mutres.mtp` and fills in the B-state atom types, charges, and bonded parameters for Cys32.
+`pmx gentop` reads the `W2F` entry from `mutres.mtp` and fills in the B-state atom types, charges, and bonded parameters; dummy atoms get type `DUM_*`, charge 0, and ε = 0.
 
 Expected output:
 ```
-log_> Hybrid Residue -> 32 | C2CM
+log_> Hybrid Residue -> 6 | W2F
 log_> Making bonds for state B -> ...
-log_> Total charge of state A = -5
-log_> Total charge of state B = -6
+log_> Total charge of state A =  0
+log_> Total charge of state B =  0
 ```
-
-State B carries one extra negative charge (the thiolate); add one K⁺ counter-ion to the state B simulation box, or run with a neutralising background charge and apply an analytical correction.
 
 ---
 
@@ -106,8 +104,6 @@ gmx grompp -f mdp/em.mdp -c solvated.gro -r solvated.gro \
 printf '13\n' | gmx genion -s ions.tpr -pname K -nname CL \
            -neutral -o ions.gro -p pmxtop.top
 ```
-
-Neutralise relative to the **state A** charge. For the state B production simulation you will need one additional K⁺ ion (or apply a charge correction in post-processing).
 
 ---
 
@@ -135,7 +131,7 @@ gmx grompp -f mdp/eqB.mdp -c em.gro -r em.gro \
 gmx mdrun -v -deffnm stateB/md
 ```
 
-Allow at least 10 ns equilibration per endpoint; the protonation state affects the local hydrogen-bond network around the active site, which needs time to reorganise.
+Allow at least 10 ns equilibration per endpoint before harvesting transition frames. The Trp Cage is small (20 residues) and equilibrates quickly.
 
 ---
 
@@ -181,12 +177,10 @@ pmx analyze \
     -fB transitionB/frame*/ti.xvg
 ```
 
-`results.txt` gives ΔG1 (deprotonation free energy in the protein). Repeat Steps 1–9 with a short Cys-containing reference peptide in water to get ΔG2, then:
+`results.txt` gives ΔG1 (Trp→Phe free energy cost in the protein). Repeat Steps 1–9 with a short Trp-containing reference peptide in water to get ΔG2, then:
 
 ```
 ΔΔG = ΔG1 − ΔG2
-
-pKa = pKa_ref + ΔΔG / (RT ln 10)
 ```
 
-Using pKa_ref = 8.3 (solution Cys), a negative ΔΔG means deprotonation is more favourable in the protein → lower pKa (Cys32 in thioredoxin gives pKa ≈ 6.3, so ΔΔG ≈ −2.7 kcal/mol).
+A positive ΔΔG means the mutation destabilises the folded protein relative to the unfolded reference.
