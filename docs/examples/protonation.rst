@@ -46,8 +46,9 @@ Setup
 
 ::
 
+    echo "32 CM" > mut.txt
     pmx mutate -f 1ERT.pdb -o mutant.pdb \
-        --resid 32 --resname CM -ff charmm36m-mut
+        --script mut.txt -ff charmm36m-mut
 
     gmx pdb2gmx -f mutant.pdb -o processed.gro -p topol.top \
         -ff charmm36m-mut -water tip3p -ignh -ss no

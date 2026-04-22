@@ -60,8 +60,9 @@ The deletion is triggered by targeting Met1 directly with ``--resname DEL``.
 pmx detects that Met1 is the N-terminus, adds dummy protons to the new
 N-terminus (Glu2), and renames Glu2 to ``EdeN`` internally::
 
+    echo "1 DEL" > mut.txt
     pmx mutate -f 1ELR_peptide.pdb -o mutant.pdb \
-        --resid 1 --resname DEL -ff charmm36m-mut
+        --script mut.txt -ff charmm36m-mut
 
     gmx pdb2gmx -f mutant.pdb -o processed.gro -p topol.top \
         -ff charmm36m-mut -water tip3p -ignh

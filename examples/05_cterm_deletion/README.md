@@ -1,31 +1,41 @@
-# Alchemical N-terminal residue deletion: HSP90 MEEVD peptide (1ELR)
+# Alchemical C-terminal residue deletion: HSP90 MEEVD peptide (1ELR)
 
 ```
-State A — full peptide                 State B — N-terminally truncated
+State A — full peptide                 State B — C-terminally truncated
 
-  M(1)–E(2)–E(3)–V(4)–D(5)               [M(1)]–E(2)–E(3)–V(4)–D(5)
+  M(1)–E(2)–E(3)–V(4)–D(5)               M(1)–E(2)–E(3)–V(4)–[D(5)]
          |                                              |
         ΔG1 (protein)                                ΔG1
          |                                              |
-  M(1)–E(2)–E(3)–V(4)–D(5) ─── ΔG2 ─── [M(1)]–E(2)–E(3)–V(4)–D(5)
+  M(1)–E(2)–E(3)–V(4)–D(5) ─── ΔG2 ─── M(1)–E(2)–E(3)–V(4)–[D(5)]
           (reference peptide in water)
 
-  ΔΔG = ΔG1 − ΔG2      [M] = non-interacting dummy in state B
+  ΔΔG = ΔG1 − ΔG2      [D] = non-interacting dummy in state B
 ```
 
-We compute the free energy cost of removing the N-terminal methionine from
+We compute the free energy cost of removing the C-terminal aspartate from
 the HSP90 C-terminal MEEVD peptide (PDB: 1ELR chain B).  The same
 calculation in a reference peptide in water gives ΔG2; the difference ΔΔG
 reflects how the protein environment modulates the cost of the truncation.
 
 **Terminal deletion** is a special pmx mutation type:
-- Met1 stays physically present but becomes fully non-interacting in state B
+- Asp5 stays physically present but becomes fully non-interacting in state B
   (`DUM_` atom types, zero charge and LJ ε)
-- The neighbouring residue Glu2 gains two dummy protons (`DH2`, `DH3`) that
-  become real N-terminal NH₃⁺ protons in state B
+- The neighbouring residue Val4 gains a dummy oxygen (`DOT2`, type `DUM_OC`,
+  charge 0) that becomes the real C-terminal `OT2` carboxylate oxygen in
+  state B
 
-The hybrid residue placed on Glu2 is called **`EdeN`** (GLU as N-terminal
+The hybrid residue placed on Val4 is called **`VdeC`** (VAL as C-terminal
 deletion neighbour).
+
+> **Note on charge states:** Asp5 at the C-terminus bears a formal charge of
+> −2 (sidechain COO⁻ plus the C-terminal carboxylate patch).  When it is
+> dummified, both charges are zeroed, while VdeC in state B only gains one
+> extra carboxylate oxygen (charge −1).  As a result state A = −3 e and
+> state B = −2 e.  This is correct physics — the charge asymmetry reflects
+> the removal of a charged residue — and must be compensated by a
+> counter-ion correction term in the analysis (add/remove one K⁺/Cl⁻ ion
+> between the two boxes, or apply a Poisson–Boltzmann charge correction).
 
 ---
 
@@ -72,19 +82,19 @@ GROMACS's internal rename tables.  The output `.gro` is passed to `pmx mutate`.
 ## Step 2 — Build the hybrid structure
 
 Target the residue to be **deleted** with the code `DEL`.  `pmx` detects that
-Met1 is the N-terminus and automatically:
-- renames Glu2 → `EdeN`
-- adds two dummy protons (`DH2`, `DH3`) to Glu2 representing the future
-  NH₃⁺ group
+Asp5 is the C-terminus and automatically:
+- renames Val4 → `VdeC`
+- adds a dummy oxygen (`DOT2`) to Val4 representing the future C-terminal
+  `OT2` carboxylate oxygen
 
 ```bash
-printf "1 DEL\n" | pmx mutate \
+printf "5 DEL\n" | pmx mutate \
     -f      wt.gro \
     -o      mutant.pdb \
     -ff     charmm36m-mut
 ```
 
-Met1 itself is left physically in the structure; it will be dummified at the
+Asp5 itself is left physically in the structure; it will be dummified at the
 topology level by `pmx gentop`.
 
 ---
@@ -92,7 +102,7 @@ topology level by `pmx gentop`.
 ## Step 3 — Build the hybrid topology
 
 ```bash
-# Copy hybrid RTP/MTP into the FF directory so pdb2gmx can find EdeN
+# Copy hybrid RTP/MTP into the FF directory so pdb2gmx can find VdeC
 FFDIR=$(python3 -c "import os; from pmx.gmx import set_gmxlib; set_gmxlib(); \
     print(os.environ['GMXLIB']+'/charmm36m-mut.ff')")
 cp mutres_term.rtp "$FFDIR/"
@@ -106,12 +116,12 @@ gmx pdb2gmx \
     -water  tip3p
 ```
 
-Do **not** pass `-ignh` — the dummy atoms `DH2`/`DH3` placed by `pmx mutate`
-must be preserved; GROMACS cannot rebuild them from the hydrogen database.
+Do **not** pass `-ignh` — the dummy atom `DOT2` placed by `pmx mutate` must
+be preserved; GROMACS cannot rebuild it from the hydrogen database.
 
-`pdb2gmx` will find the `EdeN` residue definition in `mutres_term.rtp` and
-generate a standard GROMACS topology that has Met1 as a regular MET (to be
-dummified later) and Glu2 as an `EdeN` interior residue.
+`pdb2gmx` will find the `VdeC` residue definition in `mutres_term.rtp` and
+generate a standard GROMACS topology that has Asp5 as a regular ASP (to be
+dummified later) and Val4 as a `VdeC` interior residue.
 
 ---
 
@@ -126,26 +136,28 @@ pmx gentop \
 ```
 
 `pmx gentop` will:
-- Find the `EdeN` hybrid residue
-- Dummify Met1 (set all atom types to `DUM_*` in state B, charge 0)
-- Apply the N-terminal patch to Glu2 in state B: N type NH1→NH3, `DH2`→H2,
-  `DH3`→H3
-- Zero the B-state force constants on dihedrals that cross the Met1–Glu2
-  boundary (since Met1 is absent in state B)
+- Find the `VdeC` hybrid residue
+- Dummify Asp5 (set all atom types to `DUM_*` in state B, charge 0)
+- Apply the C-terminal patch to Val4 in state B: C type C→CC, O type O→OC
+  (renamed OT1), DOT2→OC as OT2
+- Zero the B-state force constants on dihedrals that cross the Val4–Asp5
+  boundary (since Asp5 is absent in state B)
 
 Expected output:
 ```
-log_> Hybrid Residue -> 2 | EdeN
-log_> Dummifying deletion target: 1 | MET
-log_> Making bonds for state B -> 36 bonds with perturbed atoms
-log_> Making angles for state B -> 70 angles with perturbed atoms
-log_> Making dihedrals for state B -> 76 dihedrals with perturbed atoms
-log_> Removed 4 fake dihedrals
+log_> Hybrid Residue -> 4 | VdeC
+log_> Dummifying deletion target: 5 | ASP
+log_> Making bonds for state B -> 30 bonds with perturbed atoms
+log_> Making angles for state B -> 56 angles with perturbed atoms
+log_> Making dihedrals for state B -> 49 dihedrals with perturbed atoms
+log_> Removed 2 fake dihedrals
 log_> Total charge of state A = -3
-log_> Total charge of state B = -3
-log_> Decoupling cross-residue dihedrals: EdeN (res 2) -- MET (res 1)
+log_> Total charge of state B = -2
+log_> Decoupling cross-residue dihedrals: VdeC (res 4) -- ASP (res 5)
 log_> Zeroed B-state for 13 dihedrals
 ```
+
+The A/B charge difference (−3 vs −2) is expected: see the note above.
 
 ---
 
@@ -159,6 +171,11 @@ gmx grompp -f mdp/em.mdp -c solvated.gro -r solvated.gro \
 printf '13\n' | gmx genion -s ions.tpr -pname K -nname CL \
            -neutral -o ions.gro -p pmxtop.top
 ```
+
+Because state A carries one more negative charge than state B, you must run
+separate ion sets for each endpoint (or apply a charge-correction in
+post-processing).  A common approach is to use the same ion configuration and
+apply a Born/Poisson–Boltzmann correction at analysis time.
 
 ---
 
@@ -230,27 +247,31 @@ pmx analyze \
     -fB transitionB/frame*/ti.xvg
 ```
 
-`results.txt` gives ΔG1 (free energy of N-terminal Met deletion in the
-protein context).  Repeat with a Met–Glu reference dipeptide to get ΔG2:
+`results.txt` gives ΔG1 (free energy of C-terminal Asp deletion in the
+protein context).  Repeat with an Asp–Val reference dipeptide (or the
+full MEEVD peptide in water) to get ΔG2, then:
 
 ```
 ΔΔG = ΔG1 − ΔG2
 ```
 
-A negative ΔΔG indicates Met1 is thermodynamically less favourable in the
-protein than in water (i.e. truncation is favoured by the protein environment).
+A negative ΔΔG indicates Asp5 is thermodynamically less favourable in the
+protein than in water (i.e. C-terminal truncation is favoured by the protein
+environment).
 
 ---
 
 ## Notes
 
-- The `EdeN` hybrid residue type is specific to GLU as the N-terminal
-  deletion neighbour.  For other residues, the analogous types are `AdeN`
-  (ALA), `VdeN` (VAL), etc. — all generated by `generate_term_deletion.py`.
+- The `VdeC` hybrid residue type is specific to VAL as the C-terminal
+  deletion neighbour.  For other residues, the analogous types are `AdeC`
+  (ALA), `EdeC` (GLU), etc. — all generated by `generate_term_deletion.py`.
 - The backbone amide hydrogen in `XdeN`/`XdeC` hybrid residues is named `HN`
-  (standard CHARMM36 convention).  This works because the paired file
-  `mutres_term.arn` contains the rule `* H HN`, which instructs pdb2gmx to
-  rename `H` back to `HN` for all residues defined in `mutres_term.rtp`
-  (mirroring the behaviour of `mutres.arn` for standard hybrid residues).
-- The complementary example **05_cterm_deletion** demonstrates deleting the
-  C-terminal ASP5 residue from the same MEEVD peptide.
+  (standard CHARMM36 convention).  The paired file `mutres_term.arn` contains
+  the rule `* H HN`, which instructs pdb2gmx to rename `H` back to `HN` for
+  all residues defined in `mutres_term.rtp`.
+- Deleting a **charged** C-terminal residue causes a charge asymmetry between
+  state A and state B.  Apply a charge-correction term in post-processing
+  (e.g. analytical Born correction or separate ion run).
+- The complementary example **04_nterm_deletion** demonstrates deleting the
+  N-terminal MET1 residue from the same MEEVD peptide.

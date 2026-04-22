@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-# Example 5 — Serine phosphorylation: Ser → phosphoSer (SEP)
+# Example 6 — Serine phosphorylation: Ser → phosphoSer (SEP)
 #
 # System  : SH2 domain (or any protein with a target Ser)
 # Mutation: Ser -> SEP (O-phosphoserine)

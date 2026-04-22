@@ -27,42 +27,52 @@ fi
 # ── 1. Set GMXLIB ──────────────────────────────────────────────────────────
 eval "$(python3 -c 'from pmx.gmx import set_gmxlib; import os; set_gmxlib(); print("export GMXLIB="+os.environ["GMXLIB"])')"
 
-# ── 2a. Mutate Cys32 -> C2CD ───────────────────────────────────────────────
-# The target one-letter code for the disulfide hybrid state is 'CD'
-# (encodes the C2CD hybrid; 'C' = source CYS, 'CD' = CYS_Disulfide target)
+# ── 2. Normalise atom names with pdb2gmx ───────────────────────────────────
+echo ">>> gmx pdb2gmx (wildtype — atom-name normalisation) ..."
+gmx pdb2gmx \
+    -f      "$INPUT" \
+    -o      wt.gro \
+    -p      wt.top \
+    -ff     "$FF" \
+    -water  "$WATER" \
+    -ignh
+
+# ── 3a. Mutate Cys32 -> C2CD ───────────────────────────────────────────────
+# The pmx extended code for the disulfide hybrid target is 'CD'.
 echo ">>> pmx mutate: Cys32 -> C2CD ..."
+printf "32 CD\n" > mut.txt
 pmx mutate \
-    -f  "$INPUT" \
-    -o  mutant_step1.pdb \
-    --resid   32 \
-    --resname CD \
-    -ff "$FF"
+    -f      wt.gro \
+    -o      mutant_step1.pdb \
+    --script mut.txt \
+    -ff     "$FF"
 
-# ── 2b. Mutate Cys35 -> C2CD ───────────────────────────────────────────────
+# ── 3b. Mutate Cys35 -> C2CD ───────────────────────────────────────────────
+# Apply second mutation on top of the first output.
 echo ">>> pmx mutate: Cys35 -> C2CD ..."
+printf "35 CD\n" > mut.txt
 pmx mutate \
-    -f  mutant_step1.pdb \
-    -o  mutant.pdb \
-    --resid   35 \
-    --resname CD \
-    -ff "$FF"
+    -f      mutant_step1.pdb \
+    -o      mutant.pdb \
+    --script mut.txt \
+    -ff     "$FF"
 
-rm -f mutant_step1.pdb
+rm -f mut.txt mutant_step1.pdb wt.gro wt.top
 
-# ── 3. Generate standard GROMACS topology ──────────────────────────────────
+# ── 4. Generate GROMACS topology for the hybrid structure ──────────────────
 # After both pmx mutate steps, Cys32 and Cys35 are named C2CD — they are read
 # from mutres.rtp, not as CYS.  pdb2gmx will not see any CYS pair and will not
 # attempt automatic disulfide detection.
-echo ">>> gmx pdb2gmx ..."
+# Do NOT pass -ignh: mutant.pdb already has all H atoms from pmx mutate.
+echo ">>> gmx pdb2gmx (mutant) ..."
 gmx pdb2gmx \
     -f      mutant.pdb \
     -o      processed.gro \
     -p      topol.top \
     -ff     "$FF" \
-    -water  "$WATER" \
-    -ignh
+    -water  "$WATER"
 
-# ── 4. Fill hybrid B states ─────────────────────────────────────────────────
+# ── 5. Fill hybrid B states ─────────────────────────────────────────────────
 # gentop:
 #   - detects the two C2CD residues (both satisfy is_hybrid())
 #   - calls _add_disulfide_bonded_terms() to inject the cross-residue
@@ -70,8 +80,9 @@ gmx pdb2gmx \
 #   - dummifies HG1 (-> DUM_HS) in state B for both cysteines
 echo ">>> pmx gentop ..."
 pmx gentop \
-    -p topol.top \
-    -o pmxtop.top
+    -p  topol.top \
+    -o  pmxtop.top \
+    -ff "$FF"
 
 echo ""
 echo "=== Done ==="

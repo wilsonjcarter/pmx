@@ -41486,75 +41486,91 @@
 
 ; Disulfide hybrid entries added 2026-04-21
 
-; C2CD/D2DC disulfide hybrids
-[ C2CD ] ; Cys -> Cys_disulfide (alchemical SS formation)
+; C2CD/D2DC disulfide hybrids (split-atom: CB1/CB2/SG1/SG2)
+[ C2CD ] ; Cys -> Cym (alchemical disulfide formation)
 
  [ atoms ]
-     N   NH1              -0.47000  1
-    HN   H                 0.31000  2
-    CA   CT1               0.07000  3
-    HA   HB1               0.09000  4
-    CB   CT2              -0.11000  5
-   HB1   HA2               0.09000  6
-   HB2   HA2               0.09000  7
-    SG   S                -0.23000  8
-   HG1   HS                0.16000  9
-     C   C                 0.51000  10
-     O   O                -0.51000  11
+      N   NH1              -0.47000   1
+     HN   H                 0.31000   2
+     CA   CT1               0.07000   3
+     HA   HB1               0.09000   4
+    CB1   CT2              -0.11000   5
+   HB11   HA2               0.09000   6
+   HB12   HA2               0.09000   7
+    CB2   DUM_CT2           0.00000   5
+   HB21   DUM_HA2           0.00000   6
+   HB22   DUM_HA2           0.00000   7
+    SG1   S                -0.23000   8
+    HG1   HS                0.16000  10
+    SG2   DUM_SM            0.00000   9
+      C   C                 0.51000  11
+      O   O                -0.51000  12
 
  [ bonds ]
-     N      HN ; (     N      HN)
-     N      CA ; (     N      CA)
-    CA      CB ; (    CA      CB)
-    CA       C ; (    CA       C)
-    CA      HA ; (    CA      HA)
-    CB      SG ; (    CB      SG)
-    CB     HB1 ; (    CB     HB1)
-    CB     HB2 ; (    CB     HB2)
-    SG     HG1 ; (    SG  HG.gone1)
-     C       O ; (     C       O)
-     C      +N  
+      N      HN
+      N      CA
+     CA     CB1
+     CA     CB2
+     CA       C
+     CA      HA
+    CB1     SG1
+    CB1    HB11
+    CB1    HB12
+    CB2     SG2
+    CB2    HB21
+    CB2    HB22
+    SG1     HG1
+      C       O
+      C      +N
 
  [ impropers ]
-     N      -C      CA      HN 
-     C      CA      +N       O 
+      N      -C      CA      HN
+      C      CA      +N       O
 
  [ dihedrals ]
 
  [ cmap ]
 -C     N    CA     C    +N
 
-[ D2DC ] ; Cys_disulfide -> Cys (alchemical SS breaking)
+[ D2DC ] ; Cym -> Cys (alchemical disulfide breaking)
 
  [ atoms ]
-     N   NH1              -0.47000  1
-    HN   H                 0.31000  2
-    CA   CT1               0.07000  3
-    HA   HB1               0.09000  4
-    CB   CT2              -0.10000  5
-   HB1   HA2               0.09000  6
-   HB2   HA2               0.09000  7
-    SG   SM               -0.08000  8
-     C   C                 0.51000  9
-     O   O                -0.51000  10
-    HV   DUM_HS            0.00000  11
+      N   NH1              -0.47000   1
+     HN   H                 0.31000   2
+     CA   CT1               0.07000   3
+     HA   HB1               0.09000   4
+    CB1   DUM_CT2           0.00000   5
+   HB11   DUM_HA2           0.00000   6
+   HB12   DUM_HA2           0.00000   7
+    CB2   CT2              -0.10000   5
+   HB21   HA2               0.09000   6
+   HB22   HA2               0.09000   7
+    SG1   DUM_S             0.00000   8
+    HG1   DUM_HS            0.00000  10
+    SG2   SM               -0.08000   9
+      C   C                 0.51000  11
+      O   O                -0.51000  12
 
  [ bonds ]
-     N      HN ; (     N      HN)
-     N      CA ; (     N      CA)
-    CA      CB ; (    CA      CB)
-    CA       C ; (    CA       C)
-    CA      HA ; (    CA      HA)
-    CB      SG ; (    CB      SG)
-    CB     HB1 ; (    CB     HB1)
-    CB     HB2 ; (    CB     HB2)
-    SG      HV ; (    SG     HG1)
-     C       O ; (     C       O)
-     C      +N  
+      N      HN
+      N      CA
+     CA     CB1
+     CA     CB2
+     CA       C
+     CA      HA
+    CB1     SG1
+    CB1    HB11
+    CB1    HB12
+    CB2     SG2
+    CB2    HB21
+    CB2    HB22
+    SG1     HG1
+      C       O
+      C      +N
 
  [ impropers ]
-     N      -C      CA      HN 
-     C      CA      +N       O 
+      N      -C      CA      HN
+      C      CA      +N       O
 
  [ dihedrals ]
 

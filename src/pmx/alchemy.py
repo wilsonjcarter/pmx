@@ -413,6 +413,40 @@ def gen_hybrid_top(topol, recursive=True, verbose=False, scaleDih=1.0,
             for r in rlist:
                 print('log_> Hybrid Residue -> %d | %s ' % (r.id, r.resname))
 
+        # Dummify terminal deletion target residues BEFORE bonded entry lookup.
+        # When a deletion neighbor (XdeN/XdeC) is present, the flanking deletion
+        # target residue (e.g. Met1 for an N-terminal deletion) must have its
+        # B-state atom types set to DUM_ first.  Otherwise _find_bonded_entries
+        # sees atomtypeB=None for the deleted residue's atoms and cannot resolve
+        # the inter-residue bond (e.g. Met1.C -- EdeN.N).
+        for res in rlist:
+            if res.resname.endswith('deC'):
+                chain_res = res.chain.residues
+                idx = chain_res.index(res)
+                if idx + 1 < len(chain_res):
+                    del_res = chain_res[idx + 1]
+                    if verbose:
+                        print('log_> Dummifying deletion target: %d | %s'
+                              % (del_res.id, del_res.resname))
+                    for atom in del_res.atoms:
+                        atom.atomtypeB = 'DUM_' + atom.atomtype
+                        atom.typeB = 'DUM_' + atom.type
+                        atom.qB = 0.0
+                        atom.mB = atom.m
+            elif res.resname.endswith('deN'):
+                chain_res = res.chain.residues
+                idx = chain_res.index(res)
+                if idx - 1 >= 0:
+                    del_res = chain_res[idx - 1]
+                    if verbose:
+                        print('log_> Dummifying deletion target: %d | %s'
+                              % (del_res.id, del_res.resname))
+                    for atom in del_res.atoms:
+                        atom.atomtypeB = 'DUM_' + atom.atomtype
+                        atom.typeB = 'DUM_' + atom.type
+                        atom.qB = 0.0
+                        atom.mB = atom.m
+
         _find_bonded_entries(pmxtop, verbose=verbose)
         _find_angle_entries(pmxtop, verbose=verbose)
         dih_predef_default = []
@@ -453,35 +487,6 @@ def gen_hybrid_top(topol, recursive=True, verbose=False, scaleDih=1.0,
                     if atom.name in ("CA", "HA"):
                         atom.typeB = atom.type
                         atom.atomtypeB = atom.atomtype
-
-        # dummify terminal deletion target residues
-        for res in rlist:
-            if res.resname.endswith('deC'):
-                chain_res = res.chain.residues
-                idx = chain_res.index(res)
-                if idx + 1 < len(chain_res):
-                    del_res = chain_res[idx + 1]
-                    if verbose:
-                        print('log_> Dummifying deletion target: %d | %s'
-                              % (del_res.id, del_res.resname))
-                    for atom in del_res.atoms:
-                        atom.atomtypeB = 'DUM_' + atom.atomtype
-                        atom.typeB = 'DUM_' + atom.type
-                        atom.qB = 0.0
-                        atom.mB = atom.m
-            elif res.resname.endswith('deN'):
-                chain_res = res.chain.residues
-                idx = chain_res.index(res)
-                if idx - 1 >= 0:
-                    del_res = chain_res[idx - 1]
-                    if verbose:
-                        print('log_> Dummifying deletion target: %d | %s'
-                              % (del_res.id, del_res.resname))
-                    for atom in del_res.atoms:
-                        atom.atomtypeB = 'DUM_' + atom.atomtype
-                        atom.typeB = 'DUM_' + atom.type
-                        atom.qB = 0.0
-                        atom.mB = atom.m
 
         # if prolines are involved, break one bond (CD-CG)
         # and angles X-CD-CG, CD-CG-X
@@ -745,6 +750,16 @@ def _rename_back(res, name_hash):
         atom.name = name_hash[atom.name]
 
 
+# Mapping from split-atom hybrid names to source-residue atom names.
+# Used in _set_conformation for C2CD/D2DC (CHARMM disulfide hybrids where
+# CB and SG are split into CB1/CB2 and SG1/SG2 branches).
+_SPLIT_ATOM_NAME_MAP = {
+    'CB1': 'CB',  'HB11': 'HB1', 'HB12': 'HB2',
+    'CB2': 'CB',  'HB21': 'HB1', 'HB22': 'HB2',
+    'SG1': 'SG',  'SG2':  'SG',
+}
+
+
 def _set_conformation(old_res, new_res, rotdic):
     old_res.get_real_resname()
     dihedrals = library._aa_dihedrals[old_res.real_resname]
@@ -771,8 +786,18 @@ def _set_conformation(old_res, new_res, rotdic):
         for atom in atoms:
             atom.x = rot.apply(atom.x, diff)
     for atom in new_res.atoms:
-        if (atom.name[0] != 'D') and (not atom.name.startswith('HV')):
-            atom.x = old_res[atom.name].x
+        # Skip atoms that are B-state-only dummies in state A
+        if atom.atomtype.startswith('DUM_'):
+            continue
+        # Skip atoms already placed by the rotation algorithm (D/HV prefix)
+        if (atom.name[0] == 'D') or atom.name.startswith('HV'):
+            continue
+        # Copy position from old_res; handle split-atom name mapping
+        src_name = _SPLIT_ATOM_NAME_MAP.get(atom.name, atom.name)
+        try:
+            atom.x = old_res[src_name].x
+        except (KeyError, AttributeError):
+            pass  # keep MTP/bb_super position if source atom not found
 
 
 def _proline_dihedral_decouplings(topol, rlist, rdic):
@@ -975,9 +1000,16 @@ def _proline_decouplings(topol, rlist, rdic):
 
 
 def extract_atoms(residue):
-    """Return a name→atom dict for a dual-branch Cys residue."""
-    keys = ('N', 'HN', 'CA', 'HA', 'CB', 'CB1', 'CB2', 'HB1', 'HB2',
-            'SG', 'SG1', 'SG2', 'HG1', 'C', 'O')
+    """Return a name→atom dict for a dual-branch Cys residue (C2CD/D2DC).
+
+    Expects split-atom naming: CB1/CB2 for the two CB branches and SG1/SG2
+    for the two SG branches, as defined in the CHARMM36m C2CD/D2DC RTP/MTP.
+    CB1/SG1 carry the A-state (free-thiol CYS) parameters;
+    CB2/SG2 carry the B-state (disulfide CYS) parameters.
+    """
+    keys = ('N', 'HN', 'CA', 'HA',
+            'CB1', 'CB2', 'HB11', 'HB12', 'HB21', 'HB22',
+            'SG1', 'SG2', 'HG1', 'C', 'O')
     atoms = {k: '' for k in keys}
     for a in residue.atoms:
         if a.name in atoms:

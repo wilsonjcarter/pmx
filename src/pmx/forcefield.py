@@ -744,7 +744,21 @@ class TopolBase:
                     itp = (f, where)
                     inc.append(itp)
                 if 'forcefield.itp' in line:
-                    ff = line.split()[1].strip('"').split('/')[0].split('.')[0]
+                    # extract FF name from either a relative path
+                    # ("charmm36m-mut.ff/forcefield.itp") or an absolute path
+                    # ("/full/path/to/charmm36m-mut.ff/forcefield.itp")
+                    # that newer GROMACS versions write when GMXLIB is set.
+                    import os as _os
+                    raw = line.split()[1].strip('"').replace('\\', '/')
+                    # parent directory of forcefield.itp is always the .ff dir
+                    ff_dir = _os.path.basename(_os.path.dirname(raw))
+                    if ff_dir.endswith('.ff') or ff_dir.endswith('.FF'):
+                        ff = ff_dir[:-3]
+                    elif ff_dir:
+                        ff = ff_dir
+                    else:
+                        # fallback for legacy relative-path format
+                        ff = raw.split('/')[0].split('.')[0]
                     self.forcefield = ff
 
             if line.strip().replace(' ', '') == '[moleculetype]':

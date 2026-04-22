@@ -14,7 +14,7 @@ For N-terminal deletion (XdeN):
   - The n+1 residue gains two dummy protons (DH2, DH3; DUM_HC, charge 0.0 in state A)
   - In state B, the residue becomes a true N-terminus:
     * N morphs from NH1 -> NH3, charge -0.47 -> -0.30
-    * HN morphs from H -> HC, name stays HN in topology but type changes, charge 0.31 -> 0.33
+    * HN morphs from H -> HC, charge 0.31 -> 0.33
     * DH2 morphs from DUM_HC -> HC, charge 0.0 -> 0.33
     * DH3 morphs from DUM_HC -> HC, charge 0.0 -> 0.33
     * CA type may change (CT1 -> CT1 stays, but charge 0.07 -> 0.21)
@@ -122,7 +122,7 @@ def parse_residue_from_rtp(rtp_path, resname):
             elif current_section == 'impropers':
                 parts = stripped.split(';')[0].split()
                 if len(parts) >= 4:
-                    impropers.append((parts[0], parts[1], parts[2], parts[3]))
+                    impropers.append(tuple(parts[:4]))
 
             elif current_section == 'cmap':
                 parts = stripped.split(';')[0].split()
@@ -319,6 +319,7 @@ def generate_nterm_neighbor_mtp(resname, res_data):
             typeB = nter['N']['type']
             lines.append(f"  {name:>5s}  {typeA:>10s} ->  {name:>5s}  {typeB:>10s}")
         elif name == 'HN' and resname != 'PRO':
+            # Backbone amide HN: morphs to H1 at N-terminus
             lines.append(f"  {'HN':>5s}  {typeA:>10s} ->  {'H1':>5s}  {'HC':>10s}")
         elif name == 'CA':
             typeB = nter.get('CA', {}).get('type', typeA)
@@ -350,6 +351,7 @@ def generate_nterm_neighbor_mtp(resname, res_data):
             chargeB = nter[name]['charge']
             massB = _get_mass(typeB)
         elif name == 'HN' and resname != 'PRO':
+            # Backbone amide HN: morphs to HC at N-terminus
             typeB, chargeB, massB = 'HC', 0.33, 1.008
         else:
             typeB, chargeB, massB = typeA, chargeA, massA

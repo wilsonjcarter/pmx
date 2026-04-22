@@ -40,11 +40,11 @@ Setup
 
 Mutate both cysteines in sequence::
 
-    pmx mutate -f 1ERT.pdb -o step1.pdb \
-        --resid 32 --resname CD -ff charmm36m-mut
+    echo "32 CD" > mut.txt && pmx mutate -f 1ERT.pdb -o step1.pdb \
+        --script mut.txt -ff charmm36m-mut
 
-    pmx mutate -f step1.pdb -o mutant.pdb \
-        --resid 35 --resname CD -ff charmm36m-mut
+    echo "35 CD" > mut.txt && pmx mutate -f step1.pdb -o mutant.pdb \
+        --script mut.txt -ff charmm36m-mut
 
 Generate topology without forming a standard disulfide::
 
