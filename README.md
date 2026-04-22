@@ -7,24 +7,12 @@
 try/test it and provide feedback, but use at your own risk. The current stable version of `pmx` can
 be found in the master branch: https://github.com/deGrootLab/pmx
 
-<table border="0" cellspacing="0" cellpadding="10">
-<tr>
-<td width="50%">
+<img src="examples/imgs/overview.png" alt="pmx FEP workflow overview" align="right" width="410"/>
 
 `pmx` is a python library that allows users to setup and analyse molecular
 dynamics simulations with the [Gromacs](http://gromacs.org) package.
 Among its main features are the setup and analysis of alchemical free energy
 calculations for protein, nucleic acid, and small molecule mutations.
-
-</td>
-<td width="50%">
-
-<img src="examples/imgs/overview.png" alt="pmx FEP workflow overview"/>
-
-</td>
-</tr>
-</table>
-
 
 
 https://degrootlab.github.io/pmx/
