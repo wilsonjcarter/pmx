@@ -804,7 +804,7 @@ def _set_conformation(old_res, new_res, rotdic):
 
 def _proline_dihedral_decouplings(topol, rlist, rdic):
     for r in rlist:
-        if 'P' in r.resname:
+        if 'P' in r.resname and len(r.resname) == 3:
             # identify in which state proline sits
             prolineState = 'A'
             if '2P' in r.resname:
@@ -908,7 +908,7 @@ def _proline_dihedral_decouplings(topol, rlist, rdic):
 
 def _proline_decouplings(topol, rlist, rdic):
     for r in rlist:
-        if 'P' in r.resname:
+        if 'P' in r.resname and len(r.resname) == 3:
             # identify in which state proline sits
             prolineState = 'A'
             if '2P' in r.resname:

@@ -13,7 +13,7 @@ This example computes the pKa shift of an active-site cysteine by alchemically r
 | Hybrid | C2CM |
 | State A | Protonated Cys (SG type S, HG1 present) |
 | State B | Deprotonated thiolate (SG→SM, HG1→DUM_HS) |
-| Charge shift | 0 → −1 (one K⁺ needed for state B leg) |
+| Charge shift | 0 → −1 — **doublebox required** (see below) |
 | Special steps | None |
 
 ```bash
@@ -92,22 +92,84 @@ log_> Total charge of state A = -5
 log_> Total charge of state B = -6
 ```
 
-State B carries one extra negative charge (the thiolate); add one K⁺ counter-ion to the state B simulation box, or run with a neutralising background charge and apply an analytical correction.
+State B carries one extra negative charge (the thiolate). To avoid finite-size PBC artefacts from an unbalanced box charge, use the single-box double-system approach described in Step 5 — the combined protein+reference box remains charge-neutral throughout.
 
 ---
 
-### Step 5 — Solvate and add ions
+### Step 5 — Charge-neutral setup with pmx doublebox
+
+Deprotonation shifts the system charge from 0 to −1 (relative to the wildtype). In a periodic simulation box this charge change introduces finite-size artefacts that can bias ΔG by several kJ/mol. The correct approach is the **single-box double-system** method: place the protein system and a reference peptide in the *same* box so that one gains charge while the other loses it, keeping the total box charge constant throughout the alchemical transition.
+
+```
+                          alchemical λ: 0 → 1
+  protein in box:  CYS  ──────────────────────►  CYM     Δq = −1
+  reference in box: CYM ──────────────────────►  CYS     Δq = +1
+  ─────────────────────────────────────────────────────────────────
+  net charge change in box:                                    0  ✓
+```
+
+ΔΔG is recovered directly from the combined work values: `pmx analyze` sees the total work of both simultaneous transformations, and the reference cancels the solvation component, leaving only the protein-environment contribution. This directly gives the pKa shift via ΔΔG = ΔpKa × RT ln(10).
+
+#### 5a — Prepare the reference leg
+
+The reference is a short Cys-containing peptide in water (e.g. ACE-Cys-NME, or any capped single-residue peptide). Run the same C2CM mutation on it:
 
 ```bash
-gmx solvate -cp processed.gro -cs spc216.gro -p pmxtop.top -o solvated.gro
+# Reference: short Cys peptide (provide as input/ref_peptide.pdb)
+gmx pdb2gmx \
+    -f      input/ref_peptide.pdb \
+    -o      ref_wt.gro \
+    -p      ref_wt.top \
+    -ff     charmm36m-mut \
+    -water  tip3p \
+    -ignh
 
+printf "1 CM\n" | pmx mutate \
+    -f      ref_wt.gro \
+    -o      ref_mutant.pdb \
+    -ff     charmm36m-mut
+
+gmx pdb2gmx \
+    -f      ref_mutant.pdb \
+    -o      ref_processed.gro \
+    -p      ref_topol.top \
+    -ff     charmm36m-mut \
+    -water  tip3p
+
+pmx gentop \
+    -p  ref_topol.top \
+    -o  ref_pmxtop.top \
+    -ff charmm36m-mut
+```
+
+#### 5b — Combine into one box
+
+```bash
+pmx doublebox \
+    -f1 processed.gro \
+    -f2 ref_processed.gro \
+    -o  doublebox.gro \
+    -r  2.5 \
+    -d  1.5
+```
+
+This places the protein and reference peptide in a single rectangular box separated by at least 2.5 nm, with 1.5 nm to the box wall.
+
+#### 5c — Merge topologies, solvate, and add ions
+
+Combine the two topology files by appending the reference molecule section to the protein topology. Then solvate the combined box and neutralise with `gmx genion`:
+
+```bash
+# Solvate the combined box
+gmx solvate -cp doublebox.gro -cs spc216.gro \
+            -p pmxtop.top -o solvated.gro
+
+# Add ions — system is charge-neutral by construction
 gmx grompp -f mdp/em.mdp -c solvated.gro -r solvated.gro \
            -p pmxtop.top -o ions.tpr -maxwarn 1
 printf '13\n' | gmx genion -s ions.tpr -pname K -nname CL \
-           -neutral -o ions.gro -p pmxtop.top
+           -neutral -conc 0.15 -o ions.gro -p pmxtop.top
 ```
-
-Neutralise relative to the **state A** charge. For the state B production simulation you will need one additional K⁺ ion (or apply a charge correction in post-processing).
 
 ---
 
@@ -175,18 +237,18 @@ done
 
 ### Step 9 — Analyse
 
+Because both legs (protein and reference peptide) run simultaneously in the same box, `pmx analyze` operates on the combined work values and directly yields ΔΔG:
+
 ```bash
 pmx analyze \
     -fA transitionA/frame*/ti.xvg \
     -fB transitionB/frame*/ti.xvg
 ```
 
-`results.txt` gives ΔG1 (deprotonation free energy in the protein). Repeat Steps 1–9 with a short Cys-containing reference peptide in water to get ΔG2, then:
+The output ΔG is already ΔΔG = ΔG(deprotonation in protein) − ΔG(deprotonation in water). Convert to a pKa shift via:
 
 ```
-ΔΔG = ΔG1 − ΔG2
-
 pKa = pKa_ref + ΔΔG / (RT ln 10)
 ```
 
-Using pKa_ref = 8.3 (solution Cys), a negative ΔΔG means deprotonation is more favourable in the protein → lower pKa (Cys32 in thioredoxin gives pKa ≈ 6.3, so ΔΔG ≈ −2.7 kcal/mol).
+Using pKa_ref = 8.3 (solution Cys), a negative ΔΔG means deprotonation is more favourable in the protein → lower pKa. Cys32 in thioredoxin gives pKa ≈ 6.3, consistent with ΔΔG ≈ −2.7 kcal/mol.

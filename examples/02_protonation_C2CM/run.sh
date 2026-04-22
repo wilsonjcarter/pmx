@@ -9,8 +9,13 @@
 # State A: CYS (protonated, -SH, neutral)
 # State B: CYM (deprotonated, -S-, charge -1)
 #
-# Run the same transformation in water (reference leg) and in the protein
-# (protein leg) to get the thermodynamic cycle ΔΔG = ΔpKa × RT ln(10).
+# IMPORTANT — charge-changing mutation:
+#   This transformation shifts the box charge by -1.  The correct approach is
+#   the single-box double-system (doublebox) method: the protein leg (CYS→CYM,
+#   Δq=-1) and a reference Cys-peptide leg (CYM→CYS, Δq=+1) run simultaneously
+#   in the same box so the net charge never changes.
+#   ΔΔG = ΔpKa × RT ln(10) is recovered directly from the combined work values.
+#   See example 05 README §Step 5 for the full doublebox workflow pattern.
 # =============================================================================
 set -euo pipefail
 
@@ -83,4 +88,6 @@ echo "State B charge: $(python3 -c "
 from pmx.forcefield import Topology; t=Topology('pmxtop.top'); print('%.0f' % t.get_qB())
 ") e"
 echo ""
-echo "Note: add one K+ counter-ion for the state B (charged) leg."
+echo "Note: this script prepares the protein leg only."
+echo "For a charge-neutral simulation, combine with a Cys reference peptide"
+echo "using 'pmx doublebox' — see example 05 README §Step 5 for the pattern."

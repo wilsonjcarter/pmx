@@ -14,12 +14,23 @@
 # dummy oxygen (DOT2) that represents OT2 of the new C-terminal carboxylate
 # in state B.  Asp5 stays physically present and is fully dummified later
 # by pmx gentop.
+#
+# IMPORTANT — charge-changing mutation:
+#   Deleting the C-terminal Asp5 shifts the box charge by +1 (two carboxylates
+#   lost, one gained on Val becoming the new C-terminus; net Δq = +1).
+#   Use the single-box double-system (doublebox) approach:
+#     Protein leg : MEEVD in co-chaperone complex (Δq = +1)
+#     Reference leg: MEEVD peptide free in water  (Δq = −1, reverse)
+#   Both are the BIOLOGICAL peptide, not a minimal dipeptide.  The combined
+#   work gives ΔΔG of binding: MEEV vs MEEVD affinity for the co-chaperone.
+#   See README.md §Step 6 for the full doublebox workflow.
 # =============================================================================
 set -euo pipefail
 
 FF=charmm36m-mut
 WATER=tip3p
-INPUT=input/1ELR_peptide.pdb
+INPUT=input/1ELR_peptide.pdb    # MEEVD peptide (for protein leg; ideally use the full complex)
+REF_INPUT=input/1ELR_peptide.pdb # same MEEVD peptide free in water (reference leg)
 
 # ── 0. Fetch input if not present ──────────────────────────────────────────
 if [[ ! -f "$INPUT" ]]; then
@@ -94,10 +105,83 @@ pmx gentop \
     -ff         "$FF" \
     --extra_mtp mutres_term.mtp
 
+# ════════════════════════════════════════════════════════════════════════════
+# REFERENCE LEG — same VdeC deletion applied to the MEEVD peptide free in water
+# The reference is the biological peptide itself, not a minimal dipeptide.
+# Combined with the protein (complex) leg this gives ΔΔG of co-chaperone binding.
+# ════════════════════════════════════════════════════════════════════════════
+
+echo ">>> gmx pdb2gmx (MEEVD reference peptide, free in water) ..."
+gmx pdb2gmx \
+    -f      "$REF_INPUT" \
+    -o      ref_wt.gro \
+    -p      ref_wt.top \
+    -ff     "$FF" \
+    -water  "$WATER" \
+    -ignh
+
+echo ">>> pmx mutate: reference Asp5 -> DEL ..."
+printf "5 DEL\n" | pmx mutate \
+    -f      ref_wt.gro \
+    -o      ref_mutant.pdb \
+    -ff     "$FF"
+rm -f ref_wt.gro ref_wt.top
+
+echo ">>> gmx pdb2gmx (reference mutant) ..."
+gmx pdb2gmx \
+    -f      ref_mutant.pdb \
+    -o      ref_processed.gro \
+    -p      ref_topol.top \
+    -ff     "$FF" \
+    -water  "$WATER"
+
+echo ">>> pmx gentop (reference) ..."
+pmx gentop \
+    -p          ref_topol.top \
+    -o          ref_pmxtop.top \
+    -ff         "$FF" \
+    --extra_mtp mutres_term.mtp
+
+# ════════════════════════════════════════════════════════════════════════════
+# DOUBLEBOX — combine complex and free-peptide legs in one charge-neutral box
+# ════════════════════════════════════════════════════════════════════════════
+
+echo ">>> pmx doublebox ..."
+pmx doublebox \
+    -f1 processed.gro \
+    -f2 ref_processed.gro \
+    -o  doublebox.gro \
+    -r  2.5 \
+    -d  1.5
+
+echo ">>> gmx solvate ..."
+gmx solvate \
+    -cp doublebox.gro \
+    -cs spc216.gro \
+    -p  pmxtop.top \
+    -o  solvated.gro
+
+echo ">>> gmx genion (0.15 M KCl, neutral) ..."
+gmx grompp -f mdp/em.mdp -c solvated.gro -r solvated.gro \
+           -p pmxtop.top -o ions.tpr -maxwarn 1
+printf '13\n' | gmx genion \
+    -s    ions.tpr \
+    -pname K  -nname CL \
+    -neutral  -conc 0.15 \
+    -o    ions.gro \
+    -p    pmxtop.top
+
 echo ""
 echo "=== Done ==="
-echo "Hybrid structure : mutant.pdb"
-echo "Hybrid topology  : pmxtop.top"
+echo "Combined structure : doublebox.gro  (MEEVD complex + free MEEVD peptide)"
+echo "Hybrid topology    : pmxtop.top"
 echo ""
-echo "State A: full MEEVD pentapeptide"
-echo "State B: truncated MEEV tetrapeptide (Asp5 = non-interacting dummies)"
+echo "Protein leg  (complex) — State A: full MEEVD bound to co-chaperone (charge -3)"
+echo "                       — State B: truncated MEEV, Asp5 dummies   (charge -2)"
+echo "Reference leg (free)   — State A: full MEEVD free in water        (charge -3)"
+echo "                       — State B: truncated MEEV, Asp5 dummies    (charge -2)"
+echo "                         [reference runs reverse: MEEV→MEEVD, Δq = -1]"
+echo ""
+echo "Net box charge change during NEQ transitions: 0"
+echo "Combined ΔΔG = ΔG(deletion in complex) − ΔG(deletion of free peptide)"
+echo "             = ΔΔG of co-chaperone binding: MEEV vs MEEVD"

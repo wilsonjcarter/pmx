@@ -13,7 +13,7 @@ This example computes the free energy cost of truncating a C-terminal residue (A
 | **Hybrid** | `VdeC` (on Val4) |
 | **State A** | Val4 + Asp5 (fully interacting); charge −3 |
 | **State B** | Val4 as new C-terminus; Asp5 dummified; charge −2 |
-| **Charge shift** | −3 → −2 (removing a −2 charged C-terminal residue) |
+| **Charge shift** | −3 → −2 (+1) — **doublebox required** (see below) |
 | **Special steps** | Run `generate_term_deletion` first; copy `mutres_term.rtp/.mtp` to FF dir |
 
 ```bash
@@ -98,7 +98,7 @@ gmx pdb2gmx \
 
 ## Step 5 — Fill B-state bonded terms
 
-`pmx gentop` locates the `VdeC` hybrid, dummifies Asp5 in state B, applies the C-terminal patch to Val4, and zeroes B-state force constants on dihedrals crossing the Val4–Asp5 boundary. The A/B charge difference (−3 vs −2) is expected and must be accounted for in analysis.
+`pmx gentop` locates the `VdeC` hybrid, dummifies Asp5 in state B, applies the C-terminal patch to Val4, and zeroes B-state force constants on dihedrals crossing the Val4–Asp5 boundary. The charge change (−3 → −2, Δq = +1) requires the doublebox approach described in Step 6.
 
 ```bash
 pmx gentop \
@@ -124,15 +124,80 @@ log_> Zeroed B-state for 13 dihedrals
 
 ---
 
-## Step 6 — Solvate and add ions
+## Step 6 — Charge-neutral setup with pmx doublebox
+
+Deleting Asp5 shifts the system charge from −3 to −2 (Δq = +1, net loss of the two C-terminal
+carboxylates of Asp minus the one gained by Val becoming the new C-terminus). In a periodic
+box this charge change introduces finite-size artefacts. The correct approach is the
+**single-box double-system** method:
+
+```
+                          alchemical λ: 0 → 1
+  complex in box:  MEEVD (bound) ──────────────────────►  MEEV (bound)    Δq = +1
+  peptide in box:  MEEV  (free)  ──────────────────────►  MEEVD (free)    Δq = −1
+  ──────────────────────────────────────────────────────────────────────────────────
+  net charge change in box:                                                     0  ✓
+```
+
+The reference is the **MEEVD peptide itself** (the same `1ELR_peptide.pdb`) free in water —
+not a minimal dipeptide. The protein leg uses the **full co-chaperone complex** (TPR domain +
+MEEVD peptide from 1ELR). The combined ΔΔG directly gives the binding free energy difference
+between MEEV and MEEVD for the co-chaperone: how much does losing the C-terminal Asp cost in
+binding affinity?
+
+#### 6a — Prepare the reference leg (MEEVD peptide free in water)
 
 ```bash
-gmx solvate -cp processed.gro -cs spc216.gro -p pmxtop.top -o solvated.gro
+# The reference is the same MEEVD peptide, free in solution
+gmx pdb2gmx \
+    -f      input/1ELR_peptide.pdb \
+    -o      ref_wt.gro \
+    -p      ref_wt.top \
+    -ff     charmm36m-mut \
+    -water  tip3p \
+    -ignh
+
+printf "5 DEL\n" | pmx mutate \
+    -f      ref_wt.gro \
+    -o      ref_mutant.pdb \
+    -ff     charmm36m-mut
+rm -f ref_wt.gro ref_wt.top
+
+gmx pdb2gmx \
+    -f      ref_mutant.pdb \
+    -o      ref_processed.gro \
+    -p      ref_topol.top \
+    -ff     charmm36m-mut \
+    -water  tip3p
+
+pmx gentop \
+    -p          ref_topol.top \
+    -o          ref_pmxtop.top \
+    -ff         charmm36m-mut \
+    --extra_mtp mutres_term.mtp
+```
+
+#### 6b — Combine into one box
+
+```bash
+pmx doublebox \
+    -f1 processed.gro \
+    -f2 ref_processed.gro \
+    -o  doublebox.gro \
+    -r  2.5 \
+    -d  1.5
+```
+
+#### 6c — Merge topologies, solvate, and add ions
+
+```bash
+gmx solvate -cp doublebox.gro -cs spc216.gro \
+            -p pmxtop.top -o solvated.gro
 
 gmx grompp -f mdp/em.mdp -c solvated.gro -r solvated.gro \
            -p pmxtop.top -o ions.tpr -maxwarn 1
 printf '13\n' | gmx genion -s ions.tpr -pname K -nname CL \
-           -neutral -o ions.gro -p pmxtop.top
+           -neutral -conc 0.15 -o ions.gro -p pmxtop.top
 ```
 
 ---
@@ -199,7 +264,8 @@ done
 
 ## Step 10 — Analyse
 
-`results.txt` gives ΔG1 (free energy of C-terminal Asp deletion in the protein). Repeat with a reference peptide in water to get ΔG2, then ΔΔG = ΔG1 − ΔG2.
+Because both legs (co-chaperone complex and free MEEVD peptide) run simultaneously in the
+same box, `pmx analyze` operates on the combined work values and directly yields ΔΔG:
 
 ```bash
 pmx analyze \
@@ -208,5 +274,9 @@ pmx analyze \
 ```
 
 ```
-ΔΔG = ΔG1 − ΔG2
+ΔΔG = ΔG(Asp5 deletion in complex) − ΔG(Asp5 deletion of free peptide)
+     = ΔΔG of co-chaperone binding: MEEV vs MEEVD
 ```
+
+A positive ΔΔG means MEEV binds less tightly than MEEVD — the C-terminal Asp contributes
+favourably to co-chaperone recognition.

@@ -1,4 +1,4 @@
-# Alchemical tyrosine phosphorylation: Tyr → phosphoTyr (TP1) in Lck SH2 domain (1AOT)
+# Alchemical tyrosine phosphorylation: Tyr → phosphoTyr (YP1) in Lck SH2 domain (1AOT)
 
 <p align="center">
   <img src="../imgs/schematic_p5.png" alt="phospho thermocycle" width="800"/>
@@ -6,15 +6,15 @@
 
 ## TLDR
 
-This example computes the phosphorylation ΔΔG (Tyr → monoanionic phosphotyrosine TP1) using CHARMM36m's built-in TP1 residue in the Lck SH2 domain (PDB 1AOT) — no force-field patching required. The hybrid `Y2P1` morphs the tyrosine phenol into a phosphate by converting `HH` to a non-interacting dummy and promoting five dummy phosphate atoms (DP, DO2, DH2, DO3, DO4) to real ones, capturing the electrostatic change that drives SH2-domain phosphorylation recognition.
+This example computes the phosphorylation ΔΔG (Tyr → monoanionic phosphotyrosine YP1) using CHARMM36m's built-in YP1 residue in the Lck SH2 domain (PDB 1AOT) — no force-field patching required. The hybrid `Y2P1` morphs the tyrosine phenol into a phosphate by converting `HH` to a non-interacting dummy and promoting five dummy phosphate atoms (DP, DO2, DH2, DO3, DO4) to real ones, capturing the electrostatic change that drives SH2-domain phosphorylation recognition.
 
 | | |
 |---|---|
 | **Hybrid** | `Y2P1` |
 | **State A** | Tyr: `OH` type `OH1`, `HH` present; charge 0 |
-| **State B** | TP1: `OH` → `ON2B`, `HH` → `DUM_H`, dummy `DP/DO2/DH2/DO3/DO4` → real; charge −1 |
-| **Charge shift** | 0 → −1 (add one K⁺ counter-ion for the state B leg) |
-| **Special steps** | None — TP1 is already in `charmm36m-mut`; use `P2` / `Y2P2` for dianionic (−2) form |
+| **State B** | YP1: `OH` → `ON2B`, `HH` → `DUM_H`, dummy `DP/DO2/DH2/DO3/DO4` → real; charge −1 |
+| **Charge shift** | 0 → −1 — **doublebox required** (see below) |
+| **Special steps** | None — YP1 is already in `charmm36m-mut`; use `P2` / `Y2P2` for dianionic (−2) form |
 
 ```bash
 # Unique mutation step — see run.sh for the full pipeline
@@ -101,17 +101,93 @@ log_> Total charge of state B = -1
 
 ---
 
-### Step 5 — Solvate and add ions
+### Step 5 — Charge-neutral setup with pmx doublebox
 
-Add one extra K⁺ to neutralise the −1 charge gained in state B.
+Phosphorylation shifts the system charge from 0 to −1. In a periodic simulation box this
+charge change introduces finite-size artefacts that can bias ΔG by several kJ/mol. The
+correct approach is the **single-box double-system** method: place the protein system and a
+reference peptide in the *same* box so that one gains charge while the other loses it,
+keeping the total box charge constant throughout the alchemical transition.
+
+```
+                          alchemical λ: 0 → 1
+  protein in box:   Tyr  ──────────────────────►  pTyr     Δq = −1
+  reference in box: pTyr ──────────────────────►  Tyr      Δq = +1
+  ─────────────────────────────────────────────────────────────────
+  net charge change in box:                                    0  ✓
+```
+
+ΔΔG is recovered directly from the combined work values: `pmx analyze` sees the total
+work of both simultaneous transformations. The reference (free peptide in solution) cancels
+ΔG(phosphorylation in water), leaving ΔΔG of SH2 binding — how much more tightly the SH2
+domain recruits the phosphorylated peptide vs. the unphosphorylated form.
+
+#### 5a — Prepare the reference leg
+
+The reference is the **Tyr-containing phosphopeptide extracted from 1AOT** — the biological
+SH2 ligand in free solution, not a minimal ACE-Tyr-NME tripeptide. Using the actual peptide
+captures the free energy of phosphorylation in the same sequence context and avoids
+artefacts from end-cap chemistry. The combined ΔΔG directly quantifies the binding
+preference of the SH2 domain for the phosphorylated vs. unphosphorylated form of the
+ligand (see `input/fetch_input.sh` to extract the peptide from 1AOT).
 
 ```bash
-gmx solvate -cp processed.gro -cs spc216.gro -p pmxtop.top -o solvated.gro
+# Reference: Tyr-peptide extracted from 1AOT (provide as input/1AOT_peptide.pdb)
+gmx pdb2gmx \
+    -f      input/1AOT_peptide.pdb \
+    -o      ref_wt.gro \
+    -p      ref_wt.top \
+    -ff     charmm36m-mut \
+    -water  tip3p \
+    -ignh
 
+printf "1 P1\n" | pmx mutate \
+    -f      ref_wt.gro \
+    -o      ref_mutant.pdb \
+    -ff     charmm36m-mut
+
+gmx pdb2gmx \
+    -f      ref_mutant.pdb \
+    -o      ref_processed.gro \
+    -p      ref_topol.top \
+    -ff     charmm36m-mut \
+    -water  tip3p
+
+pmx gentop \
+    -p  ref_topol.top \
+    -o  ref_pmxtop.top \
+    -ff charmm36m-mut
+```
+
+#### 5b — Combine into one box
+
+```bash
+pmx doublebox \
+    -f1 processed.gro \
+    -f2 ref_processed.gro \
+    -o  doublebox.gro \
+    -r  2.5 \
+    -d  1.5
+```
+
+This places the protein and reference peptide in a single rectangular box separated by at
+least 2.5 nm, with 1.5 nm to the box wall.
+
+#### 5c — Merge topologies, solvate, and add ions
+
+Combine the two topology files by appending the reference molecule section to the protein
+topology. Then solvate the combined box and neutralise with `gmx genion`:
+
+```bash
+# Solvate the combined box
+gmx solvate -cp doublebox.gro -cs spc216.gro \
+            -p pmxtop.top -o solvated.gro
+
+# Add ions — system is charge-neutral by construction so no extra counter-ions needed
 gmx grompp -f mdp/em.mdp -c solvated.gro -r solvated.gro \
            -p pmxtop.top -o ions.tpr -maxwarn 1
 printf '13\n' | gmx genion -s ions.tpr -pname K -nname CL \
-           -neutral -o ions.gro -p pmxtop.top
+           -neutral -conc 0.15 -o ions.gro -p pmxtop.top
 ```
 
 ---
@@ -180,7 +256,8 @@ done
 
 ### Step 9 — Analyse
 
-`results.txt` gives ΔG1 (Tyr→TP1 free energy cost in the protein). Repeat Steps 1–9 with a short Tyr-containing reference peptide in water to get ΔG2, then ΔΔG = ΔG1 − ΔG2.
+Because both legs (protein and reference peptide) run simultaneously in the same box,
+`pmx analyze` operates on the combined work values and directly yields ΔΔG:
 
 ```bash
 pmx analyze \
@@ -188,8 +265,7 @@ pmx analyze \
     -fB transitionB/frame*/ti.xvg
 ```
 
-```
-ΔΔG = ΔG1 − ΔG2
-```
-
-A negative ΔΔG indicates that the SH2 domain environment specifically stabilises the phosphorylated state — the thermodynamic signature of phospho-recognition.
+The output ΔG is ΔΔG = ΔG(phosphorylation when bound to SH2) − ΔG(phosphorylation of the
+free peptide in water). A negative ΔΔG means the SH2 domain specifically stabilises the
+phosphorylated peptide — the thermodynamic signature of phospho-recognition and the direct
+binding ΔΔG between the pTyr and Tyr forms of the ligand.

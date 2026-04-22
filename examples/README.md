@@ -39,14 +39,14 @@ Each directory contains a `run.sh` (complete pipeline) and a `README.md`
 
 ## Examples
 
-| # | Directory | System | What is calculated | FF |
-|---|-----------|--------|-------------------|----|
-| 1 | `01_trpcage_W6F` | Trp Cage (1L2Y) | ΔΔG of W→F substitution | charmm36m-mut |
-| 2 | `02_protonation_C2CM` | Thioredoxin (1ERT) | ΔpKa of Cys32 | charmm36m-mut |
-| 3 | `03_disulfide_C2CD` | Thioredoxin (1ERT) | ΔE of disulfide formation | charmm36m-mut |
-| 4 | `04_cterm_deletion` | HSP90 MEEVD peptide (1ELR) | ΔΔG of C-terminal truncation | charmm36m-mut |
-| 5 | `05_phosphorylation_pTyr` | Lck SH2 domain (1AOT) | ΔΔG of Tyr phosphorylation (YP1) | charmm36m-mut |
-| 6 | `06_nsaa_denovo` **(WIP)** | Protein with target Ser | ΔΔG of Ser→SEP via custom ITP | charmm36m-mut |
+| # | Directory | System | What is calculated | FF | Charge change |
+|---|-----------|--------|-------------------|----|---------------|
+| 1 | `01_trpcage_W6F` | Trp Cage (1L2Y) | ΔΔG of W→F substitution | charmm36m-mut | none |
+| 2 | `02_protonation_C2CM` | Thioredoxin (1ERT) | ΔpKa of Cys32 | charmm36m-mut | −1 (**doublebox**) |
+| 3 | `03_disulfide_C2CD` | Thioredoxin (1ERT) | ΔE of disulfide formation | charmm36m-mut | none |
+| 4 | `04_cterm_deletion` | HSP90 MEEVD peptide (1ELR) | ΔΔG of C-terminal truncation | charmm36m-mut | +1 (**doublebox**) |
+| 5 | `05_phosphorylation_pTyr` | Lck SH2 domain (1AOT) | ΔΔG of Tyr phosphorylation (YP1) | charmm36m-mut | −1 (**doublebox**) |
+| 6 | `06_nsaa_denovo` **(WIP)** | Protein with target Ser | ΔΔG of Ser→SEP via custom ITP | charmm36m-mut | none |
 
 ## Prerequisites
 
@@ -76,3 +76,25 @@ bash run.sh
 
 Example 4 adds a one-time `generate_term_deletion` step before step 2.
 Example 6 replaces step 2 with `pmx mutate_nsaa` and adds `prepare_nsaa_ff` before it.
+
+### Charge-changing mutations (doublebox)
+
+When the alchemical mutation shifts the net charge of the system (examples 2 and 5), a simple single-box simulation introduces finite-size PBC artefacts. The correct approach is the **single-box double-system** method:
+
+```
+protein leg:   CYS ──────────► CYM    Δq = −1  ┐
+reference leg: CYM ──────────► CYS    Δq = +1  ┘ net box Δq = 0  ✓
+```
+
+The reference is the **biological peptide** — the actual pTyr peptide (example 5), the MEEVD
+peptide itself (example 4) — not a minimal capped tripeptide. Using the real peptide captures
+the free energy in the same sequence context and gives ΔΔG of binding directly. Use
+`pmx doublebox` to place both structures in one box before solvation:
+
+```bash
+pmx doublebox -f1 processed.gro -f2 ref_processed.gro \
+              -o doublebox.gro -r 2.5 -d 1.5
+```
+
+See the README in examples 02, 04, and 05 (§Step 5 or §Step 6) for the complete
+reference-leg preparation and charge-neutral solvation.
