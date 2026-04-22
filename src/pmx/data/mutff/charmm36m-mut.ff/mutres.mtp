@@ -41244,6 +41244,139 @@
   CB-OG HG1
 
 
+[ S2P1 ] ; Ser -> Phosphoserine monoanionic (SP1)
+
+
+ [ morphes ]
+     N        NH1 ->      N        NH1
+    HN          H ->     HN          H
+    CA        CT1 ->     CA        CT1
+    HA        HB1 ->     HA        HB1
+    CB        CT2 ->     CB        CT2
+   HB1        HA2 ->    HB1        HA2
+   HB2        HA2 ->    HB2        HA2
+    OG        OH1 ->     OG        ON2
+   HG1          H ->  HG1.gone    DUM_H
+     C          C ->      C          C
+     O          O ->      O          O
+    DP     DUM_P2 ->      P          P
+  DO1P    DUM_ON3 ->    O1P        ON3
+  DO2P    DUM_ON3 ->    O2P        ON3
+   DOT    DUM_ON3 ->     OT        ON4
+   DHT    DUM_HN1 ->     HT        HN4
+
+ [ atoms ]
+       N        NH1  -0.470000      1  14.007000        NH1  -0.470000  14.007000   ;  types == | charge ==
+      HN          H   0.310000      1   1.008000          H   0.310000   1.008000   ;  types == | charge ==
+      CA        CT1   0.070000      1  12.011000        CT1   0.070000  12.011000   ;  types == | charge ==
+      HA        HB1   0.090000      1   1.008000        HB1   0.090000   1.008000   ;  types == | charge ==
+      CB        CT2   0.050000      1  12.011000        CT2  -0.080000  12.011000   ;  types == | charge !=
+     HB1        HA2   0.090000      1   1.008000        HA2   0.090000   1.008000   ;  types == | charge ==
+     HB2        HA2   0.090000      1   1.008000        HA2   0.090000   1.008000   ;  types == | charge ==
+      OG        OH1  -0.660000      1  15.999000        ON2  -0.620000  15.999000   ;  types != | charge !=
+     HG1          H   0.430000      1   1.008000      DUM_H   0.000000   1.008000   ;  types != | charge !=
+       C          C   0.510000      1  12.011000          C   0.510000  12.011000   ;  types == | charge ==
+       O          O  -0.510000      1  15.999000          O  -0.510000  15.999000   ;  types == | charge ==
+      DP     DUM_P2   0.000000      1  30.974000          P   1.500000  30.974000   ;  types != | charge !=
+    DO1P    DUM_ON3   0.000000      1  15.999000        ON3  -0.820000  15.999000   ;  types != | charge !=
+    DO2P    DUM_ON3   0.000000      1  15.999000        ON3  -0.820000  15.999000   ;  types != | charge !=
+     DOT    DUM_ON3   0.000000      1  15.999000        ON4  -0.680000  15.999000   ;  types != | charge !=
+     DHT    DUM_HN1   0.000000      1   1.008000        HN4   0.340000   1.008000   ;  types != | charge !=
+
+ [ coords ]
+  -2.994   -4.470    6.993
+  -3.510   -5.332    7.063
+  -1.676   -4.415    7.600
+  -1.774   -4.901    8.572
+  -0.668   -5.234    6.757
+  -1.036   -6.255    6.636
+  -0.582   -4.816    5.754
+   0.620   -5.297    7.343
+   0.539   -5.305    8.288
+  -1.234   -2.969    7.858
+  -1.305   -2.106    6.983
+   0.479   -5.311    8.987
+   1.864   -5.316    9.614
+  -0.278   -6.556    9.420
+  -0.278   -4.073    9.441
+  -0.756   -3.291    9.728
+
+ [ impropers ]
+      N     -C     CA     HN     default-A                 default-B
+      C     CA     +N      O     default-A                 default-B
+
+ [ dihedrals ]
+
+ [ rotations ]
+  CA-CB HB1 HB2 OG HG1 DP DO1P DO2P DOT DHT
+  CB-OG HG1
+
+
+[ S2P2 ] ; Ser -> Phosphoserine dianionic (SP2)
+
+
+ [ morphes ]
+     N        NH1 ->      N        NH1
+    HN          H ->     HN          H
+    CA        CT1 ->     CA        CT1
+    HA        HB1 ->     HA        HB1
+    CB        CT2 ->     CB        CT2
+   HB1        HA2 ->    HB1        HA2
+   HB2        HA2 ->    HB2        HA2
+    OG        OH1 ->     OG        ON2
+   HG1          H ->  HG1.gone    DUM_H
+     C          C ->      C          C
+     O          O ->      O          O
+    DP     DUM_P2 ->      P          P
+  DO1P    DUM_ON3 ->    O1P        ON3
+  DO2P    DUM_ON3 ->    O2P        ON3
+   DOT    DUM_ON3 ->     OT        ON3
+
+ [ atoms ]
+       N        NH1  -0.470000      1  14.007000        NH1  -0.470000  14.007000   ;  types == | charge ==
+      HN          H   0.310000      1   1.008000          H   0.310000   1.008000   ;  types == | charge ==
+      CA        CT1   0.070000      1  12.011000        CT1   0.070000  12.011000   ;  types == | charge ==
+      HA        HB1   0.090000      1   1.008000        HB1   0.090000   1.008000   ;  types == | charge ==
+      CB        CT2   0.050000      1  12.011000        CT2  -0.180000  12.011000   ;  types == | charge !=
+     HB1        HA2   0.090000      1   1.008000        HA2   0.090000   1.008000   ;  types == | charge ==
+     HB2        HA2   0.090000      1   1.008000        HA2   0.090000   1.008000   ;  types == | charge ==
+      OG        OH1  -0.660000      1  15.999000        ON2  -0.400000  15.999000   ;  types != | charge !=
+     HG1          H   0.430000      1   1.008000      DUM_H   0.000000   1.008000   ;  types != | charge !=
+       C          C   0.510000      1  12.011000          C   0.510000  12.011000   ;  types == | charge ==
+       O          O  -0.510000      1  15.999000          O  -0.510000  15.999000   ;  types == | charge ==
+      DP     DUM_P2   0.000000      1  30.974000          P   1.100000  30.974000   ;  types != | charge !=
+    DO1P    DUM_ON3   0.000000      1  15.999000        ON3  -0.900000  15.999000   ;  types != | charge !=
+    DO2P    DUM_ON3   0.000000      1  15.999000        ON3  -0.900000  15.999000   ;  types != | charge !=
+     DOT    DUM_ON3   0.000000      1  15.999000        ON3  -0.900000  15.999000   ;  types != | charge !=
+
+ [ coords ]
+  -2.994   -4.470    6.993
+  -3.510   -5.332    7.063
+  -1.676   -4.415    7.600
+  -1.774   -4.901    8.572
+  -0.668   -5.234    6.757
+  -1.036   -6.255    6.636
+  -0.582   -4.816    5.754
+   0.620   -5.297    7.343
+   0.539   -5.305    8.288
+  -1.234   -2.969    7.858
+  -1.305   -2.106    6.983
+   0.479   -5.311    8.987
+   1.864   -5.316    9.614
+  -0.278   -6.556    9.420
+  -0.278   -4.073    9.441
+
+ [ impropers ]
+      N     -C     CA     HN     default-A                 default-B
+      C     CA     +N      O     default-A                 default-B
+
+ [ dihedrals ]
+
+ [ rotations ]
+  CA-CB HB1 HB2 OG HG1 DP DO1P DO2P DOT
+  CB-OG HG1
+
+
 [ S2Z ] ; Ser -> Hsp
 
 

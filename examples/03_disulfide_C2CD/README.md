@@ -1,17 +1,8 @@
 # Alchemical disulfide formation: C2CD hybrid residues (1ERT thioredoxin)
 
-```
-State A — reduced (free thiols)        State B — oxidised (disulfide)
-
-  Cys32–SH   Cys35–SH                     Cys32–S–S–Cys35
-       |                                         |
-      ΔG1 (protein)                           ΔG1
-       |                                         |
-  Cys32–SH   Cys35–SH ─── ΔG2 (peptide) ─── Cys32–S–S–Cys35
-             (reference dipeptide in water)
-
-  ΔΔG = ΔG1 − ΔG2
-```
+<p align="center">
+  <img src="../imgs/schematic_p3.png" alt="disulfide thermocycle" width="800"/>
+</p>
 
 The relative free energy of disulfide formation (ΔG1) is computed in the
 protein and subtracted from the same quantity in a short reference peptide in

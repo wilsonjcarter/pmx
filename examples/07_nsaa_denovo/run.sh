@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # =============================================================================
-# Example 6 — Serine phosphorylation: Ser → phosphoSer (SEP)
+# Example 7 [WIP] — De-novo NSAA: Ser → phosphoSer (SEP) via ITP→RTP patching
 #
-# System  : SH2 domain (or any protein with a target Ser)
-# Mutation: Ser -> SEP (O-phosphoserine)
+# System  : Protein with a target Ser
+# Mutation: Ser -> SEP (O-phosphoserine, dianionic, -2)
 # FF      : charmm36m-mut
 # NSAA workflow: prepare_nsaa_ff -> mutate_nsaa -> pdb2gmx -> gentop
 #
@@ -15,6 +15,9 @@
 #   - input/sep.pdb        (SEP fragment with CH3 cap at CA)
 #   - input/sep.itp        (GAFF2/CGenFF ITP for SEP)
 #   See input/README_sep_params.md for how to prepare the ITP.
+#
+# For a simpler phosphorylation calculation using the built-in SP1 residue,
+# see examples/06_phosphorylation_SP1/run.sh (no ITP preparation required).
 # =============================================================================
 set -euo pipefail
 

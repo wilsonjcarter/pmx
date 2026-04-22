@@ -1,16 +1,8 @@
 # Alchemical pKa shift: Cys32 CYS→CYM in thioredoxin (1ERT)
 
-```
-State A — protonated (CYS)             State B — deprotonated (CYM)
-
-  Cys32–SH  (protein)                    Cys32–S⁻  (protein)
-       |                                        |
-      ΔG1 (protein)                           ΔG1
-       |                                        |
-  Cys32–SH  (water)    ─── ΔG2 (water) ─── Cys32–S⁻  (water)
-
-  ΔΔG = ΔG1 − ΔG2      pKa = pKa_ref + ΔΔG / (RT ln 10)
-```
+<p align="center">
+  <img src="../imgs/schematic_p2.png" alt="pka thermocycle" width="800"/>
+</p>
 
 We compute the free energy cost of deprotonating Cys32 in *E. coli*
 thioredoxin (PDB: 1ERT) and subtract the same quantity measured for a

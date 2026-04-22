@@ -28748,7 +28748,99 @@
  [ dihedrals ]
 
  [ cmap ]
--C     N    CA     C    +N  
+-C     N    CA     C    +N
+
+[ S2P1 ] ; Ser -> Phosphoserine monoanionic (SP1)
+
+ [ atoms ]
+     N   NH1              -0.47000  1
+    HN   H                 0.31000  2
+    CA   CT1               0.07000  3
+    HA   HB1               0.09000  4
+    CB   CT2               0.05000  5
+   HB1   HA2               0.09000  6
+   HB2   HA2               0.09000  7
+    OG   OH1              -0.66000  8
+   HG1   H                 0.43000  9
+     C   C                 0.51000  10
+     O   O                -0.51000  11
+    DP   DUM_P2            0.00000  12
+  DO1P   DUM_ON3           0.00000  13
+  DO2P   DUM_ON3           0.00000  14
+   DOT   DUM_ON3           0.00000  15
+   DHT   DUM_HN1           0.00000  16
+
+ [ bonds ]
+     N      HN ; (     N      HN)
+     N      CA ; (     N      CA)
+    CA      CB ; (    CA      CB)
+    CA       C ; (    CA       C)
+    CA      HA ; (    CA      HA)
+    CB      OG ; (    CB      OG)
+    CB     HB1 ; (    CB     HB1)
+    CB     HB2 ; (    CB     HB2)
+    OG     HG1 ; (    OG  HG1.gone)
+    OG      DP ; (    OG       P)
+     C       O ; (     C       O)
+    DP    DO1P ; (     P     O1P)
+    DP    DO2P ; (     P     O2P)
+    DP     DOT ; (     P      OT)
+   DOT     DHT ; (    OT      HT)
+     C      +N
+
+ [ impropers ]
+     N      -C      CA      HN
+     C      CA      +N       O
+
+ [ dihedrals ]
+
+ [ cmap ]
+-C     N    CA     C    +N
+
+[ S2P2 ] ; Ser -> Phosphoserine dianionic (SP2)
+
+ [ atoms ]
+     N   NH1              -0.47000  1
+    HN   H                 0.31000  2
+    CA   CT1               0.07000  3
+    HA   HB1               0.09000  4
+    CB   CT2               0.05000  5
+   HB1   HA2               0.09000  6
+   HB2   HA2               0.09000  7
+    OG   OH1              -0.66000  8
+   HG1   H                 0.43000  9
+     C   C                 0.51000  10
+     O   O                -0.51000  11
+    DP   DUM_P2            0.00000  12
+  DO1P   DUM_ON3           0.00000  13
+  DO2P   DUM_ON3           0.00000  14
+   DOT   DUM_ON3           0.00000  15
+
+ [ bonds ]
+     N      HN ; (     N      HN)
+     N      CA ; (     N      CA)
+    CA      CB ; (    CA      CB)
+    CA       C ; (    CA       C)
+    CA      HA ; (    CA      HA)
+    CB      OG ; (    CB      OG)
+    CB     HB1 ; (    CB     HB1)
+    CB     HB2 ; (    CB     HB2)
+    OG     HG1 ; (    OG  HG1.gone)
+    OG      DP ; (    OG       P)
+     C       O ; (     C       O)
+    DP    DO1P ; (     P     O1P)
+    DP    DO2P ; (     P     O2P)
+    DP     DOT ; (     P      OT)
+     C      +N
+
+ [ impropers ]
+     N      -C      CA      HN
+     C      CA      +N       O
+
+ [ dihedrals ]
+
+ [ cmap ]
+-C     N    CA     C    +N
 
 [ S2Z ] ; Ser -> Hsp
 

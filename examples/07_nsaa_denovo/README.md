@@ -1,4 +1,21 @@
-# Alchemical phosphorylation: Ser → phosphoSer (SEP) via NSAA workflow
+# [WIP] De-novo NSAA: Ser → phosphoSer (SEP) via ITP→RTP patching
+
+> **Work in progress.** The `prepare_nsaa_ff` and `mutate_nsaa` tools are
+> functional but the end-to-end workflow is still being validated.  Use
+> `examples/06_phosphorylation_SP1/` for a production-ready phosphorylation
+> calculation using the CHARMM36m built-in SP1 residue.
+
+---
+
+## When to use this workflow vs example 06
+
+| Scenario | Recommended |
+|----------|-------------|
+| Phosphorylation using CHARMM36m SP1/SP2 | **Example 06** (fast, no ITP needed) |
+| Phosphorylation with custom ITP parameters | **Example 07** (this example) |
+| Any other PTM or non-standard AA | **Example 07** |
+
+---
 
 ```
 State A — unphosphorylated             State B — phosphorylated
@@ -276,3 +293,5 @@ form, as seen in many regulatory phosphorylation sites).
   consistent treatment.
 - Adjust `--resid 42` to match the target serine in your own structure (pmx
   numbers residues from 1 within each chain by default).
+- For the simpler case where the target residue IS already in the force-field
+  library (SP1/SP2 for phosphoserine), see `examples/06_phosphorylation_SP1/`.

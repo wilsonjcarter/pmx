@@ -1,16 +1,8 @@
 # Alchemical amino acid substitution: Trp6→Ala in Trp Cage (1L2Y)
 
-```
-State A — wildtype                     State B — mutant
-
-  Trp6 (folded Trp Cage)                 Ala6 (folded Trp Cage)
-       |                                        |
-      ΔG1 (protein)                           ΔG1
-       |                                        |
-  Trp6 (unfolded / water)  ─── ΔG2 ───  Ala6 (unfolded / water)
-
-  ΔΔG = ΔG1 − ΔG2
-```
+<p align="center">
+  <img src="../imgs/schematic_p1.png" alt="mutation thermocycle" width="800"/>
+</p>
 
 We compute the free energy difference between the wildtype (Trp6) and mutant
 (Ala6) forms of the Trp Cage miniprotein (PDB: 1L2Y).  Repeating the

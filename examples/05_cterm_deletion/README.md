@@ -1,17 +1,8 @@
 # Alchemical C-terminal residue deletion: HSP90 MEEVD peptide (1ELR)
 
-```
-State A — full peptide                 State B — C-terminally truncated
-
-  M(1)–E(2)–E(3)–V(4)–D(5)               M(1)–E(2)–E(3)–V(4)–[D(5)]
-         |                                              |
-        ΔG1 (protein)                                ΔG1
-         |                                              |
-  M(1)–E(2)–E(3)–V(4)–D(5) ─── ΔG2 ─── M(1)–E(2)–E(3)–V(4)–[D(5)]
-          (reference peptide in water)
-
-  ΔΔG = ΔG1 − ΔG2      [D] = non-interacting dummy in state B
-```
+<p align="center">
+  <img src="../imgs/schematic_p4.png" alt="deletion thermocycle" width="800"/>
+</p>
 
 We compute the free energy cost of removing the C-terminal aspartate from
 the HSP90 C-terminal MEEVD peptide (PDB: 1ELR chain B).  The same

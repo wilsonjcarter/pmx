@@ -262,7 +262,7 @@ class InteractiveSelection:
 
         _check_residue_name(residue)
         print('\nSelect new amino acid for %s-%s: ' % (residue.id, residue.resname))
-        sys.stdout.write('Three- or one-letter code (or four-letter for ff specific residues): ')
+        sys.stdout.write('One-, two-, three-, or four-letter code: ')
         if residue.resname in ['HIE', 'HISE', 'HSE']:
             rol = 'X'
         elif residue.resname in ['HIP', 'HISH', 'HSP']:
@@ -291,18 +291,17 @@ class InteractiveSelection:
 
         while aa is None:
             aa = input().upper()
-            # some special residues:
-            #   CM - deprotonated cysteine
-            #   YM - deprotonated tyrosine
-            if aa == 'CM':
-                sys.stdout.write('Special case for deprotonated residue')
+            # two-letter codes (e.g. CM=deprotonated cysteine, P1=monoanionic
+            # phosphoserine SP1, P2=dianionic phosphoserine SP2)
+            if len(aa) == 2 and aa in ol:
+                pass  # valid two-letter code, keep as-is
             elif len(aa) != 1 and len(aa) != 3 and len(aa) != 4:
-                sys.stdout.write('Nope!\nThree- or one-letter code (or four-letter for ff specific residues): ')
+                sys.stdout.write('Nope!\nOne-, two-, three-, or four-letter code: ')
                 aa = None
             elif (len(aa) == 1 and aa not in ol+['B', 'J', 'O', 'X', 'Z']) or \
                  (len(aa) == 3 and aa not in tl) or \
                  (len(aa) == 4 and aa not in tl):
-                sys.stdout.write('Unknown aa "%s"!\nThree- or one-letter code (or four-letter for ff specific residues): ' % aa)
+                sys.stdout.write('Unknown aa "%s"!\nOne-, two-, three-, or four-letter code: ' % aa)
                 aa = None
             if aa and (len(aa) == 3 or len(aa) == 4):
                 aa = library._ext_one_letter[aa]
