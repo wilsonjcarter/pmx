@@ -7,7 +7,7 @@
 > extended protein mutation support.** It adds hybrid residues and force-field parameters for post-translational
 > modifications and non-standard chemistries not present in the upstream release — see highlights below.
 
-<img src="examples/imgs/overview.png" alt="pmx FEP workflow overview" align="right" width="410"/>
+<img src="examples/imgs/pmx_overview.png" alt="pmx FEP workflow overview" align="center" width="410"/>
 
 `pmx` is a Python library for setting up and analysing alchemical free-energy calculations in
 [GROMACS](http://gromacs.org). Starting from a crystal structure you can build hybrid (dual-topology)
@@ -15,14 +15,13 @@ residues, generate perturbed force-field parameters, and compute ΔG via non-equ
 
 ### What this fork adds (on top of upstream `develop`)
 
+## New free energy capabilities
 | Feature | Hybrid code | Force field |
 |---------|------------|-------------|
-| Ser → phosphoSer (mono/dianionic) | S2P1 / S2P2 | SP1/SP2 in `charmm36m-mut` |
-| Thr → phosphoThr (mono/dianionic) | T2P1 / T2P2 | TP1/TP2 in `charmm36m-mut` |
-| Tyr → phosphoTyr (mono/dianionic) | Y2P1 / Y2P2 | YP1/YP2 in `charmm36m-mut` |
 | Cys–Cys disulfide formation / breaking | C2CD | — |
 | C-terminal residue deletion | *deC | — |
 | N-terminal residue deletion | *deN | — |
+| Post-translational modifications | SP1/SP2/YP1/YP2/TP1/TP2/MLZ/MLY/M3L | — |
 
 All phosphorylation hybrids use the same user-facing target code (`P1` monoanionic, `P2` dianionic);
 pmx automatically picks the correct hybrid based on the source residue:
@@ -33,7 +32,14 @@ printf "42 P1\n" | pmx mutate -f wt.gro -o mutant.pdb -ff charmm36m-mut  # Ser �
 printf "18 P1\n" | pmx mutate -f wt.gro -o mutant.pdb -ff charmm36m-mut  # Thr → TP1
 ```
 
+`pmx` should now be able to handle arbitrary PTMs for which an `.rtp` entry is present in the `.ff` folder. A user supplied `.pdb` of the modified residue is still required in order to position the hybrid atoms.
+
 See [`examples/`](examples/) for six worked end-to-end FEP pipelines.
+
+More features will be added as they become available
+
+## Modified force force fields
+Over the past several years we've experimented with force field modifications, assessing their effect on free energy calculation accuracy. Two major developements have been the use of modified backbone partial charges in the Amber force field family, and charge-scaling in both the Amber and CHARMM families. Several modified force fields are available and can be used directly with `pmx` or to run plain molecular dynamics simulations.
 
 https://degrootlab.github.io/pmx/
 
