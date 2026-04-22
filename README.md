@@ -13,8 +13,6 @@
 [GROMACS](http://gromacs.org). Starting from a crystal structure you can build hybrid (dual-topology)
 residues, generate perturbed force-field parameters, and compute ΔG via non-equilibrium switching or BAR.
 
-### What this fork adds (on top of upstream `develop`)
-
 ## New free energy capabilities
 | Feature | Hybrid code | Force field |
 |---------|------------|-------------|
@@ -32,14 +30,34 @@ printf "42 P1\n" | pmx mutate -f wt.gro -o mutant.pdb -ff charmm36m-mut  # Ser �
 printf "18 P1\n" | pmx mutate -f wt.gro -o mutant.pdb -ff charmm36m-mut  # Thr → TP1
 ```
 
-`pmx` should now be able to handle arbitrary PTMs for which an `.rtp` entry is present in the `.ff` folder. A user supplied `.pdb` of the modified residue is still required in order to position the hybrid atoms.
+`pmx` should now be able to handle arbitrary PTMs for which an `.rtp` entry is present in the `.ff` folder. A user-supplied `.pdb` of the modified residue is still required in order to position the hybrid atoms.
 
 See [`examples/`](examples/) for six worked end-to-end FEP pipelines.
 
-More features will be added as they become available
+More features will be added as they become available.
 
-## Modified force force fields
-Over the past several years we've experimented with force field modifications, assessing their effect on free energy calculation accuracy. Two major developements have been the use of modified backbone partial charges in the Amber force field family, and charge-scaling in both the Amber and CHARMM families. Several modified force fields are available and can be used directly with `pmx` or to run plain molecular dynamics simulations.
+## Modified force fields
+Over the past several years we've experimented with force field modifications, assessing their effect on free energy calculation accuracy. Two major developments have been the use of modified backbone partial charges in the Amber force field family, and charge-scaling in both the Amber and CHARMM families. Several modified force fields are available and can be used directly with `pmx` or to run plain molecular dynamics simulations.
+
+## Installation
+
+```bash
+# 1. Clone this repository
+git clone -b develop https://github.com/wilsonjcarter/pmx.git
+cd pmx
+
+# 2. Create and activate a conda environment
+conda create -n devpmx python=3.11 numpy matplotlib scipy pip jupyter pandas
+conda activate devpmx
+
+# 3. Install pmx
+pip install .
+
+# 4. Activate GROMACS (adjust path to your installation)
+source /usr/local/gromacs/bin/GMXRC
+```
+
+GROMACS 2022 or newer is recommended. The `charmm36m-mut` force field is bundled with pmx and requires no separate installation.
 
 ## Citations
 

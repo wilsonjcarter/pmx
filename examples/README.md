@@ -7,7 +7,7 @@ Each directory contains a `run.sh` (complete pipeline) and a `README.md`
 (unique highlights + detailed walkthrough).
 
 <table bgcolor="#ffffff" cellspacing="0" cellpadding="8" border="0">
-<tr>
+<tr bgcolor="#ffffff">
 <td align="center" width="33%" bgcolor="#ffffff">
 <img src="imgs/schematic_p1.png" width="100%"/><br/>
 <sub><b>01</b> &nbsp; amino acid substitution (W→F)</sub>
@@ -21,7 +21,7 @@ Each directory contains a `run.sh` (complete pipeline) and a `README.md`
 <sub><b>03</b> &nbsp; disulfide bond formation</sub>
 </td>
 </tr>
-<tr>
+<tr bgcolor="#ffffff">
 <td align="center" width="33%" bgcolor="#ffffff">
 <img src="imgs/schematic_p4.png" width="100%"/><br/>
 <sub><b>04</b> &nbsp; C-terminal residue deletion</sub>
@@ -45,7 +45,7 @@ Each directory contains a `run.sh` (complete pipeline) and a `README.md`
 | 2 | `02_protonation_C2CM` | Thioredoxin (1ERT) | ΔpKa of Cys32 | charmm36m-mut |
 | 3 | `03_disulfide_C2CD` | Thioredoxin (1ERT) | ΔE of disulfide formation | charmm36m-mut |
 | 4 | `04_cterm_deletion` | HSP90 MEEVD peptide (1ELR) | ΔΔG of C-terminal truncation | charmm36m-mut |
-| 5 | `05_phosphorylation_pTyr` | Lck SH2 domain (1AOT) | ΔΔG of Tyr phosphorylation (TP1) | charmm36m-mut |
+| 5 | `05_phosphorylation_pTyr` | Lck SH2 domain (1AOT) | ΔΔG of Tyr phosphorylation (YP1) | charmm36m-mut |
 | 6 | `06_nsaa_denovo` **(WIP)** | Protein with target Ser | ΔΔG of Ser→SEP via custom ITP | charmm36m-mut |
 
 ## Prerequisites
