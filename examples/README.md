@@ -91,8 +91,8 @@ protein leg:   CYS ──────────► CYM    Δq = −1  ┐
 reference leg: CYM ──────────► CYS    Δq = +1  ┘ net box Δq = 0  ✓
 ```
 
-The reference is the **biological peptide** — the actual pTyr peptide (example 5), the MEEVD
-peptide itself (example 4) — not a minimal capped tripeptide. Using the real peptide captures
+The reference is typically the **biological peptide** — the actual pTyr peptide (example 5), the MEEVD
+peptide itself (example 4) — not a minimal capped tripeptide (except when this is the experimental reference). Using the real peptide captures
 the free energy in the same sequence context and gives ΔΔG of binding directly. Use
 `pmx doublebox` to place both structures in one box before solvation:
 
