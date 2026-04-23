@@ -138,15 +138,19 @@ log_> Total charge of state B = -2
 
 ---
 
-## Step 6 — Solvate and add ions
+## Step 6 — Define box, solvate, and add ions
+
+`gmx editconf` must be called before `gmx solvate` to define box vectors.
 
 ```bash
-gmx solvate -cp processed.gro -cs spc216.gro -p pmxtop.top -o solvated.gro
+gmx editconf -f processed.gro -o boxed.gro -bt dodecahedron -d 1.2
+
+gmx solvate -cp boxed.gro -cs spc216.gro -p pmxtop.top -o solvated.gro
 
 gmx grompp -f mdp/em.mdp -c solvated.gro -r solvated.gro \
            -p pmxtop.top -o ions.tpr -maxwarn 1
 printf '13\n' | gmx genion -s ions.tpr -pname K -nname CL \
-           -neutral -o ions.gro -p pmxtop.top
+           -neutral -conc 0.15 -o ions.gro -p pmxtop.top
 ```
 
 ---

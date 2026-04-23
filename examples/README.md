@@ -65,14 +65,19 @@ bash run.sh
 ## General pmx protein FEP workflow
 
 ```
-1. pdb2gmx (wildtype)  → normalised atom names (.gro)
-2. pmx mutate          → hybrid structure (.pdb)
-3. pdb2gmx (mutant)    → standard topology (.top)
-4. pmx gentop          → hybrid topology (pmxtop.top)
-5. solvate + ions + em → production-ready system
-6. endpoint MD + NEQ   → transition trajectories
-7. pmx analyze         → ΔG via Crooks/BAR
+1. pdb2gmx (wildtype)         → normalised atom names (.gro)
+2. pmx mutate                 → hybrid structure (.pdb)
+3. pdb2gmx (mutant)           → standard topology (.top)
+4. pmx gentop                 → hybrid topology (pmxtop.top)
+5a. gmx editconf              → simulation box (.gro)  [single-system only]
+5b. gmx solvate + gmx genion  → solvated, ion-neutralised system
+6.  endpoint MD + NEQ         → transition trajectories
+7.  pmx analyze               → ΔG via Crooks/BAR
 ```
+
+Step 5a (`gmx editconf`) defines the box for single-system setups (examples 1, 3). The
+charge-changing examples (2, 4, 5) use `pmx doublebox` instead, which sets the box vectors
+internally — `editconf` is not needed when using doublebox.
 
 Example 4 adds a one-time `generate_term_deletion` step before step 2.
 Example 6 replaces step 2 with `pmx mutate_nsaa` and adds `prepare_nsaa_ff` before it.

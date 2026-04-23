@@ -94,15 +94,20 @@ log_> Total charge of state B =  0
 
 ---
 
-### Step 5 — Solvate and add ions
+### Step 5 — Define box, solvate, and add ions
+
+`gmx editconf` defines the simulation box before solvation. For the Trp Cage miniprotein a
+truncated-octahedron (dodecahedron) with 1.2 nm to the box wall is standard.
 
 ```bash
-gmx solvate -cp processed.gro -cs spc216.gro -p pmxtop.top -o solvated.gro
+gmx editconf -f processed.gro -o boxed.gro -bt dodecahedron -d 1.2
+
+gmx solvate -cp boxed.gro -cs spc216.gro -p pmxtop.top -o solvated.gro
 
 gmx grompp -f mdp/em.mdp -c solvated.gro -r solvated.gro \
            -p pmxtop.top -o ions.tpr -maxwarn 1
 printf '13\n' | gmx genion -s ions.tpr -pname K -nname CL \
-           -neutral -o ions.gro -p pmxtop.top
+           -neutral -conc 0.15 -o ions.gro -p pmxtop.top
 ```
 
 ---

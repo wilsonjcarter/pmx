@@ -71,10 +71,36 @@ pmx gentop \
     -o  pmxtop.top \
     -ff "$FF"
 
+# ── 6. Define box, solvate, and add ions ───────────────────────────────────
+# editconf must be called before solvate to define the box vectors.
+# The doublebox examples (02, 04, 05) skip this because pmx doublebox already
+# sets the box; single-system setups always need editconf first.
+echo ">>> gmx editconf ..."
+gmx editconf \
+    -f  processed.gro \
+    -o  boxed.gro \
+    -bt dodecahedron \
+    -d  1.2
+
+echo ">>> gmx solvate ..."
+gmx solvate \
+    -cp boxed.gro \
+    -cs spc216.gro \
+    -p  pmxtop.top \
+    -o  solvated.gro
+
+echo ">>> gmx genion (0.15 M KCl, neutral) ..."
+gmx grompp -f mdp/em.mdp -c solvated.gro -r solvated.gro \
+           -p pmxtop.top -o ions.tpr -maxwarn 1
+printf '13\n' | gmx genion \
+    -s    ions.tpr \
+    -pname K  -nname CL \
+    -neutral  -conc 0.15 \
+    -o    ions.gro \
+    -p    pmxtop.top
+
 echo ""
 echo "=== Done ==="
 echo "Hybrid structure : mutant.pdb"
 echo "Hybrid topology  : pmxtop.top"
-echo ""
-echo "Next steps: solvate, add ions, energy minimise, equilibrate,"
-echo "then run stateA and stateB production simulations."
+echo "Solvated system  : ions.gro  (ready for energy minimisation)"

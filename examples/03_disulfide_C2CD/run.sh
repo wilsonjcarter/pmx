@@ -84,10 +84,37 @@ pmx gentop \
     -o  pmxtop.top \
     -ff "$FF"
 
+# ── 6. Define box, solvate, and add ions ───────────────────────────────────
+# editconf must be called before solvate to define the box vectors.
+echo ">>> gmx editconf ..."
+gmx editconf \
+    -f  processed.gro \
+    -o  boxed.gro \
+    -bt dodecahedron \
+    -d  1.2
+
+echo ">>> gmx solvate ..."
+gmx solvate \
+    -cp boxed.gro \
+    -cs spc216.gro \
+    -p  pmxtop.top \
+    -o  solvated.gro
+
+echo ">>> gmx genion (0.15 M KCl, neutral) ..."
+gmx grompp -f mdp/em.mdp -c solvated.gro -r solvated.gro \
+           -p pmxtop.top -o ions.tpr -maxwarn 1
+printf '13\n' | gmx genion \
+    -s    ions.tpr \
+    -pname K  -nname CL \
+    -neutral  -conc 0.15 \
+    -o    ions.gro \
+    -p    pmxtop.top
+
 echo ""
 echo "=== Done ==="
 echo "Hybrid structure : mutant.pdb    (Cys32 and Cys35 are C2CD)"
 echo "Hybrid topology  : pmxtop.top    (SG-SG cross-residue terms included)"
+echo "Solvated system  : ions.gro      (ready for energy minimisation)"
 echo ""
 echo "State A: reduced thioredoxin  (both Cys free thiols)"
 echo "State B: oxidised thioredoxin (Cys32-Cys35 disulfide)"
