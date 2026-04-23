@@ -39,6 +39,17 @@ More features will be added as they become available.
 ## Modified force fields
 Over the past several years we've experimented with force field modifications, assessing their effect on free energy calculation accuracy. Two major developments have been the use of modified backbone partial charges in the Amber force field family, and charge-scaling in both the Amber and CHARMM families. Several modified force fields are available and can be used directly with `pmx` or to run plain molecular dynamics simulations.
 
+| ff19SB-q-mut.ff | modified backbone partial charge; mutres per-residue cmap  |
+| ff14SB-q-mut.ff | modified backbone partial charge  |
+| ff99SB-star-ildnp-q-mut.ff | modified backbone partial charge; proline correction  |
+| charmm36m-ecc-mut.ff | ECC charge-scaling; cysteine vdW correction |
+
+If you use these modified force fields, in addition to the original force field references please consider citing:
+
+Backbone partial charges for Amber14SB (and improve free energy calculations): Wilson, C.J. J. Chem. Theory Comput. 21(8) 4095–4106 (2025) [10.1021/acs.jctc.5c00031]
+Backbone partial charges for Amber99SB: Best R., de Sancho D., Mittal J, Biophys. J, 102, 1462-1467 (2012) [10.1016/j.bpj.2012.02.024]
+Charge-scaling: I. V., Leontyev, A. A. Stuchebrukhov, J. Chem. Phys. 130(8), 085102 (2009) [10.1063/1.3060164]
+
 ## Installation
 
 ```bash
