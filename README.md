@@ -47,9 +47,9 @@ Over the past several years we've experimented with force field modifications, a
 
 If you use these modified force fields, in addition to the original force field references please consider citing:
 
-- Backbone partial charges for Amber14SB (and improve free energy calculations): Wilson, C.J. J. Chem. Theory Comput. 21(8) 4095–4106 (2025) [https://doi.org/10.1021/acs.jctc.5c00031]
-- Backbone partial charges for Amber99SB: Best R., de Sancho D., Mittal J, Biophys. J, 102, 1462-1467 (2012) [https://doi.org/10.1016/j.bpj.2012.02.024]
-- Charge-scaling: I. V., Leontyev, A. A. Stuchebrukhov, J. Chem. Phys. 130(8), 085102 (2009) [https://doi.org/10.1063/1.3060164]
+- Backbone partial charges for Amber14SB (and improved free energy calculations): Wilson, C.J., et al. *JCTC* 21(8) 4095–4106 (2025) [link](https://doi.org/10.1021/acs.jctc.5c00031)
+- Backbone partial charges for Amber99SB: Best R., et al. *BJ* 102, 1462-1467 (2012) [link](https://doi.org/10.1016/j.bpj.2012.02.024)
+- Charge-scaling: I. V., Leontyev, A. A. Stuchebrukhov, *JCP* 130(8), 085102 (2009) [link](https://doi.org/10.1063/1.3060164)
 
 ## Installation
 
