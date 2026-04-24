@@ -537,7 +537,7 @@ class Molecule(Atomselection):
                     result.append(atom)
         return result
 
-    def fetchm(self, keys, how='byname'):
+    def fetchm(self, keys, how='byname', permissive=False):
         """Fetch multiple atoms. It select atoms using a list names or
         elements.
 
