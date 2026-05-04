@@ -573,14 +573,17 @@ def _assign_rtp_entries(mol, rtp, term=None):
 
     neigh = []
 
+    #print(entr)
     for atom_entry in entr['atoms']:
         atom_name, atom_type, atom_q = atom_entry[0], atom_entry[1], atom_entry[2]
+        #print(atom_name,atom_type,atom_q)
         # Apply CHARMM alias inversion
         if resname in _inverted_aliases and atom_name in _inverted_aliases[resname]:
             atom_name = _inverted_aliases[resname][atom_name]
         elif atom_name[0].isnumeric():
             # Numeric-prefix to suffix (e.g. "1HB" → "HB1")
             atom_name = atom_name[1:] + atom_name[0]
+        #print(atom_name,atom_type,atom_q)
 
         try:
             atom = mol.fetchm([atom_name], permissive=True)[0]
@@ -1382,6 +1385,7 @@ def mutate_nsaa(m, mut_resid: int, mut_resname: str, ff: str,
     if m2.unity == 'nm':
         m2.nm2a()
 
+    #print(mut_resid,mut_chain)
     residue1 = m2.fetch_residue(idx=mut_resid, chain=mut_chain)
     chain    = residue1.chain
     cterm    = chain.cterminus()
@@ -1450,6 +1454,12 @@ def mutate_nsaa(m, mut_resid: int, mut_resname: str, ff: str,
         logger.warning("'%s' not in RTP and no ITP provided — "
                        "parameters may be incomplete.", residue2.resname)
 
+    #print("*****")
+    #for i in residue1.atoms:
+    #    print(i)
+    #for i in residue2.atoms:
+    #    print(i)
+
     _validate_atom_parameters(residue1, 'state A')
     _validate_atom_parameters(residue2, 'state B')
     _assign_mass_atp(residue1, residue2,
@@ -1497,7 +1507,8 @@ def mutate_nsaa(m, mut_resid: int, mut_resname: str, ff: str,
     merged_atoms2 = []
     residue1.batoms = []
     atom_pairs = []
-
+    #for i in residue2.atoms:
+    #    print(i.atomtype,i.atomtypeB)
     for id1, id2 in zip(pairs1, pairs2):
         at1, at2 = residue1.atoms[id1], residue2.atoms[id2]
         logger.info("  %s ---> %s", at1.name, at2.name)
@@ -1507,7 +1518,16 @@ def mutate_nsaa(m, mut_resid: int, mut_resname: str, ff: str,
         merged_atoms2.append(at2)
         atom_pairs.append([at1, at2])
 
+    #print()
+    #for a in merged_atoms2:
+    #    print(a.name,a.atomtype)
+
+    #print()
+    #for a in residue2.atoms:
+    #    print(a.name, a.atomtype)
+
     dummies = [a for a in residue2.atoms if a not in merged_atoms2]
+    #print([(i.name, i.atomtype, i.atomtypeB) for i in dummies])
     logger.info("Dummy atoms (B-state only): %s", [a.name for a in dummies])
     _merge_molecules(residue1, dummies)
     _make_bstate_dummies(residue1)
@@ -1538,8 +1558,8 @@ def mutate_nsaa(m, mut_resid: int, mut_resname: str, ff: str,
 
     # ── Name and write outputs ────────────────────────────────────────────────
     one_letter = library._one_letter.get(residue1.resname, residue1.resname[0])
-    hybrid_name = one_letter + '2' + mut_resname[:3].upper()
-
+    hybrid_name = one_letter + '2' + mut_resname.upper()
+    hybrid_name = hybrid_name[:4] # truncate
     residue1.resnA, residue1.resnB = residue1.resname, mut_resname
     residue1.set_resname(hybrid_name)
 

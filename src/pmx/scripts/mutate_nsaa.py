@@ -232,6 +232,10 @@ def main(args):
 
     # ── Run the NSAA mutation ─────────────────────────────────────────────────
     print('log_> Mutating residue %d to %s ...' % (args.resid, args.resname))
+    print(args.chain)
+    print(args.chain)
+    print(args.chain)
+    print(args.chain)
 
     mutate_nsaa(
         m=m,
