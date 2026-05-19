@@ -1599,7 +1599,7 @@ def _explicit_defined_dihedrals(filename, ff):
         if line.startswith('#define'):
             entr = line.split()
             name = entr[1]
-            if ffnamelower.startswith('amber'):
+            if "amber" in ffnamelower: #ffnamelower.startswith('amber'):
                 params = [9, float(entr[2]), float(entr[3]), int(entr[4])]
             elif ffnamelower.startswith('opls'):
                 if len(entr) == 8:  # dihedral

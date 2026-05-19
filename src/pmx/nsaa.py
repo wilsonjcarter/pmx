@@ -1559,6 +1559,11 @@ def mutate_nsaa(m, mut_resid: int, mut_resname: str, ff: str,
     # ── Name and write outputs ────────────────────────────────────────────────
     one_letter = library._one_letter.get(residue1.resname, residue1.resname[0])
     hybrid_name = one_letter + '2' + mut_resname.upper()
+    #if one_letter == mut_resname.upper()[0]:
+    #    hybrid_name = one_letter + '2' + mut_resname.upper()[::-1]
+
+    #hybrid_name = residue1.resname[:2] + mut_resname.upper()[:2]
+
     hybrid_name = hybrid_name[:4] # truncate
     residue1.resnA, residue1.resnB = residue1.resname, mut_resname
     residue1.set_resname(hybrid_name)

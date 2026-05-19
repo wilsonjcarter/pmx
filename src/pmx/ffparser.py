@@ -711,7 +711,7 @@ class NBParser:
                         }
 
         elif version == 'new':
-            if ffnamelower.startswith('amber') or ffnamelower.startswith('charmm'):
+            if 'amber' in ffnamelower or 'charmm' in ffnamelower: #.startswith('amber') or ffnamelower.startswith('charmm'):
                 lst = parseList('siffsff', lst)
                 for entr in lst:
                     self.atomtypes[entr[0]] = {
