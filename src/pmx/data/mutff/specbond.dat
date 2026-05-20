@@ -1,4 +1,4 @@
-8
+14
 CYS	SG	1	CYS	SG	1	0.2	CYS2	CYS2
 CYS	SG	1	HEM 	FE	2	0.25	CYS2	HEME
 CYS	SG	1	HEM 	CAB	1	0.18	CYS2	HEME
@@ -7,3 +7,9 @@ HIS	NE2	1	HEM 	FE	1	0.2	HIS1	HEME
 MET	SD	1	HEM 	FE	1	0.24	MET	HEME
 CO      C       1       HEME    FE      1       0.19    CO      HEME
 CYM     SG      1       CYM     SG      1       0.2     CYS2    CYS2
+CYS  	SG   	2 	ZN  	ZN 	4 	0.234 	CYN  	ZN
+CYN  	SG   	2 	ZN  	ZN 	4 	0.234 	CYN  	ZN
+HSE  	ND1   	2 	ZN  	ZN 	4 	0.200 	HSE  	ZN
+HIS  	ND1   	2 	ZN  	ZN 	4 	0.200 	HSE  	ZN
+HSD  	NE2   	2 	ZN  	ZN 	4 	0.200 	HSD  	ZN
+HIS  	NE2   	2 	ZN  	ZN 	4 	0.200 	HSD  	ZN

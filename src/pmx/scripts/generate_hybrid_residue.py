@@ -900,6 +900,29 @@ def _improp_entries_match(lst1, lst2):
             res = False
     return res
 
+# def _improp_entries_match(lst1, lst2):
+#     res = True
+#     for a1, a2 in zip(lst1[:4], lst2[:4]):
+#         if a1.name != a2.name:
+#             res = False
+#     if res is True:
+#         return res
+#     res = True
+#     for a1, a2 in zip(lst1[:4], list(reversed(lst2[:4]))):
+#         if a1.name != a2.name:
+#             res = False
+#     if len(lst1) > 4:
+#         if len(lst2) > 4:
+#             if lst1[4:] == lst2[4:]:
+#                 res = True
+#             else:
+#                 res = False
+#         else:
+#             res = False
+#     return res
+
+
+
 
 def _generate_dihedral_entries(im1, im2, r, pairs):
     logger.info('Updating dihedrals')
@@ -1569,14 +1592,18 @@ def create_hybrid_lib(m1, m2,
 
     # check if is one of the charmm ff
     # also check ff name contains either amber, charmm, opls
+    bNineteen = False
     if "charmm" in ffname:
         bCharmm = True
     elif 'amber' in ffname or 'opls' in ffname:
         bCharmm = False
+        if '19sb' in ffname:
+            bNineteen = True
     else:
         raise ValueError('cannot determine force field type from the path/'
                          'directory name')
 
+    print(ffname,bNineteen)
     # Get 3-letter resname from models
     nm1 = m1.residues[0].resname
     nm2 = m2.residues[0].resname
@@ -1888,6 +1915,8 @@ def create_hybrid_lib(m1, m2,
     cmap = []
     if bCharmm is True:
         cmap = rtp[r1.resname]['cmap']
+    if bNineteen is True:
+        cmap = rtp[r1.resname]['cmap']
 
     # dihedrals
     dihi_list = _generate_dihedral_entries(dih1, dih2, r1, atom_pairs)
@@ -2060,8 +2089,17 @@ def main(args):
             # import data
             pmxdata = get_pmxdata(fname='aminoacids.pkl')
             aminoacids = pickle.load(open(pmxdata, "rb"))
+            aminoacids_extra = Model(get_pmxdata(fname="CYM.pdb"))
+            aminoacids_extra.moltype = "protein"
+            entry =  deepcopy(aminoacids_extra.chdic["A"])
+            aminoacids_extra.chdic["pmxA"] = entry
+            aminoacids_extra.chdic.pop("A")
+            aminoacids["CYM"] = aminoacids_extra
+            #print(aminoacids_extra)
+            #print(aminoacids_extra.chdic)
             # aminoacids is a dict with resname: model
             keys = natural_sort(aminoacids.keys())
+            keys = ["CYS","CYM"]
             # prepare rtp/rtp lists
             rtp_all = _rtp_template
             mtp_all = []
@@ -2072,6 +2110,9 @@ def main(args):
                         # Create Models
                         m1 = aminoacids[a1]
                         m2 = aminoacids[a2]
+                        #print(m1.chdic,m2.chdic)
+                        for a in m1.atoms:
+                            print(a)
                         # print some info
                         text = ('Building library files for {0} --> {1} '
                                 'mutant'.format(m1.residues[0].resname,
