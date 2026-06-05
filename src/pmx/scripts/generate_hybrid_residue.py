@@ -445,6 +445,43 @@ dna_names = {
     'DG3_DC3':'D3Z',
     }
 
+rna_names = {
+    'RA5_RU5': 'R5K',
+    'RA5_RC5': 'R5L',
+    'RA5_RG5': 'R5M',
+    'RU5_RA5': 'R5N',
+    'RU5_RC5': 'R5O',
+    'RU5_RG5': 'R5P',
+    'RC5_RA5': 'R5R',
+    'RC5_RU5': 'R5S',
+    'RC5_RG5': 'R5T',
+    'RG5_RA5': 'R5X',
+    'RG5_RU5': 'R5Y',
+    'RG5_RC5': 'R5Z',
+    'RA3_RU3': 'R3K',
+    'RA3_RC3': 'R3L',
+    'RA3_RG3': 'R3M',
+    'RU3_RA3': 'R3N',
+    'RU3_RC3': 'R3O',
+    'RU3_RG3': 'R3P',
+    'RC3_RA3': 'R3R',
+    'RC3_RU3': 'R3S',
+    'RC3_RG3': 'R3T',
+    'RG3_RA3': 'R3X',
+    'RG3_RU3': 'R3Y',
+    'RG3_RC3': 'R3Z',
+    # False names to avoid an error
+    'RG3_RG3': 'FOO',
+    'RC3_RC3': 'FOO',
+    'RA3_RA3': 'FOO',
+    'RU3_RU3': 'FOO',
+    'RG5_RG5': 'FOO',
+    'RC5_RC5': 'FOO',
+    'RA5_RA5': 'FOO',
+    'RU5_RU5': 'FOO',
+    }
+
+
 _rtp_template = ['''[ bondedtypes ]
 ; Col 1: Type of bond
 ; Col 2: Type of angles
@@ -473,8 +510,8 @@ def _dna_mutation_naming(aa1, aa2):
 def _rna_mutation_naming(aa1, aa2):
     rr_name = 'R'+aa1[-1]+aa2[-1]
     dict_key = aa1+'_'+aa2
-    if dict_key in dna_names.keys():
-        rr_name = dna_names[dict_key]
+    if dict_key in rna_names.keys():
+        rr_name = rna_names[dict_key]
     return(rr_name)
 
 
@@ -1608,8 +1645,8 @@ def create_hybrid_lib(m1, m2,
     nm1 = m1.residues[0].resname
     nm2 = m2.residues[0].resname
     # Convert 3-letter names to 1-letter ones
-    aa1 = library._ext_one_letter[nm1]
-    aa2 = library._ext_one_letter[nm2]
+    aa1 = nm1 #library._ext_one_letter[nm1]
+    aa2 = nm2 #library._ext_one_letter[nm2]
 
     # determine hybrid residue name (rr_name)
     if moltype == 'protein':
@@ -2099,7 +2136,7 @@ def main(args):
             #print(aminoacids_extra.chdic)
             # aminoacids is a dict with resname: model
             keys = natural_sort(aminoacids.keys())
-            keys = ["CYS","CYM"]
+            #keys = ["CYS","CYM"]
             # prepare rtp/rtp lists
             rtp_all = _rtp_template
             mtp_all = []
