@@ -124,7 +124,7 @@ gmx pdb2gmx \
     -water  tip3p \
     -ignh
 
-printf "1 CM\n" | pmx mutate \
+printf "1\nC\nn\n" | pmx mutate \
     -f      ref_wt.gro \
     -o      ref_mutant.pdb \
     -ff     charmm36m-mut
