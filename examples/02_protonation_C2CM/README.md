@@ -131,17 +131,46 @@ pmx gentop \
 
 Expected output:
 ```
+log_> Reading input itp file "topol_Protein_chain_A.itp""
+log_> Scanning database for C2CM
 log_> Hybrid Residue -> 32 | C2CM
-log_> Making bonds for state B -> ...
+log_> Making bonds for state B -> 12 bonds with perturbed atoms
+log_> Making angles for state B -> 23 angles with perturbed atoms
+log_> Making dihedrals for state B -> 16 dihedrals with perturbed atoms
+log_> Removed 0 fake dihedrals
 log_> Total charge of state A = -5
 log_> Total charge of state B = -6
+
+log_> Reading input itp file "topol_Protein_chain_B.itp""
+log_> Scanning database for CM2C
+log_> Hybrid Residue -> 3 | CM2C
+log_> Making bonds for state B -> 12 bonds with perturbed atoms
+log_> Making angles for state B -> 23 angles with perturbed atoms
+log_> Making dihedrals for state B -> 16 dihedrals with perturbed atoms
+log_> Removed 0 fake dihedrals
+log_> Total charge of state A = -1
+log_> Total charge of state B = 0
 ```
 
-Notice that our the single-box double-system approach ensures total charge of state A and B is zero.
+Notice that while our the the protein charge goes from -5 to -6 and the peptide goes from -1 to 0, our single-box double-system approach ensures the system charge remains zero.
 
 ---
 
-### Step 6 — Energy minimise
+### Step 6 — Solvate and add ions
+
+```bash
+# Solvate the combined box
+gmx solvate -cp doublebox.gro -cs spc216.gro \
+            -p pmxtop.top -o solvated.pdb
+
+# Add ions — system is charge-neutral by construction
+gmx grompp -f mdp/em.mdp -c solvated.pdb -r solvated.gro \
+           -p pmxtop.top -o ions.tpr -maxwarn 1
+
+printf '13\n' | gmx genion -s ions.tpr -pname K -nname CL \
+           -neutral -conc 0.15 -o ions.pdb -p pmxtop.top
+```
+### Step 7 — Energy minimise
 
 ```bash
 gmx grompp -f mdp/em.mdp -c ions.gro -r ions.gro \
@@ -151,7 +180,7 @@ gmx mdrun -v -deffnm em -ntmpi 1
 
 ---
 
-### Step 7 — Equilibrate and run endpoint simulations
+### Step 8 — Equilibrate and run endpoint simulations
 
 ```bash
 mkdir -p stateA
@@ -169,7 +198,7 @@ Allow at least 10 ns equilibration per endpoint; the protonation state affects t
 
 ---
 
-### Step 8 — Non-equilibrium transition simulations
+### Step 9 — Non-equilibrium transition simulations
 
 ```bash
 mkdir -p transitionA
@@ -203,7 +232,7 @@ done
 
 ---
 
-### Step 9 — Analyse
+### Step 10 — Analyse
 
 Because both legs (protein and reference peptide) run simultaneously in the same box, `pmx analyze` operates on the combined work values and directly yields ΔΔG:
 
