@@ -49,7 +49,7 @@ gmx pdb2gmx \
 
 ```bash
 printf "32\nCM\nn\n" | pmx mutate \
-    -f      wt.gro \
+    -f      wt.pdb \
     -o      mutant.pdb \
     -ff     charmm36m-mut
 ```
@@ -58,14 +58,59 @@ printf "32\nCM\nn\n" | pmx mutate \
 
 ---
 
-### Step 3 — Build the hybrid topology
+### Step 3 — Build the reference structure
+```bash
+printf '3\n4\n' | gmx pdb2gmx \
+    -f      input/ref_peptide.pdb \
+    -o      ref_wt.pdb \
+    -p      ref_wt.top \
+    -ff     charmm36m-mut \
+    -water  tip3p \
+    -ter \
+    -ignh
+
+printf "3\nC\nn\n" | pmx mutate \
+    -f      ref_wt.pdb \
+    -o      ref_mutant.pdb \
+    -ff     charmm36m-mut
+```
+
+
+### Charge-neutral setup with pmx doublebox
+
+Deprotonation shifts the system charge from 0 to −1 (relative to the wildtype). In a periodic simulation box this charge change introduces finite-size artefacts that can bias ΔG by several kJ/mol. The correct approach is the **single-box double-system** method: place the protein system and a reference peptide in the *same* box so that one gains charge while the other loses it, keeping the total box charge constant throughout the alchemical transition.
+
+```
+                          alchemical λ: 0 → 1
+  protein in box:  CYS  ──────────────────────►  CYM     Δq = −1
+  reference in box: CYM ──────────────────────►  CYS     Δq = +1
+  ─────────────────────────────────────────────────────────────────
+  net charge change in box:                                    0  ✓
+```
+
+ΔΔG is recovered directly from the combined work values: `pmx analyze` sees the total work of both simultaneous transformations, and the reference cancels the solvation component, leaving only the protein-environment contribution. This directly gives the pKa shift via ΔΔG = ΔpKa × RT ln(10).
+
+
+#### Step 4a — Combine into one box
 
 ```bash
-gmx pdb2gmx \
-    -f      mutant.pdb \
-    -o      processed.gro \
+pmx doublebox \
+    -f1 mutant.pdb \
+    -f2 ref_mutant.pdb \
+    -o  doublebox.pdb \
+    -r  2.5 \
+    -d  1.5
+```
+
+### Step 4b — Build the doublebox topology
+
+```bash
+printf '0\n0\n3\n4\n' | gmx pdb2gmx \
+    -f      doublebox.pdb \
+    -o      gmx_doublebox.pdb \
     -p      topol.top \
     -ff     charmm36m-mut \
+    -ter \
     -water  tip3p
 ```
 
@@ -73,7 +118,7 @@ Do **not** pass `-ignh` — `pmx mutate` has already positioned all hydrogens an
 
 ---
 
-### Step 4 — Fill B-state bonded terms
+### Step 5 — Fill B-state bonded terms
 
 ```bash
 pmx gentop \
@@ -92,86 +137,7 @@ log_> Total charge of state A = -5
 log_> Total charge of state B = -6
 ```
 
-State B carries one extra negative charge (the thiolate). To avoid finite-size PBC artefacts from an unbalanced box charge, use the single-box double-system approach described in Step 5 — the combined protein+reference box remains charge-neutral throughout.
-
----
-
-### Step 5 — Charge-neutral setup with pmx doublebox
-
-Deprotonation shifts the system charge from 0 to −1 (relative to the wildtype). In a periodic simulation box this charge change introduces finite-size artefacts that can bias ΔG by several kJ/mol. The correct approach is the **single-box double-system** method: place the protein system and a reference peptide in the *same* box so that one gains charge while the other loses it, keeping the total box charge constant throughout the alchemical transition.
-
-```
-                          alchemical λ: 0 → 1
-  protein in box:  CYS  ──────────────────────►  CYM     Δq = −1
-  reference in box: CYM ──────────────────────►  CYS     Δq = +1
-  ─────────────────────────────────────────────────────────────────
-  net charge change in box:                                    0  ✓
-```
-
-ΔΔG is recovered directly from the combined work values: `pmx analyze` sees the total work of both simultaneous transformations, and the reference cancels the solvation component, leaving only the protein-environment contribution. This directly gives the pKa shift via ΔΔG = ΔpKa × RT ln(10).
-
-#### 5a — Prepare the reference leg
-
-The reference is a short Cys-containing peptide in water (e.g. ACE-Cys-NME, or any capped single-residue peptide). Run the same C2CM mutation on it:
-
-```bash
-# Reference: short Cys peptide (provide as input/ref_peptide.pdb)
-printf '3\n4\n' | gmx pdb2gmx \
-    -f      input/ref_peptide.pdb \
-    -o      ref_wt.gro \
-    -p      ref_wt.top \
-    -ff     charmm36m-mut \
-    -water  tip3p \
-    -ter \
-    -ignh
-
-printf "3\nC\nn\n" | pmx mutate \
-    -f      ref_wt.gro \
-    -o      ref_mutant.pdb \
-    -ff     charmm36m-mut
-
-printf '3\n4\n' | gmx pdb2gmx \
-    -f      ref_mutant.pdb \
-    -o      ref_processed.gro \
-    -p      ref_topol.top \
-    -ff     charmm36m-mut \
-    -ter \
-    -water  tip3p
-
-pmx gentop \
-    -p  ref_topol.top \
-    -o  ref_pmxtop.top \
-    -ff charmm36m-mut
-```
-
-#### 5b — Combine into one box
-
-```bash
-pmx doublebox \
-    -f1 processed.gro \
-    -f2 ref_processed.gro \
-    -o  doublebox.gro \
-    -r  2.5 \
-    -d  1.5
-```
-
-This places the protein and reference peptide in a single rectangular box separated by at least 2.5 nm, with 1.5 nm to the box wall.
-
-#### 5c — Merge topologies, solvate, and add ions
-
-Combine the two topology files by appending the reference molecule section to the protein topology. Then solvate the combined box and neutralise with `gmx genion`:
-
-```bash
-# Solvate the combined box
-gmx solvate -cp doublebox.gro -cs spc216.gro \
-            -p pmxtop.top -o solvated.gro
-
-# Add ions — system is charge-neutral by construction
-gmx grompp -f mdp/em.mdp -c solvated.gro -r solvated.gro \
-           -p pmxtop.top -o ions.tpr -maxwarn 1
-printf '13\n' | gmx genion -s ions.tpr -pname K -nname CL \
-           -neutral -conc 0.15 -o ions.gro -p pmxtop.top
-```
+Notice that our the single-box double-system approach ensures total charge of state A and B is zero.
 
 ---
 
