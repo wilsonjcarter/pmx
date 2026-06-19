@@ -48,7 +48,7 @@ gmx pdb2gmx \
 ### Step 2 — Build the hybrid structure
 
 ```bash
-printf "32 CM\n" | pmx mutate \
+printf "32\nCM\nn\n" | pmx mutate \
     -f      wt.gro \
     -o      mutant.pdb \
     -ff     charmm36m-mut
