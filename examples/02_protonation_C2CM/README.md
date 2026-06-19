@@ -18,7 +18,7 @@ This example computes the pKa shift of an active-site cysteine by alchemically r
 
 ```bash
 # Unique mutation step for this example
-printf "32 CM\n" | pmx mutate -f wt.gro -o mutant.pdb -ff charmm36m-mut
+printf "32\nCM\n" | pmx mutate -f wt.pdb -o mutant.pdb -ff charmm36m-mut
 
 # See run.sh for the complete workflow (Steps 1–9)
 ```
@@ -41,7 +41,7 @@ gmx pdb2gmx \
     -ignh
 ```
 
-`-ignh` strips all existing hydrogens so GROMACS rebuilds them consistently. The wildtype `.gro` is used only to normalise atom names before `pmx mutate`; the topology (`wt.top`) is discarded.
+`-ignh` strips all existing hydrogens so GROMACS rebuilds them consistently. The wildtype `.pdb` is used only to normalise atom names before `pmx mutate`; the topology (`wt.top`) is discarded.
 
 ---
 
@@ -152,7 +152,7 @@ log_> Total charge of state A = -1
 log_> Total charge of state B = 0
 ```
 
-Notice that while our the the protein charge goes from -5 to -6 and the peptide goes from -1 to 0, our single-box double-system approach ensures the system charge remains zero.
+Notice that while the protein charge goes from -5 to -6, the peptide goes from -1 to 0; this ensures the system charge remains zero.
 
 ---
 
@@ -164,7 +164,7 @@ gmx solvate -cp gmx_doublebox.pdb -cs spc216.gro \
             -p pmxtop.top -o solvated.pdb
 
 # Add ions — system is charge-neutral by construction
-gmx grompp -f mdp/em.mdp -c solvated.pdb -r solvated.gro \
+gmx grompp -f mdp/em.mdp -c solvated.pdb -r solvated.pdb \
            -p pmxtop.top -o ions.tpr -maxwarn 1
 printf '13\n' | gmx genion -s ions.tpr -pname K -nname CL \
            -neutral -conc 0.15 -o ions.pdb -p pmxtop.top
