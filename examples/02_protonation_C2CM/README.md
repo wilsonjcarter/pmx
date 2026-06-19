@@ -48,7 +48,7 @@ gmx pdb2gmx \
 ### Step 2 — Build the hybrid structure
 
 ```bash
-printf "32 CM\n" | pmx mutate \
+printf "32\nCM\nn\n" | pmx mutate \
     -f      wt.gro \
     -o      mutant.pdb \
     -ff     charmm36m-mut
@@ -116,24 +116,26 @@ The reference is a short Cys-containing peptide in water (e.g. ACE-Cys-NME, or a
 
 ```bash
 # Reference: short Cys peptide (provide as input/ref_peptide.pdb)
-gmx pdb2gmx \
+printf '3\n4\n' | gmx pdb2gmx \
     -f      input/ref_peptide.pdb \
     -o      ref_wt.gro \
     -p      ref_wt.top \
     -ff     charmm36m-mut \
     -water  tip3p \
+    -ter \
     -ignh
 
-printf "1 CM\n" | pmx mutate \
+printf "3\nC\nn\n" | pmx mutate \
     -f      ref_wt.gro \
     -o      ref_mutant.pdb \
     -ff     charmm36m-mut
 
-gmx pdb2gmx \
+printf '3\n4\n' | gmx pdb2gmx \
     -f      ref_mutant.pdb \
     -o      ref_processed.gro \
     -p      ref_topol.top \
     -ff     charmm36m-mut \
+    -ter \
     -water  tip3p
 
 pmx gentop \
