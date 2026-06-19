@@ -160,20 +160,19 @@ Notice that while our the the protein charge goes from -5 to -6 and the peptide 
 
 ```bash
 # Solvate the combined box
-gmx solvate -cp doublebox.gro -cs spc216.gro \
+gmx solvate -cp gmx_doublebox.pdb -cs spc216.gro \
             -p pmxtop.top -o solvated.pdb
 
 # Add ions — system is charge-neutral by construction
 gmx grompp -f mdp/em.mdp -c solvated.pdb -r solvated.gro \
            -p pmxtop.top -o ions.tpr -maxwarn 1
-
 printf '13\n' | gmx genion -s ions.tpr -pname K -nname CL \
            -neutral -conc 0.15 -o ions.pdb -p pmxtop.top
 ```
 ### Step 7 — Energy minimise
 
 ```bash
-gmx grompp -f mdp/em.mdp -c ions.gro -r ions.gro \
+gmx grompp -f mdp/em.mdp -c ions.pdb -r ions.pdb \
            -p pmxtop.top -o em.tpr -maxwarn 1
 gmx mdrun -v -deffnm em -ntmpi 1
 ```
