@@ -34,7 +34,7 @@ eval "$(python3 -c 'from pmx.gmx import set_gmxlib; import os; set_gmxlib(); pri
 
 gmx pdb2gmx \
     -f      input/1ERT.pdb \
-    -o      wt.gro \
+    -o      wt.pdb \
     -p      wt.top \
     -ff     charmm36m-mut \
     -water  tip3p \
@@ -76,7 +76,7 @@ printf "3\nC\nn\n" | pmx mutate \
 ```
 
 
-### Charge-neutral setup with pmx doublebox
+### Step 4 - Sharge-neutral setup with pmx doublebox
 
 Deprotonation shifts the system charge from 0 to −1 (relative to the wildtype). In a periodic simulation box this charge change introduces finite-size artefacts that can bias ΔG by several kJ/mol. The correct approach is the **single-box double-system** method: place the protein system and a reference peptide in the *same* box so that one gains charge while the other loses it, keeping the total box charge constant throughout the alchemical transition.
 
@@ -102,7 +102,7 @@ pmx doublebox \
     -d  1.5
 ```
 
-### Step 4b — Build the doublebox topology
+#### Step 4b — Build the doublebox topology
 
 ```bash
 printf '0\n0\n3\n4\n' | gmx pdb2gmx \
