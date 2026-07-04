@@ -96,6 +96,56 @@ def _inter_residue_bonds(rtp, resname, term):
             if a1.startswith(("+", "-")) or a2.startswith(("+", "-"))]
 
 
+# section headers *within* a residue entry -- used to find where one entry ends
+_SECTION_KW = {"atoms", "bonds", "angles", "impropers", "dihedrals", "cmap",
+               "bondedtypes", "exclusions", "pairs", "morphes", "coords",
+               "rotations", "settles", "virtual_sites"}
+
+
+def _is_entry_header(line: str) -> bool:
+    """True for a top-level residue header '[ NAME ]' (not a '[ atoms ]' etc.)."""
+    s = line.strip()
+    if not (s.startswith("[") and "]" in s):
+        return False
+    tok = s[1:s.index("]")].split()
+    return bool(tok) and tok[0].lower() not in _SECTION_KW
+
+
+def _split_rtp_header(rtp_text: str, name: str):
+    """Split _make_rtp output into (file header, single residue entry)."""
+    idx = rtp_text.find(f"[ {name} ]")
+    return (rtp_text[:idx], rtp_text[idx:]) if idx != -1 else ("", rtp_text)
+
+
+def _upsert_entry(path: str, name: str, entry_text: str, header: str = "") -> None:
+    """Insert or replace the ``[ name ]`` block in a multi-entry RTP/MTP file.
+
+    Mirrors the single-file mutres.rtp/mutres.mtp convention: one accumulating
+    file per force field rather than a new file per hybrid.  Re-mutating the
+    same hybrid replaces its entry instead of duplicating it.
+    """
+    if not entry_text.endswith("\n"):
+        entry_text += "\n"
+    if not os.path.isfile(path):
+        with open(path, "w") as f:
+            f.write(header + entry_text)
+        return
+    lines = open(path).read().splitlines(keepends=True)
+    start = next((i for i, l in enumerate(lines)
+                  if l.strip().startswith(f"[ {name} ]")), None)
+    if start is None:
+        with open(path, "a") as f:
+            if lines and not lines[-1].endswith("\n"):
+                f.write("\n")
+            f.write("\n" + entry_text)
+        return
+    end = next((j for j in range(start + 1, len(lines))
+                if _is_entry_header(lines[j])), len(lines))
+    lines[start:end] = [entry_text]
+    with open(path, "w") as f:
+        f.writelines(lines)
+
+
 # ── residue-level hybrid build ────────────────────────────────────────────────
 
 def build_hybrid_residue(residue1, residue2, ff: str, mut_resname: str,
@@ -217,18 +267,33 @@ def mutate(model, mut_resid: int, target: str, ff: str,
         residue1, residue2, ff, target, term=term, write_ff_types=write_files)
 
     if write_files:
-        list2file([rtp_text], os.path.join(ffpath, f"{hybrid_name}.rtp"))
-        list2file([mtp_text], f"./{hybrid_name}.mtp")
+        # Accumulate all engine-built hybrids into single per-force-field files
+        # (nsaa.rtp / nsaa.mtp), mirroring the mutres.rtp/mutres.mtp convention,
+        # instead of scattering one file per hybrid.  pdb2gmx globs *.rtp in the
+        # FF dir, and gen_hybrid_top reads multi-entry MTPs -- so a single file
+        # works for both.  Re-mutating a hybrid replaces its entry.
+        rtp_header, rtp_entry = _split_rtp_header(rtp_text, hybrid_name)
+        _upsert_entry(os.path.join(ffpath, "nsaa.rtp"), hybrid_name, rtp_entry,
+                      header=rtp_header)
+        _upsert_entry(os.path.join(ffpath, "nsaa.mtp"), hybrid_name, mtp_text)
         if bCharmm:
-            list2file([_ARN_CONTENT], os.path.join(ffpath, f"{hybrid_name}.arn"))
+            # generic atom-renaming spec (constant content) -- write once
+            arn = os.path.join(ffpath, "nsaa.arn")
+            if not os.path.isfile(arn):
+                list2file([_ARN_CONTENT], arn)
         fn_restypes = pmx_data_file("mutff/residuetypes.dat")
         existing = _get_residue_types(fn_restypes)
-        mode = "a" if os.path.isfile(fn_restypes) else "w"
-        with open(fn_restypes, mode) as f:
-            if hybrid_name not in existing:
-                f.write(f"{hybrid_name:<6} Protein\n")
+        if hybrid_name not in existing:
+            # residuetypes.dat may lack a trailing newline; GROMACS rejects a
+            # merged line, so ensure the previous entry is terminated first.
+            need_nl = (os.path.isfile(fn_restypes)
+                       and os.path.getsize(fn_restypes) > 0
+                       and open(fn_restypes, "rb").read()[-1:] != b"\n")
+            with open(fn_restypes, "a" if os.path.isfile(fn_restypes) else "w") as f:
+                f.write(("\n" if need_nl else "") + f"{hybrid_name:<6} Protein\n")
 
     if verbose:
         print(f"log_> covalent.mutate: hybrid {hybrid_name} "
-              f"({residue1.resnA} -> {target})")
+              f"({residue1.resnA} -> {target}); "
+              f"MTP -> {os.path.join(ffpath, 'nsaa.mtp')}")
     return hybrid_name

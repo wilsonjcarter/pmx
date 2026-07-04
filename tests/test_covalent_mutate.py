@@ -74,6 +74,36 @@ def test_hydroxyl_h_disappears(hybrid):
     assert any("HG" in m[0] for m in gone), "hydroxyl H should disappear"
 
 
+def test_split_rtp_header():
+    from pmx.covalent.mutate import _split_rtp_header
+    rtp = "[ bondedtypes ]\nHDR\n\n[ A2SE ] ; x\n[ atoms ]\n  N N\n"
+    h, e = _split_rtp_header(rtp, "A2SE")
+    assert h == "[ bondedtypes ]\nHDR\n\n"
+    assert e.startswith("[ A2SE ]")
+
+
+def test_upsert_entry_create_append_replace(tmp_path):
+    from pmx.covalent.mutate import _upsert_entry
+    p = str(tmp_path / "nsaa.rtp")
+    # create with header
+    _upsert_entry(p, "A2SE", "[ A2SE ] ; a\n[ atoms ]\n  N N\n",
+                  header="[ bondedtypes ]\nHDR\n\n")
+    txt = open(p).read()
+    assert txt.startswith("[ bondedtypes ]")
+    assert txt.count("[ A2SE ]") == 1
+    # append a different hybrid -- header not duplicated
+    _upsert_entry(p, "B2SE", "[ B2SE ] ; b\n[ atoms ]\n  N N\n")
+    txt = open(p).read()
+    assert "[ A2SE ]" in txt and "[ B2SE ]" in txt
+    assert txt.count("[ bondedtypes ]") == 1
+    # re-mutate A2SE -> its entry is replaced, not duplicated; B2SE untouched
+    _upsert_entry(p, "A2SE", "[ A2SE ] ; a2\n[ atoms ]\n  N NEW\n")
+    txt = open(p).read()
+    assert txt.count("[ A2SE ]") == 1
+    assert "NEW" in txt and "; a2" in txt
+    assert "[ B2SE ]" in txt
+
+
 def test_phosphate_appears_as_bstate(hybrid):
     """Phosphate atoms are dummies in A (DUM_) and real in B."""
     morphes = {m[2]: m for m in hybrid[3]}  # keyed by B-state name
