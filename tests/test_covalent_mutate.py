@@ -176,10 +176,17 @@ def test_protonation_warning_on_hydrogenless_wt(tmp_path):
         mutate(m, 1, "SEP", FF, inplace=True, write_files=False)
 
 
-def test_disulfide_cys_built_by_the_common_core():
-    """A disulfide-cysteine hybrid goes through the SAME build_hybrid_residue
-    core as a PTM mutation: SG retypes (free thiol -> disulfide) and the thiol
-    hydrogen disappears -- no split-atom / special path."""
+def test_cys_thiol_to_disulfide_type_morph_maps():
+    """The graph core maps the CYS -> disulfide-Cys charge/type change: SG
+    retypes (S -> SM, free thiol -> disulfide) and the thiol hydrogen disappears.
+
+    NOTE: this is ONLY the per-residue electrostatic/type morph.  A physically
+    valid alchemical disulfide additionally needs the SG-SG bond's topological
+    1-4 exclusions handled (they would otherwise corrupt the free-thiol state) --
+    via the vsite + [ pairs ] scheme documented in
+    docs/developers/covalent_framework.md.  A plain 1:1 residue map does NOT
+    provide that, so this test asserts the mapping only, not a valid disulfide.
+    """
     from pmx.gmx import set_gmxlib
     from pmx.covalent import TargetResidue, build_hybrid_residue, map_residues
     set_gmxlib()
