@@ -21,6 +21,10 @@ additively and will progressively host those pieces without changing behaviour.
 from .target import TargetResidue
 from .mapping import map_residues, ResidueMapping, attach_bonds_from_rtp
 from .mutate import mutate, build_hybrid_residue
+from .edit import (CovalentEdit, InterResidueBondMorph, Interaction,
+                   apply_edit, apply_bond_morph, disulfide_morph, nos_morph)
 
 __all__ = ["TargetResidue", "map_residues", "ResidueMapping",
-           "attach_bonds_from_rtp", "mutate", "build_hybrid_residue"]
+           "attach_bonds_from_rtp", "mutate", "build_hybrid_residue",
+           "CovalentEdit", "InterResidueBondMorph", "Interaction",
+           "apply_edit", "apply_bond_morph", "disulfide_morph", "nos_morph"]
