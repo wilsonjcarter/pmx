@@ -47,3 +47,30 @@ def test_walk_unknown_bond_atom_raises():
     r = TargetResidue.from_rtp("CYS", FF).residue
     with pytest.raises(KeyError):
         walk_reacting_atoms(r, "ZZ")
+
+
+def test_build_split_residue_reproduces_c2cd_structure():
+    """Auto-generated CYS+CYS2 split-atom hybrid matches C2CD structure/params."""
+    from pmx.covalent.crosslink import build_split_residue
+    cys = TargetResidue.from_rtp("CYS", FF).residue
+    cys2 = TargetResidue.from_rtp("CYS2", FF).residue
+    atoms, bonds = build_split_residue(cys, cys2, "SG", boundary_depth=2)
+    by = {a.name: a for a in atoms}
+
+    assert len(atoms) == 15                         # same count as C2CD
+
+    # free branch (real A / dummy B) with WT free-thiol params
+    assert by["SG1"].atomtype == "S" and by["SG1"].atomtypeB == "DUM_S"
+    assert by["CB1"].atomtype == "CT2" and by["CB1"].atomtypeB == "DUM_CT2"
+    # bound branch (dummy A / real B) with disulfide params
+    assert by["SG2"].atomtype == "DUM_SM" and by["SG2"].atomtypeB == "SM"
+    assert by["CB2"].atomtype == "DUM_CT2" and by["CB2"].atomtypeB == "CT2"
+    # thiol H lives on the free branch only and disappears
+    assert "HG11" in by and by["HG11"].atomtypeB.startswith("DUM")
+    assert not any(n.startswith("HG") and n != "HG11" for n in by)
+
+    # boundary CA (common) reconnects to BOTH branches
+    assert ("CA", "CB1") in bonds and ("CA", "CB2") in bonds
+    # backbone stays common (single, morphing atoms)
+    for bb in ("N", "CA", "C", "O"):
+        assert bb in by and not by[bb].atomtype.startswith("DUM")
