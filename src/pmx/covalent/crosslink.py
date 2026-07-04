@@ -225,32 +225,50 @@ def build_crosslink_mtp(wt_res, bound_res, bond_atom_name: str,
     return emit_crosslink_mtp(atoms, resname, wt_res.resname, bound_res.resname)
 
 
+def decouple(wt_res, bound_res, bond_atom_name: str, boundary_depth: int = 2):
+    """The unified 'decouple' operation: split a residue's reacting sidechain.
+
+    Returns ``(atom_map, atoms, bonds)`` where *atom_map* is ``name -> Atom``
+    over the split atoms (so callers reference the bound-branch ``*2`` atoms
+    when building the cross-link bond-morph).  This is the single primitive the
+    cross-link recipes below share.
+    """
+    atoms, bonds = build_split_residue(wt_res, bound_res, bond_atom_name,
+                                       boundary_depth)
+    return {a.name: a for a in atoms}, atoms, bonds
+
+
 def disulfide_edit(cys1_res, cys2_res, bound1_res, bound2_res, mode="form"):
-    """Compose an alchemical disulfide: decouple each Cys + the SG-SG bond.
+    """Alchemical disulfide = decouple x2 + SG-SG bond on the bound branch.
 
-    ``cysN_res`` are the WT cysteines; ``boundN_res`` the disulfide-Cys targets
-    (``CYS2``/``CYX``).  Returns ``(edit, split1, split2)`` where *edit* is a
-    :class:`~pmx.covalent.edit.CovalentEdit` carrying the SG2-SG2' bond-morph on
-    the bound-branch atoms (dummy in A -> exclusions harmless), and *splitN* are
-    the ``(atoms, bonds)`` of each decoupled residue.
-
-    This is the composition "decouple x2 + bond" of the unified operations.
+    ``cysN_res`` = WT cysteines; ``boundN_res`` = disulfide-Cys targets
+    (``CYS2``/``CYX``).  Returns ``(edit, split1, split2)``.
     """
     from .edit import CovalentEdit, disulfide_morph
-
-    split1 = build_split_residue(cys1_res, bound1_res, "SG")
-    split2 = build_split_residue(cys2_res, bound2_res, "SG")
-    d1 = {a.name: a for a in split1[0]}
-    d2 = {a.name: a for a in split2[0]}
-
-    # bond on the BOUND branch (CB2/SG2); CA is the common boundary
-    morph = disulfide_morph(
-        {"CA": d1["CA"], "CB": d1["CB2"], "SG": d1["SG2"]},
-        {"CA": d2["CA"], "CB": d2["CB2"], "SG": d2["SG2"]},
-        mode=mode)
+    a1, at1, b1 = decouple(cys1_res, bound1_res, "SG")
+    a2, at2, b2 = decouple(cys2_res, bound2_res, "SG")
+    morph = disulfide_morph(a1, a2, mode=mode, cb="CB2", sg="SG2")
     edit = CovalentEdit(residues=[cys1_res.resname, cys2_res.resname],
                         bond_morphs=[morph])
-    return edit, split1, split2
+    return edit, (at1, b1), (at2, b2)
+
+
+def nos_edit(cys_res, lys_res, nos_cys_res, nos_lys_res, mode="form"):
+    """Alchemical N-O-S bridge = decouple Cys + decouple Lys + NZ-OD/OD-SG bonds.
+
+    Same two primitives as the disulfide (``decouple`` + a bond-morph), just a
+    different recipe: the Cys reacts at ``SG`` (its bound target gains the
+    bridging ``OD``), the Lys reacts at ``NZ``.  ``nos_morph`` already reads the
+    bound-branch ``*2`` names, so no remapping is needed.  ``nos_cys_res`` /
+    ``nos_lys_res`` are the bound NOS targets (e.g. ``CSO``-derived for Cys).
+    """
+    from .edit import CovalentEdit, nos_morph
+    ac, atc, bc = decouple(cys_res, nos_cys_res, "SG")
+    al, atl, bl = decouple(lys_res, nos_lys_res, "NZ")
+    morph = nos_morph(ac, al, mode=mode)
+    edit = CovalentEdit(residues=[cys_res.resname, lys_res.resname],
+                        bond_morphs=[morph])
+    return edit, (atc, bc), (atl, bl)
 
 
 def _split_bonds(wt_res, bound_res, reacting_set, boundary):
