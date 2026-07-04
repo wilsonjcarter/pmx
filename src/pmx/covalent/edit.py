@@ -137,14 +137,18 @@ def apply_edit(topol, edit: CovalentEdit) -> None:
 
 # ── constructors (declarative equivalents of the alchemy routines) ────────────
 
-def disulfide_morph(cys1: Dict, cys2: Dict, mode: str = "form") -> InterResidueBondMorph:
+def disulfide_morph(cys1: Dict, cys2: Dict, mode: str = "form",
+                    ca="CA", cb="CB", sg="SG") -> InterResidueBondMorph:
     """SG-SG bond + CB-SG-SG angles + SS dihedrals (cf. _add_ss_bonded_terms).
 
-    Each of *cys1*, *cys2* is a name->Atom dict with keys CA, CB2, SG2.
+    Each of *cys1*, *cys2* is a name->Atom dict.  The atom-name keys default to
+    the graph-engine convention (``CA``/``CB``/``SG`` -- a plain CYS->CYS2 morph
+    through ``build_hybrid_residue``); pass ``cb='CB2'``/``sg='SG2'`` for the
+    legacy split-atom encoding.
     """
     I = Interaction
-    ca1, cb1, sg1 = cys1["CA"], cys1["CB2"], cys1["SG2"]
-    ca2, cb2, sg2 = cys2["CA"], cys2["CB2"], cys2["SG2"]
+    ca1, cb1, sg1 = cys1[ca], cys1[cb], cys1[sg]
+    ca2, cb2, sg2 = cys2[ca], cys2[cb], cys2[sg]
     return InterResidueBondMorph(mode, [
         I("bond", [sg1, sg2]),
         I("angle", [cb1, sg1, sg2]),

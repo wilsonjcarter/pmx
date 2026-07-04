@@ -176,6 +176,24 @@ def test_protonation_warning_on_hydrogenless_wt(tmp_path):
         mutate(m, 1, "SEP", FF, inplace=True, write_files=False)
 
 
+def test_disulfide_cys_built_by_the_common_core():
+    """A disulfide-cysteine hybrid goes through the SAME build_hybrid_residue
+    core as a PTM mutation: SG retypes (free thiol -> disulfide) and the thiol
+    hydrogen disappears -- no split-atom / special path."""
+    from pmx.gmx import set_gmxlib
+    from pmx.covalent import TargetResidue, build_hybrid_residue, map_residues
+    set_gmxlib()
+    cys = TargetResidue.from_rtp("CYS", FF).residue
+    cys2 = TargetResidue.from_rtp("CYS2", FF).residue        # disulfide cystine
+    m = map_residues(cys, cys2)
+    assert dict(m.named_pairs())["SG"] == "SG"               # SG common (retypes)
+    assert any("HG" in cys.atoms[i].name for i in m.disappear)   # thiol H goes
+    _, mtp, _ = build_hybrid_residue(cys, cys2, FF, "CYS2", write_ff_types=False)
+    sg = [l.strip() for l in mtp.splitlines()
+          if l.strip().startswith("SG ") and "->" in l]
+    assert sg and "SM" in sg[0] and "DUM" not in sg[0]
+
+
 def test_split_rtp_header():
     from pmx.covalent.mutate import _split_rtp_header
     rtp = "[ bondedtypes ]\nHDR\n\n[ A2SE ] ; x\n[ atoms ]\n  N N\n"

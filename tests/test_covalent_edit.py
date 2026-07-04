@@ -50,13 +50,13 @@ def test_disulfide_morph_matches_alchemy(mode):
     told = _Topol()
     _add_ss_bonded_terms(told, _cys(0), _cys(10), mode=mode)
     tnew = _Topol()
-    apply_bond_morph(tnew, disulfide_morph(_cys(0), _cys(10), mode=mode))
+    apply_bond_morph(tnew, disulfide_morph(_cys(0), _cys(10), mode=mode, cb="CB2", sg="SG2"))
     assert _dump(told) == _dump(tnew)
 
 
 def test_disulfide_form_A_off_B_on():
     t = _Topol()
-    apply_bond_morph(t, disulfide_morph(_cys(0), _cys(10), mode="form"))
+    apply_bond_morph(t, disulfide_morph(_cys(0), _cys(10), mode="form", cb="CB2", sg="SG2"))
     # bond: state A force constant zero, state B on
     _, _, a_params, b_params = _sig(t.bonds[0], 2)
     assert a_params[2] == 0.0 and b_params[2] == 100.0
@@ -90,6 +90,6 @@ def test_nos_morph_optional_atoms_absent():
 
 def test_covalent_edit_container():
     e = CovalentEdit(residues=["C2CD", "C2CD"],
-                     bond_morphs=[disulfide_morph(_cys(0), _cys(10))])
+                     bond_morphs=[disulfide_morph(_cys(0), _cys(10), cb="CB2", sg="SG2")])
     assert len(e.bond_morphs) == 1
     assert e.residues == ["C2CD", "C2CD"]
