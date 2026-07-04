@@ -166,7 +166,8 @@ class Molecule(Atomselection):
         if self.resname != '':
             if (self.resname in library._perturbed_nucleotides or
                self.resname[1] == '2' or '2CM' in self.resname or
-               'CM2' in self.resname):  # special two letter cases
+               'CM2' in self.resname or '2YM' in self.resname or
+               'YM2' in self.resname):  # special two letter cases
                 return True
             else:
                 return False

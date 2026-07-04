@@ -93,7 +93,7 @@ mutate, and after having passed that mutated structure through pdb2gmx.
                         dest='scale_mass',
                         help='Scale the masses of dummy atoms by multiplying '
                         'with scale_mass factor',
-                        default=0.33, #TODO: need a function to check for oscillation period: need to ensure 2*pi*sqrt(m1*m2/((m1+m2)*k)) > 10*dt
+                        default=1.0, #TODO: need a function to check for oscillation period: need to ensure 2*pi*sqrt(m1*m2/((m1+m2)*k)) > 10*dt
                         action='store')
     parser.add_argument('--scale_dih',
                         dest='scale_dih',

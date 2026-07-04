@@ -37,3 +37,6 @@ examples/**/mutres_term.rtp
 examples/**/mutres_term.mtp
 # GROMACS numbered backup files  (#file.ext.N#)
 \#*\#
+
+# Scratch archives (force-field snapshots, ad-hoc zips)
+*.zip

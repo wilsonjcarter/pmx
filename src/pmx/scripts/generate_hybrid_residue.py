@@ -1645,15 +1645,21 @@ def create_hybrid_lib(m1, m2,
     nm1 = m1.residues[0].resname
     nm2 = m2.residues[0].resname
     # Convert 3-letter names to 1-letter ones
-    aa1 = nm1 #library._ext_one_letter[nm1]
-    aa2 = nm2 #library._ext_one_letter[nm2]
+    #aa1 = nm1 #library._ext_one_letter[nm1]
+    #aa2 = nm2 #library._ext_one_letter[nm2]
 
     # determine hybrid residue name (rr_name)
     if moltype == 'protein':
+        aa1 = library._ext_one_letter[nm1]
+        aa2 = library._ext_one_letter[nm2]
         rr_name = aa1 + '2' + aa2
     elif moltype == 'dna':
+        aa1 = nm1 #library._ext_one_letter[nm1]
+        aa2 = nm2 #library._ext_one_letter[nm2]
         rr_name = _dna_mutation_naming(aa1, aa2)
     elif moltype == 'rna':
+        aa1 = nm1 #library._ext_one_letter[nm1]
+        aa2 = nm2 #library._ext_one_letter[nm2]
         rr_name = _rna_mutation_naming(aa1, aa2)
 
     # Get element of all atoms in models
@@ -2089,7 +2095,7 @@ written to new files.
                         help='Whether to allow hydrogen to/from heavy atoms \n'
                         'morphing. Default is True, this flag sets it to '
                         'False.',
-                        default=True,
+                        default=False,
                         action='store_false')
     parser.add_argument('--log',
                         metavar='log',

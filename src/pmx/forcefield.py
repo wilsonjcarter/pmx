@@ -382,10 +382,17 @@ class TopolBase:
         lst = readSection(lines, '[ constraints ]', '[')
         self.constraints = []
         for line in lst:
-            idx = [int(x) for x in line.split()]
-            self.constraints.append([self.atoms[idx[0]-1],
-                                     self.atoms[idx[1]-1],
-                                     idx[2]])
+            if len(line.split()) == 3:
+                idx = [int(x) for x in line.split()]
+                self.constraints.append([self.atoms[idx[0]-1],
+                                         self.atoms[idx[1]-1],
+                                         idx[2]])
+            else:
+                idx = [int(x) for x in line.split()[:3]]
+                b0  = float(line.split()[3])
+                self.constraints.append([self.atoms[idx[0]-1],
+                                         self.atoms[idx[1]-1],
+                                         idx[2],b0])
         if self.constraints:
             self.have_constraints = True
 
@@ -507,7 +514,7 @@ class TopolBase:
             for line in lst:
                 entr = line.split()
                 idx = [int(x) for x in entr[:]]
-                toappend = [self.atoms[x-1] for x in idx] 
+                toappend = [self.atoms[x-1] for x in idx]
                 self.exclusions.append( toappend )
 
     def read_vsites2(self, lines):
@@ -957,6 +964,7 @@ class TopolBase:
 
         print('', file=fp)
         for itp, where in self.include_itps:
+            print(itp,where)
             if (itp in self.includes) or ('"{0}"'.format(itp) in self.includes): # already included
                 continue
             if where == which:
@@ -985,13 +993,15 @@ class TopolBase:
             The order of the sections will reflect the order of keywords in
             this list.
         '''
-
+        #present = []
         def _write_foot_section(fp, keyword):
             '''writes only specific lines/sections of footer.
             '''
             if keyword == 'all':
                 for line in self.footer:
-                    print(line, file=fp)
+                    if line not in present:
+                        print(line, file=fp)
+                    #present.append(line)
 
             # posre for molecule
             elif keyword == 'posre':
@@ -1028,8 +1038,9 @@ class TopolBase:
             # water params
             elif keyword == 'water':
                 for line in self.footer:
-                    if 'ff' in line and ('tip' in line or 'spc' in line):
+                    if 'ff' in line and ('tip' in line or 'spc' in line or 'opc' in line) and "_" not in line:
                         print(line, file=fp)
+                    #present.append(line)
 
             # posre for water
             elif keyword == 'posre_water':
@@ -1047,8 +1058,9 @@ class TopolBase:
             # ion params
             elif keyword == 'ions':
                 for line in self.footer:
-                    if 'ff' in line and 'ion' in line:
+                    if 'ff' in line and 'ion' in line: # and line not in present:
                         print(line, file=fp)
+                    #present.append(line)
 
             else:
                 raise ValueError('keyword does not exists/not implemented')

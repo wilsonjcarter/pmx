@@ -55,9 +55,9 @@ def clean_gromacs_backup_files( path ):
         path where to delete files starting with #
     """
 
-    toclean = glob('{0}/*#'.format(path)) 
+    toclean = glob('{0}/*#'.format(path))
     for clean in toclean:
-        os.remove(clean)     
+        os.remove(clean)
 
 def copy_files_folders( source, target ):
     """Copy files or folders.
@@ -85,7 +85,7 @@ def create_folder( path, fname=False ):
         folder fname will be created in this path
     fname: str, optional
         name of the folder to create
-    """ 
+    """
     if fname==False:
         if not os.path.exists(path):
             os.makedirs(path)
@@ -145,7 +145,7 @@ def ffopen(filename, mode='r', backup=True):
         return open(filename, mode)
 
 # this function echanges netmount with home
-def remove_netmount( string ): 
+def remove_netmount( string ):
     regexp = re.compile('netmount')
     string = regexp.sub('home',string)
     return(string)
@@ -237,6 +237,8 @@ def get_mtp_file(residue, ff):
     elif residue.moltype == 'rna':
         mtp_file = os.path.join(ffpath, 'mutres_rna.mtp')
     # Protein mutation
+    elif residue.resname in ["C2CD","C2VD","U2CN","CN2U","C2CN","CN2C","K2KN","O2KN","KN2O","KN2K"]:
+        mtp_file = os.path.join(ffpath,'disulfide.mtp')        
     elif residue.moltype == 'protein':
         mtp_file = os.path.join(ffpath, 'mutres.mtp')
     else:
@@ -561,4 +563,3 @@ class importError(Exception):
 
     def __str__(self):
         return repr(self.s)
-

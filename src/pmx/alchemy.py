@@ -19,6 +19,8 @@ from .utils import get_mtp_file
 
 __all__ = ['mutate', 'gen_hybrid_top', 'write_split_top', 'AbsRestraints']
 
+_NOS_CYS_HYBRIDS = {'CNOS', 'U2UO'}   # NOS-Cys (carries SG2 + bridging OD2)
+_NOS_LYS_HYBRIDS = {'KNOS', 'K2KN'}   # NOS-Lys (carries NZ2)
 
 # ==============
 # Main Functions
@@ -68,10 +70,10 @@ def mutate(m, mut_resid, mut_resname, ff, mut_chain=None,
         m2.nm2a()
         if verbose:
             print('Model units have been converted from nm to A.')
-
     # get the residue based on the index
     # fetch_residue also checks the selection is valid and unique
     residue = m2.fetch_residue(idx=mut_resid, chain=mut_chain)
+
     # get the correct mtp file
     mtp_file = get_mtp_file(residue, ff)
 
@@ -496,6 +498,7 @@ def gen_hybrid_top(topol, recursive=True, verbose=False, scaleDih=1.0,
         _proline_dihedral_decouplings(pmxtop, rlist, rdic)
 
         _add_disulfide_bonded_terms(pmxtop, rlist, rdic, ff)
+        _add_nos_bonded_terms(pmxtop, rlist, rdic, ff)
         _terminal_deletion_decouplings(pmxtop, rlist, verbose=verbose)
         return pmxtop
 
@@ -702,7 +705,8 @@ def _convert_aa_name(aa):
     # DC : reverse disulfide target for D2DC hybrid (alchemical SS breaking)
     # P1 : monoanionic phospho-amino acid target for S2P1 (SER), T2P1 (THR), or Y2P1 (TYR)
     # P2 : dianionic phospho-amino acid target for S2P2 (SER), T2P2 (THR), or Y2P2 (TYR)
-    _special = {'CM', 'CD', 'DC', 'P1', 'P2'}
+    # YM: deprotonated tyrosine
+    _special = {'CM', 'CD', 'DC', 'P1', 'P2', 'YM', 'CN', 'KN'}
     if aa.upper() in _special:
         return aa.upper()
     elif len(aa) == 1:
@@ -758,11 +762,14 @@ def _rename_back(res, name_hash):
 _SPLIT_ATOM_NAME_MAP = {
     'CB1': 'CB',  'HB11': 'HB1', 'HB12': 'HB2',
     'CB2': 'CB',  'HB21': 'HB1', 'HB22': 'HB2',
+    'CE1': 'CE',  'HE11': 'HE1', 'HE12': 'HE2',
+    'NZ1': 'NZ',  'HZ11': 'HZ1', 'HZ12': 'HZ2', 'HZ13': 'HZ3',
     'SG1': 'SG',  'SG2':  'SG',
 }
 
 
 def _set_conformation(old_res, new_res, rotdic):
+    #print(new_res.name)
     old_res.get_real_resname()
     dihedrals = library._aa_dihedrals[old_res.real_resname]
     for key, lst in rotdic.items():
@@ -795,7 +802,10 @@ def _set_conformation(old_res, new_res, rotdic):
         if (atom.name[0] == 'D') or atom.name.startswith('HV'):
             continue
         # Copy position from old_res; handle split-atom name mapping
-        src_name = _SPLIT_ATOM_NAME_MAP.get(atom.name, atom.name)
+        if new_res.resname in ["O2CN","CN2O","C2CN","CN2C","O2KN","KN2O","K2KN","KN2K"]:
+            src_name = _SPLIT_ATOM_NAME_MAP.get(atom.name, atom.name)
+        else:
+            src_name = atom.name
         try:
             atom.x = old_res[src_name].x
         except (KeyError, AttributeError):
@@ -1023,6 +1033,34 @@ def extract_atoms(residue):
     return atoms
 
 
+def extract_nos_atoms(cys_res, lys_res):
+    """Return (cys, lys) name->atom dicts for a NOS hybrid pair.
+
+    Cys side (C2CO, split-atom): CB2/SG2 = B-state branch, OD2 = bridging O.
+    Lys side (K2KO, split-atom): CE2/NZ2 = B-state (NOS) branch, HZ21 its proton;
+                                 CD (common) for the CD-CE2-NZ2-OD dihedral.
+    """
+    cwant = ('CA', 'CB2', 'SG2', 'OD2')
+    lwant = ('CD', 'CE2', 'NZ2', 'HZ21', 'HE21', 'HE22')
+    cys = {k: None for k in cwant}
+    lys = {k: None for k in lwant}
+    for a in cys_res.atoms:
+        if a.name in cys:
+            cys[a.name] = a
+    for a in lys_res.atoms:
+        if a.name in lys:
+            lys[a.name] = a
+    cmiss = [k for k in ('CB2', 'SG2', 'OD2') if cys[k] is None]
+    lmiss = [k for k in ('CE2', 'NZ2') if lys[k] is None]
+    if cmiss:
+        raise ValueError(f"O2CN residue {cys_res.resname}:{cys_res.id} "
+                         f"missing atoms: {cmiss}")
+    if lmiss:
+        raise ValueError(f"O2KN residue {lys_res.resname}:{lys_res.id} "
+                         f"missing atoms: {lmiss}")
+    return cys, lys
+
+
 def _zero_B_if_has_dummy_angle(entry):
     """Zero B-state force constants when any angle atom carries a DUM type."""
     if any('DUM' in a.typeB for a in entry[:3]):
@@ -1087,6 +1125,79 @@ def _add_ss_bonded_terms(topol, r1_atoms, r2_atoms, mode='form'):
             _zero_B_if_has_dummy_dihedral(topol.dihedrals[-1])
 
 
+def _add_nos_terms(topol, cys, lys, mode='form'):
+    """Append the cross-residue NOS bonded terms.
+
+    mode : 'form'  - A-state off (k=0), B-state on  (Cys/Lys -> NOS).
+           'break' - A-state on, B-state off (k=0).
+           'perma' - both states on.
+
+    Bond:    NZ-OD2
+    Angles:  CE-NZ-OD2, HZ1-NZ-OD2, NZ-OD2-SG2
+    Dihedrals: CD-CE-NZ-OD2, HE1/HE2-CE-NZ-OD2, HZ1-NZ-OD2-SG2,
+               CE-NZ-OD2-SG2, NZ-OD2-SG2-CB2
+    Force constants pulled from topol.BondedParams (the FF ffbonded.itp must
+    contain the CNOS/optimised NG311/OG301/SG301 parameters).
+    """
+    get_t = (lambda a: a.typeB) if mode == 'form' else (lambda a: a.type)
+
+    nz, od2, sg2 = lys['NZ2'], cys['OD2'], cys['SG2']
+    ce, cd, hz1 = lys['CE2'], lys['CD'], lys['HZ21']
+    cb2 = cys['CB2']
+    he1, he2 = lys.get('HE21'), lys.get('HE22')
+
+    # ---- bond NZ-OD2 ----
+    func, x0, k = topol.BondedParams.get_bond_param(get_t(nz), get_t(od2))
+    k_A = 0.0 if mode == 'form' else k
+    k_B = 0.0 if mode == 'break' else k
+    topol.bonds.append([nz, od2, func, [func, x0, k_A], [func, x0, k_B]])
+
+    # ---- angles ----
+    angle_triplets = [[ce, nz, od2], [nz, od2, sg2]]
+    if hz1 is not None:
+        angle_triplets.insert(1, [hz1, nz, od2])
+    for t in angle_triplets:
+        parm = topol.BondedParams.get_angle_param(*[get_t(a) for a in t])
+        if len(parm) != 5:
+            parm = list(parm) + [0, 0]
+        func, th0, kth, r0_ub, kub = parm
+        k_ang_A = 0.0 if mode == 'form' else kth
+        k_ang_B = 0.0 if mode == 'break' else kth
+        k_ub_A = 0.0 if mode == 'form' else kub
+        k_ub_B = 0.0 if mode == 'break' else kub
+        topol.angles.append(t + [
+            func,
+            [func, th0, k_ang_A, r0_ub, k_ub_A],
+            [func, th0, k_ang_B, r0_ub, k_ub_B],
+        ])
+        _zero_B_if_has_dummy_angle(topol.angles[-1])
+
+    # ---- dihedrals ----
+    quartets = [
+        [cd, ce, nz, od2],        # CG321 CG321 NG311 OG301
+        [ce, nz, od2, sg2],       # CG321 NG311 OG301 SG301
+        [nz, od2, sg2, cb2],      # NG311 OG301 SG301 CG321
+    ]
+    if hz1 is not None:
+        quartets.append([hz1, nz, od2, sg2])   # HGP1 NG311 OG301 SG301
+    if he1 is not None:
+        quartets.append([he1, ce, nz, od2])    # HGA2 CG321 NG311 OG301
+    if he2 is not None:
+        quartets.append([he2, ce, nz, od2])
+    for q in quartets:
+        terms = topol.BondedParams.get_dihedral_param(*[get_t(a) for a in q], 9)
+        for func, phi0, kphi, mult in terms:
+            k_dih_A = 0.0 if mode == 'form' else kphi
+            k_dih_B = 0.0 if mode == 'break' else kphi
+            topol.dihedrals.append(q + [
+                func,
+                [func, phi0, k_dih_A, mult],
+                [func, phi0, k_dih_B, mult],
+            ])
+            _zero_B_if_has_dummy_dihedral(topol.dihedrals[-1])
+
+
+
 def _add_disulfide_bonded_terms(topol, rlist, rdic, ff):
     """Add cross-residue SG2-SG2' bonded terms for alchemical disulfide pairs.
 
@@ -1104,6 +1215,26 @@ def _add_disulfide_bonded_terms(topol, rlist, rdic, ff):
                          extract_atoms(disulfide_pair[0]),
                          extract_atoms(disulfide_pair[1]),
                          mode='form')
+
+
+def _add_nos_bonded_terms(topol, rlist, rdic, ff):
+    """Add cross-residue N-O-S bonded terms for an alchemical NOS pair.
+
+    Expects exactly one NOS-Cys (C2CO) and one NOS-Lys (K2KO) hybrid in rlist,
+    or none (no-op). With one of each, adds A-state-off / B-state-on NOS terms.
+    """
+
+    lys = [r for r in rlist if r.resname in library._nos_hybrids and r.resname in ["K2KN","O2KN"]]
+    cys = [r for r in rlist if r.resname in library._nos_hybrids and r.resname in ["U2CN","C2CN"]]
+    if not cys and not lys:
+        return
+    if len(cys) != 1 or len(lys) != 1:
+        raise RuntimeError(
+            "Need exactly one C2CO (Cys) and one K2KO (Lys) NOS hybrid in "
+            f"rlist, got {len(cys)} Cys and {len(lys)} Lys.")
+    c_atoms, l_atoms = extract_nos_atoms(cys[0], lys[0])
+    _add_nos_terms(topol, c_atoms, l_atoms, mode='form')
+
 
 
 def _terminal_deletion_decouplings(topol, rlist, verbose=False):
