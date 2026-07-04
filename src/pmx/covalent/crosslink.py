@@ -192,6 +192,37 @@ def build_split_residue(wt_res, bound_res, bond_atom_name: str,
     return atoms, bonds
 
 
+class _SplitResidue:
+    """Minimal residue view over split-atom dual-state atoms, for _make_mtp."""
+    def __init__(self, atoms, resname, resnA, resnB):
+        self.atoms = atoms
+        self.resname = resname
+        self.resnA = resnA
+        self.resnB = resnB
+
+
+def emit_crosslink_mtp(atoms: List[Atom], resname: str,
+                       resnA: str, resnB: str) -> str:
+    """Emit the split-atom cross-link residue as MTP text (reuses _make_mtp).
+
+    Impropers/dihedrals are left empty here (added from the RTP by the caller);
+    this covers [ morphes ] / [ atoms ] / [ coords ] -- the dual-state core.
+    """
+    from ..nsaa import _make_mtp
+    for i, a in enumerate(atoms, 1):
+        a.id = i
+    r = _SplitResidue(atoms, resname, resnA, resnB)
+    return "".join(_make_mtp(r, [], [], rotations=None))
+
+
+def build_crosslink_mtp(wt_res, bound_res, bond_atom_name: str,
+                        resname: str, boundary_depth: int = 2) -> str:
+    """Walk + duplicate + emit: the split-atom cross-link hybrid as MTP text."""
+    atoms, _bonds = build_split_residue(wt_res, bound_res, bond_atom_name,
+                                        boundary_depth)
+    return emit_crosslink_mtp(atoms, resname, wt_res.resname, bound_res.resname)
+
+
 def _split_bonds(wt_res, bound_res, reacting_set, boundary):
     """Reconnect the two branches: each reacting bond is duplicated per branch;
     a bond crossing the reacting/common boundary connects to both branches."""

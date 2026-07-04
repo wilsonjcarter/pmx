@@ -74,3 +74,20 @@ def test_build_split_residue_reproduces_c2cd_structure():
     # backbone stays common (single, morphing atoms)
     for bb in ("N", "CA", "C", "O"):
         assert bb in by and not by[bb].atomtype.startswith("DUM")
+
+
+def test_build_crosslink_mtp_emits_c2cd_morphes():
+    """The split-atom hybrid emits a valid MTP with the C2CD morph structure."""
+    from pmx.covalent.crosslink import build_crosslink_mtp
+    cys = TargetResidue.from_rtp("CYS", FF).residue
+    cys2 = TargetResidue.from_rtp("CYS2", FF).residue
+    mtp = build_crosslink_mtp(cys, cys2, "SG", "C2CD")
+    for section in ("[ morphes ]", "[ atoms ]", "[ coords ]"):
+        assert section in mtp
+    morphes = {l.split()[0]: l for l in mtp.splitlines()
+               if l.strip() and l.split()[0] in
+               ("SG1", "SG2", "CB1", "CB2")}
+    # free branch disappears (A-real type -> DUM), bound branch appears
+    assert "S" in morphes["SG1"] and "DUM_S" in morphes["SG1"]
+    assert "DUM_SM" in morphes["SG2"] and "SM" in morphes["SG2"]
+    assert "CT2" in morphes["CB1"] and "DUM_CT2" in morphes["CB1"]
