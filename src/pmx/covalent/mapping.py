@@ -229,6 +229,28 @@ def _graph_heavy_pairs(res1, res2) -> List[Tuple[int, int]]:
     return [(heavy1[a], heavy2[b]) for a, b in zip(m1, m2)]
 
 
+# The peptide backbone is the invariant scaffold of any residue mutation, so
+# these always correspond by name -- even when one side puts them in a ring
+# (proline), where a pure ring-matching MCS would otherwise refuse to map them.
+_BACKBONE = {"N", "CA", "C", "O", "OT1", "OT2", "OC1", "OC2", "OXT"}
+
+
+def _force_backbone(res1, res2, heavy_pairs, method):
+    """Force backbone atoms to map by name, overriding the MCS where needed."""
+    n1 = {_canon_name(a.name): i for i, a in enumerate(res1.atoms)}
+    n2 = {_canon_name(a.name): j for j, a in enumerate(res2.atoms)}
+    forced = []
+    for nm in _BACKBONE:
+        if nm in n1 and nm in n2:
+            forced.append((n1[nm], n2[nm]))
+    fi = {i for i, _ in forced}
+    fj = {j for _, j in forced}
+    kept = [(i, j) for i, j in heavy_pairs if i not in fi and j not in fj]
+    for i, _ in forced:
+        method[i] = "backbone"
+    return forced + kept
+
+
 def _h_neighbors(res, i) -> List[int]:
     out = []
     for nb in getattr(res.atoms[i], "bonds", []):
@@ -325,6 +347,7 @@ def map_residues(res1, res2, method: str = "auto",
         heavy_pairs = _graph_heavy_pairs(res1, res2)
         for i, _ in heavy_pairs:
             method_used[i] = "mcs"
+        heavy_pairs = _force_backbone(res1, res2, heavy_pairs, method_used)
         h_pairs = _map_hydrogens(res1, res2, heavy_pairs, method_used)
         pairs = heavy_pairs + h_pairs
     else:

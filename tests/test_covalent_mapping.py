@@ -117,3 +117,19 @@ def test_ser_to_sep_graph_maps_hn_and_isolates_phosphate():
     assert mapped["HN"] == "HN" and mapped["OG"] == "OG" and mapped["CB"] == "CB"
     assert {sep.atoms[j].name for j in m.appear} == {"P", "O1P", "O2P", "O3P", "H3T"}
     assert any("HG" in ser.atoms[i].name for i in m.disappear)
+
+
+def test_proline_backbone_not_decoupled():
+    """Proline's ring must not decouple the backbone (backbone anchor overrides
+    the ring-only MCS constraint)."""
+    from pmx.gmx import set_gmxlib
+    from pmx.covalent import TargetResidue
+    set_gmxlib()
+    ala = TargetResidue.from_rtp("ALA", "amber14sbmut").residue
+    pro = TargetResidue.from_rtp("PRO", "amber14sbmut").residue
+    m = map_residues(ala, pro)
+    mapped = dict(m.named_pairs())
+    for bb in ("N", "CA", "C", "O"):
+        assert mapped.get(bb) == bb, f"backbone {bb} decoupled"
+    # proline ring carbons appear (dummies), they are not mapped to Ala atoms
+    assert {pro.atoms[j].name for j in m.appear} >= {"CB", "CG", "CD"}
