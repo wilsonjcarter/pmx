@@ -20,6 +20,7 @@ additively and will progressively host those pieces without changing behaviour.
 
 from .target import TargetResidue
 from .mapping import map_residues, ResidueMapping, attach_bonds_from_rtp
+from .mutate import mutate, build_hybrid_residue
 
 __all__ = ["TargetResidue", "map_residues", "ResidueMapping",
-           "attach_bonds_from_rtp"]
+           "attach_bonds_from_rtp", "mutate", "build_hybrid_residue"]
