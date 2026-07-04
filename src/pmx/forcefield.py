@@ -2371,7 +2371,9 @@ def assign_ffamber99sb_params(m):
         c.make_residue_tree()
 
     make_amber_residue_names(m)
-    rtp = RTPParser('ffamber99sb.rtp')
+    # This path matches RTP atoms against a model renamed via make_long_name
+    # (PDB-style names, e.g. 1HB), so it needs the aliased RTP names.
+    rtp = RTPParser('ffamber99sb.rtp', resolve_aliases=True)
     rtp.assign_params(m)
     bo = BondedParser('ffamber99sbbon.itp')
     nb = NBParser('ffamber99sbnb.itp')

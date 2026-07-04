@@ -58,12 +58,6 @@ logger = logging.getLogger(__name__)
 
 # ── Module-level constants ────────────────────────────────────────────────────
 
-# Inverted alias table: RTP atom name → PDB atom name (per residue)
-_inverted_aliases: Dict[str, Dict[str, str]] = {}
-for _k in library._aliases:
-    _inverted_aliases[_k] = {v: k for k, v in library._aliases[_k].items()}
-_inverted_aliases.setdefault("ILE", {})["CD1"] = "CD1"
-
 # Standard atomic masses for element-symbol fallback
 _ELEM_MASS = {
     'H': 1.008,  'C': 12.011, 'N': 14.007, 'O': 15.999,
@@ -576,15 +570,8 @@ def _assign_rtp_entries(mol, rtp, term=None):
     #print(entr)
     for atom_entry in entr['atoms']:
         atom_name, atom_type, atom_q = atom_entry[0], atom_entry[1], atom_entry[2]
-        #print(atom_name,atom_type,atom_q)
-        # Apply CHARMM alias inversion
-        if resname in _inverted_aliases and atom_name in _inverted_aliases[resname]:
-            atom_name = _inverted_aliases[resname][atom_name]
-        elif atom_name[0].isnumeric():
-            # Numeric-prefix to suffix (e.g. "1HB" → "HB1")
-            atom_name = atom_name[1:] + atom_name[0]
-        #print(atom_name,atom_type,atom_q)
-
+        # RTPParser returns RTP-native names (HB1), which already match the
+        # model's atom names -- no alias inversion needed.
         try:
             atom = mol.fetchm([atom_name], permissive=True)[0]
         except IndexError:
@@ -597,9 +584,6 @@ def _assign_rtp_entries(mol, rtp, term=None):
     for a1, a2 in entr['bonds']:
         within = '-' not in a1 and '+' not in a1 and '-' not in a2 and '+' not in a2
         if within:
-            if resname in _inverted_aliases:
-                a1 = _inverted_aliases[resname].get(a1, a1)
-                a2 = _inverted_aliases[resname].get(a2, a2)
             try:
                 at1, at2 = mol.fetchm([a1, a2], permissive=True)
                 at1.bonds.append(at2)
@@ -1062,15 +1046,11 @@ def _improps_as_atoms(im: list, r, r2, use_b: bool = False) -> list:
                 new_ii.append(Atom(name=name))
                 continue
             if use_b:
-                if r2.resname in _inverted_aliases:
-                    name = _inverted_aliases[r2.resname].get(name, name)
                 a = next((at for at in r.atoms if at.nameB == name), None)
                 if a is None:
                     logger.debug("Improper B-atom '%s' not found.", name)
                     a = Atom(name=name)
             else:
-                if r.resname in _inverted_aliases:
-                    name = _inverted_aliases[r.resname].get(name, name)
                 found = r.fetch(name)
                 a = found[0] if found else Atom(name=name)
             new_ii.append(a)

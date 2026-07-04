@@ -1705,7 +1705,9 @@ def create_hybrid_lib(m1, m2,
 
     # read rtp file
     logger.info('reading rtp file "%s"' % rtpfile)
-    rtp = RTPParser(rtpfile)
+    # _assign_rtp_entries fetches atoms from r1/r2, whose names were set by
+    # make_long_name (PDB-style, e.g. 1HB); match that with aliased RTP names.
+    rtp = RTPParser(rtpfile, resolve_aliases=True)
     bond_neigh = _assign_rtp_entries(r1, rtp)
     _assign_rtp_entries(r2, rtp)  # FIXME/QUESTION is this line doing anything?
     _assign_mass_atp(r1=r1, r2=r2,
