@@ -277,6 +277,12 @@ class TargetResidue:
             a.m = masses.get(atype, 0.0)
             atoms.append(a)
 
+        # attach intra-residue connectivity so downstream graph-based mapping
+        # (pmx.covalent.mapping) has the molecular topology available
+        for i, j in bond_idx:
+            atoms[i].bonds.append(atoms[j])
+            atoms[j].bonds.append(atoms[i])
+
         model = cls._model_from_atoms(atoms, resname)
 
         if verbose:

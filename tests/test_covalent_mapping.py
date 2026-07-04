@@ -1,26 +1,34 @@
 #!/usr/bin/env python
-"""Tests for pmx.covalent.map_residues (topology/name-first mapper).
+"""Tests for pmx.covalent.map_residues (graph-MCS core + name prior).
 
-The mapper itself needs no RDKit; the realistic SER/SEP integration cases build
-their residues via TargetResidue.from_rtp and are skipped without RDKit.
+Pure-graph/name logic runs without RDKit-built structures by hand-constructing
+small residues; the realistic SER/SEP cases build residues via
+TargetResidue.from_rtp and are skipped without RDKit.
 """
 import pytest
 
 from pmx.atom import Atom
 from pmx.covalent.mapping import _canon_name, map_residues
 
+rdkit = pytest.importorskip("rdkit")  # graph path needs RDKit
+
 
 class _Res:
-    """Minimal residue-like holder for pure-logic tests."""
-    def __init__(self, spec):
-        # spec: list of (name, element)
-        self.atoms = []
-        for i, (name, el) in enumerate(spec):
-            a = Atom(name=name, symbol=el, id=i + 1)
-            self.atoms.append(a)
+    def __init__(self, atoms):
+        self.atoms = atoms
 
 
-# ── pure logic (no RDKit) ─────────────────────────────────────────────────────
+def build(spec, bonds):
+    """spec: list of (name, element); bonds: list of (name, name)."""
+    atoms = [Atom(name=n, symbol=e, id=i + 1) for i, (n, e) in enumerate(spec)]
+    by = {a.name: a for a in atoms}
+    for a, b in bonds:
+        by[a].bonds.append(by[b])
+        by[b].bonds.append(by[a])
+    return _Res(atoms)
+
+
+# ── name canonicalization (pure) ──────────────────────────────────────────────
 
 @pytest.mark.parametrize("raw,canon", [
     ("1HB", "HB1"), ("2HB", "HB2"), ("1HG", "HG1"),
@@ -30,52 +38,67 @@ def test_canon_name(raw, canon):
     assert _canon_name(raw) == canon
 
 
-def test_pairs_always_equal_length():
-    """Even when res1 lacks atoms present in res2, pairs stay consistent."""
-    r1 = _Res([("N", "N"), ("CA", "C"), ("C", "C"), ("O", "O")])  # no H
-    r2 = _Res([("N", "N"), ("HN", "H"), ("CA", "C"), ("HA", "H"),
-               ("C", "C"), ("O", "O")])
-    m = map_residues(r1, r2)
+# ── graph guarantee: mapping follows topology, not names ──────────────────────
+
+def test_graph_maps_by_position_not_name():
+    """A target atom that merely reuses a name at a different graph position
+    must NOT capture the WT atom of that name."""
+    # WT:     N-CA-CB           ; Target: N-CA-CG-CB  ('CB' now 2 bonds from CA)
+    r1 = build([("N", "N"), ("CA", "C"), ("CB", "C")],
+               [("N", "CA"), ("CA", "CB")])
+    r2 = build([("N", "N"), ("CA", "C"), ("CG", "C"), ("CB", "C")],
+               [("N", "CA"), ("CA", "CG"), ("CG", "CB")])
+    g = dict(map_residues(r1, r2, method="graph").named_pairs())
+    n = dict(map_residues(r1, r2, method="name").named_pairs())
+    assert g["CB"] == "CG"     # graph maps by position
+    assert n["CB"] == "CB"     # name path is fooled by the label
+
+
+def test_graph_collision_dummifies_substituents():
+    """methyl-CB vs carbonyl-CB: CB<->CB kept via the real CA-CB edge; the
+    differing substituents become dummies."""
+    r1 = build([("N", "N"), ("CA", "C"), ("CB", "C"),
+                ("HB1", "H"), ("HB2", "H"), ("HB3", "H")],
+               [("N", "CA"), ("CA", "CB"), ("CB", "HB1"),
+                ("CB", "HB2"), ("CB", "HB3")])
+    r2 = build([("N", "N"), ("CA", "C"), ("CB", "C"), ("OX", "O")],
+               [("N", "CA"), ("CA", "CB"), ("CB", "OX")])
+    m = map_residues(r1, r2, method="graph")
+    assert dict(m.named_pairs())["CB"] == "CB"
+    assert {r1.atoms[i].name for i in m.disappear} == {"HB1", "HB2", "HB3"}
+    assert {r2.atoms[j].name for j in m.appear} == {"OX"}
+
+
+def test_graph_requires_bonds():
+    r1 = _Res([Atom(name="N", symbol="N", id=1)])
+    r2 = _Res([Atom(name="N", symbol="N", id=1)])
+    with pytest.raises(ValueError):
+        map_residues(r1, r2, method="graph")
+
+
+def test_hydrogens_follow_mapped_parent():
+    r1 = build([("CA", "C"), ("1HA", "H")], [("CA", "1HA")])
+    r2 = build([("CA", "C"), ("HA1", "H")], [("CA", "HA1")])
+    m = map_residues(r1, r2, method="graph")
+    # heavy CA maps, and its H maps by canonical name across 1HA/HA1
+    assert ("CA", "CA") in m.named_pairs()
+    assert ("1HA", "HA1") in m.named_pairs()
+
+
+# ── name-only fallback (unsafe, explicit) ─────────────────────────────────────
+
+def test_name_path_equal_length_no_zip_bug():
+    r1 = build([("N", "N"), ("CA", "C"), ("C", "C"), ("O", "O")],
+               [("N", "CA"), ("CA", "C"), ("C", "O")])
+    r2 = build([("N", "N"), ("HN", "H"), ("CA", "C"), ("HA", "H"),
+                ("C", "C"), ("O", "O")],
+               [("N", "CA"), ("N", "HN"), ("CA", "C"), ("CA", "HA"), ("C", "O")])
+    m = map_residues(r1, r2, method="name")
     assert len(m.pairs1()) == len(m.pairs2())
-    assert {r1.atoms[i].name for i in m.pairs1()} == {"N", "CA", "C", "O"}
-    # res2-only hydrogens are cleanly classified as appearing, not corrupted
     assert {r2.atoms[j].name for j in m.appear} == {"HN", "HA"}
-    assert m.disappear == []
 
 
-def test_name_canonicalization_bridges_pdb_gromacs():
-    """1HB (PDB) on one side matches HB1 (GROMACS) on the other."""
-    r1 = _Res([("CB", "C"), ("1HB", "H"), ("2HB", "H")])
-    r2 = _Res([("CB", "C"), ("HB1", "H"), ("HB2", "H")])
-    m = map_residues(r1, r2)
-    assert len(m.pairs) == 3
-    assert m.disappear == [] and m.appear == []
-
-
-def test_element_guard_blocks_cross_element_name_collision():
-    r1 = _Res([("X1", "C")])
-    r2 = _Res([("X1", "O")])
-    m = map_residues(r1, r2, element_guard=True)
-    assert m.pairs == [] and m.disappear == [0] and m.appear == [0]
-    m2 = map_residues(r1, r2, element_guard=False)
-    assert len(m2.pairs) == 1
-
-
-def test_self_map_is_identity():
-    r = _Res([("N", "N"), ("CA", "C"), ("CB", "C"), ("OG", "O")])
-    m = map_residues(r, _Res([("N", "N"), ("CA", "C"), ("CB", "C"), ("OG", "O")]))
-    assert len(m.pairs) == 4
-    assert m.disappear == [] and m.appear == []
-
-
-def test_mcs_fallback_not_implemented():
-    r1 = _Res([("N", "N"), ("ZZ", "C")])
-    r2 = _Res([("N", "N"), ("QQ", "C")])
-    with pytest.raises(NotImplementedError):
-        map_residues(r1, r2, mcs_fallback=True)
-
-
-# ── realistic SER -> SEP (needs RDKit for from_rtp) ───────────────────────────
+# ── realistic SER -> SEP (graph path via from_rtp bonds) ──────────────────────
 
 def _built_residues():
     from pmx.gmx import set_gmxlib
@@ -86,21 +109,11 @@ def _built_residues():
     return ser, sep
 
 
-def test_ser_to_sep_maps_hn_by_name():
-    pytest.importorskip("rdkit")
+def test_ser_to_sep_graph_maps_hn_and_isolates_phosphate():
     ser, sep = _built_residues()
-    m = map_residues(ser, sep)
-    mapped_sep = {b for _, b in m.named_pairs()}
-    # the whole SER core, hydrogens included, maps -- HN in particular
-    assert {"N", "HN", "CA", "HA", "CB", "HB1", "HB2", "OG", "C", "O"} <= mapped_sep
-    assert ("HN", "HN") in m.named_pairs()
-
-
-def test_ser_to_sep_phosphate_appears_hydroxyl_disappears():
-    pytest.importorskip("rdkit")
-    ser, sep = _built_residues()
-    m = map_residues(ser, sep)
-    appear = {sep.atoms[j].name for j in m.appear}
-    disappear = {ser.atoms[i].name for i in m.disappear}
-    assert appear == {"P", "O1P", "O2P", "O3P", "H3T"}
-    assert any("HG" in n for n in disappear)
+    m = map_residues(ser, sep)          # auto -> graph (from_rtp carries bonds)
+    assert "mcs" in set(m.method.values())
+    mapped = dict(m.named_pairs())
+    assert mapped["HN"] == "HN" and mapped["OG"] == "OG" and mapped["CB"] == "CB"
+    assert {sep.atoms[j].name for j in m.appear} == {"P", "O1P", "O2P", "O3P", "H3T"}
+    assert any("HG" in ser.atoms[i].name for i in m.disappear)
