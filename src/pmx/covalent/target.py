@@ -250,15 +250,25 @@ class TargetResidue:
         ffpath, atom_rows, intra_bonds = _rtp_atoms_bonds(resname, ff)
         masses = _load_atomtype_masses(ffpath)
 
-        names = [row[0] for row in atom_rows]
+        # RTPParser applies library._aliases (e.g. HB1 -> 1HB) for standard
+        # residues, but the RTP files (and the mutres library) use canonical
+        # names, and residues without an alias entry (e.g. SEP) are left as-is.
+        # Undo the alias so the engine emits consistent RTP-native names.
+        from ..library import _aliases
+        _unalias = {v: k for k, v in _aliases.get(resname, {}).items()}
+
+        def _canon(n):
+            return _unalias.get(n, n)
+
+        names = [_canon(row[0]) for row in atom_rows]
         types = [row[1] for row in atom_rows]
         name2idx = {n: i for i, n in enumerate(names)}
         elements = [_element_for_type(t, masses) for t in types]
 
         bond_idx = [
-            (name2idx[a1], name2idx[a2])
+            (name2idx[_canon(a1)], name2idx[_canon(a2)])
             for a1, a2 in intra_bonds
-            if a1 in name2idx and a2 in name2idx
+            if _canon(a1) in name2idx and _canon(a2) in name2idx
         ]
 
         coords = _embed_coords(elements, bond_idx, seed=seed)

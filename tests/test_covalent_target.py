@@ -40,9 +40,14 @@ def _rtp_oracle(ff):
 
 
 def _rtp_reference(resname, ff):
+    # from_rtp un-aliases RTPParser's PDB-style names (1HB -> HB1); mirror that
+    # here so the oracle compares against the same RTP-native names.
+    from pmx.library import _aliases
+    unalias = {v: k for k, v in _aliases.get(resname, {}).items()}
+    canon = lambda n: unalias.get(n, n)
     entry = _rtp_oracle(ff)[resname]
-    names = [a[0] for a in entry["atoms"]]
-    bonds = [(a1, a2) for a1, a2 in entry["bonds"]
+    names = [canon(a[0]) for a in entry["atoms"]]
+    bonds = [(canon(a1), canon(a2)) for a1, a2 in entry["bonds"]
              if not a1.startswith(("+", "-")) and not a2.startswith(("+", "-"))]
     return names, bonds
 
