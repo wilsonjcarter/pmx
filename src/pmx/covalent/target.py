@@ -111,8 +111,32 @@ def _load_rtp(rtp_file: str) -> RTPParser:
     return RTPParser(rtp_file)
 
 
+# Residue-name synonyms so a generic/target name resolves to the force field's
+# actual RTP entry: histidine tautomers (amber HID/HIE/HIP vs charmm
+# HSD/HSE/HSP) and common protonation-state variants.  Ordered by preference;
+# the histidine default (HID/HSD, N-delta) matches the pmx mutres convention.
+_RESNAME_SYNONYMS = {
+    "HIS":  ["HID", "HSD", "HIE", "HSE", "HIP", "HSP"],
+    "HISD": ["HID", "HSD"], "HISE": ["HIE", "HSE"], "HISH": ["HIP", "HSP"],
+    "HID":  ["HID", "HSD"], "HIE": ["HIE", "HSE"], "HIP": ["HIP", "HSP"],
+    "HSD":  ["HSD", "HID"], "HSE": ["HSE", "HIE"], "HSP": ["HSP", "HIP"],
+    "LYN":  ["LYN", "LSN"], "ASH": ["ASH", "ASPP"], "GLH": ["GLH", "GLUP"],
+    "CYX":  ["CYX", "CYS2"], "CYM": ["CYM"],
+}
+
+
+def _resolve_resname(resname: str, rtp) -> Optional[str]:
+    """Resolve *resname* to a key present in *rtp*, via synonyms if needed."""
+    if resname in rtp:
+        return resname
+    for alt in _RESNAME_SYNONYMS.get(resname.upper(), []):
+        if alt in rtp:
+            return alt
+    return None
+
+
 def _rtp_atoms_bonds(resname: str, ff: str):
-    """Return (ffpath, atom_rows, intra_bonds) for an RTP residue.
+    """Return (ffpath, resolved_resname, atom_rows, intra_bonds) for an RTP residue.
 
     ``atom_rows`` is the RTP ``[atoms]`` list [name, type, charge, cgnr];
     ``intra_bonds`` is the list of within-residue (name1, name2) pairs, with
@@ -123,17 +147,18 @@ def _rtp_atoms_bonds(resname: str, ff: str):
     if not os.path.isfile(rtp_file):
         rtp_file = os.path.join(ffpath, "aminoacids.rtp")
     rtp = _load_rtp(rtp_file)
-    if resname not in rtp:
+    resolved = _resolve_resname(resname, rtp)
+    if resolved is None:
         raise KeyError(
             f"Residue '{resname}' not found in {rtp_file}. "
             "Provide a structure/ITP target, or add the RTP entry.")
-    entry = rtp[resname]
+    entry = rtp[resolved]
     atom_rows = entry["atoms"]
     intra_bonds = [
         (a1, a2) for a1, a2 in entry["bonds"]
         if not a1.startswith(("+", "-")) and not a2.startswith(("+", "-"))
     ]
-    return ffpath, atom_rows, intra_bonds
+    return ffpath, resolved, atom_rows, intra_bonds
 
 
 def _embed_coords(elements: List[str],
@@ -247,7 +272,7 @@ class TargetResidue:
         -------
         TargetResidue
         """
-        ffpath, atom_rows, intra_bonds = _rtp_atoms_bonds(resname, ff)
+        ffpath, resname, atom_rows, intra_bonds = _rtp_atoms_bonds(resname, ff)
         masses = _load_atomtype_masses(ffpath)
 
         # RTPParser applies library._aliases (e.g. HB1 -> 1HB) for standard
