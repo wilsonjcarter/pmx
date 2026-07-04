@@ -24,7 +24,7 @@ This is what the ``[ inter_bonds ]`` MTP section will serialize.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 # Reuse the dummy-zeroing helpers from alchemy (behaviour must stay identical).
 from ..alchemy import _zero_B_if_has_dummy_angle, _zero_B_if_has_dummy_dihedral
@@ -65,9 +65,24 @@ class CovalentEdit:
     inter-residue bonded transformations to apply; ``decoupled`` the split-atom
     residues produced by :meth:`decouple` (each ``(resname, atoms, bonds)``).
     """
+    ff: Optional[str] = None
     residues: List[str] = field(default_factory=list)
     bond_morphs: List["InterResidueBondMorph"] = field(default_factory=list)
     decoupled: List = field(default_factory=list)
+    hybrids: List = field(default_factory=list)     # (name, mtp_text) per residue
+
+    def mutate(self, wt_res, target_res) -> "CovalentEdit":
+        """Morph one residue WT->target through the common core (=build_hybrid_
+        residue).  A single-residue modification is just ``.mutate(...).emit()``.
+        """
+        from .mutate import build_hybrid_residue
+        if self.ff is None:
+            raise ValueError("CovalentEdit.mutate needs ff (CovalentEdit(ff=...)).")
+        _rtp, mtp, name = build_hybrid_residue(
+            wt_res, target_res, self.ff, target_res.resname, write_ff_types=False)
+        self.residues.append(wt_res.resname)
+        self.hybrids.append((name, mtp))
+        return self
 
     def decouple(self, wt_res, bound_res, bond_atom_name, boundary_depth=2):
         """Split *wt_res*'s reacting sidechain (WT->bound). Returns name->Atom.
@@ -75,17 +90,28 @@ class CovalentEdit:
         The returned map lets a caller reference the bound-branch ``*2`` atoms
         when building the cross-link bond-morph.
         """
-        from .crosslink import decouple as _decouple
+        from .crosslink import decouple as _decouple, emit_crosslink_mtp
         amap, atoms, bonds = _decouple(wt_res, bound_res, bond_atom_name,
                                        boundary_depth)
+        name = f"{wt_res.resname[:1]}2{bound_res.resname[:2]}"[:4]
         self.residues.append(wt_res.resname)
         self.decoupled.append((wt_res.resname, atoms, bonds))
+        self.hybrids.append(
+            (name, emit_crosslink_mtp(atoms, name, wt_res.resname, bound_res.resname)))
         return amap
 
     def bond(self, morph: "InterResidueBondMorph") -> "CovalentEdit":
         """Register an inter-residue bond-morph; returns self for chaining."""
         self.bond_morphs.append(morph)
         return self
+
+    def emit(self) -> str:
+        """MTP text for every residue of the edit (mutated and/or decoupled).
+
+        The single emit path for single-residue *and* cross-link modifications.
+        Inter-residue ``bond_morphs`` are applied later by ``gen_hybrid_top``.
+        """
+        return "\n".join(mtp for _, mtp in self.hybrids)
 
 
 # ── applying a morph to a topology ────────────────────────────────────────────

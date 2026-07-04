@@ -142,3 +142,20 @@ def test_composable_covalent_edit_api():
     assert edit.residues == ["CYS", "CYS"]
     # decouple exposes the bound-branch SG2 (dummy in A) for the bond
     assert a1["SG2"].atomtype == "DUM_SM"
+
+
+def test_covalent_edit_unified_emit_single_and_crosslink():
+    """A single-residue mutation and a cross-link emit through one CovalentEdit."""
+    from pmx.covalent import CovalentEdit
+    # single-residue mutation via the same API
+    e1 = CovalentEdit(ff=FF).mutate(
+        TargetResidue.from_rtp("SER", FF).residue,
+        TargetResidue.from_rtp("SEP", FF).residue)
+    assert "[ morphes ]" in e1.emit() and e1.hybrids[0][0] == "S2SE"
+
+    # cross-link (decoupled) via the same API + same .emit()
+    e2 = CovalentEdit()
+    e2.decouple(TargetResidue.from_rtp("CYS", FF).residue,
+                TargetResidue.from_rtp("CYS2", FF).residue, "SG")
+    m2 = e2.emit()
+    assert "SG1" in m2 and "SG2" in m2
