@@ -107,6 +107,75 @@ def test_itp_target_requires_structure():
                               structure=None, itp="frag.itp")
 
 
+def _write_capped_sep_fragment(tmp_path):
+    """Build a CH3-capped SEP sidechain fragment (ITP + PDB) from from_rtp SEP."""
+    import numpy as np
+    from pmx.covalent import TargetResidue
+    keep = ["CA", "HA", "CB", "HB1", "HB2", "OG", "P", "O1P", "O2P", "O3P", "H3T"]
+    mass = {"C": 12.011, "H": 1.008, "O": 15.999, "P": 30.974}
+    sep = TargetResidue.from_rtp("SEP", FF).residue
+    by = {a.name: a for a in sep.atoms}
+    ca, cb = np.array(by["CA"].x), np.array(by["CB"].x)
+    d = (ca - cb) / np.linalg.norm(ca - cb)
+    cy = ca + d * 1.5
+    hy = [cy + np.array(v) for v in ([.6, .6, 0], [-.6, .6, 0], [0, -.6, .6])]
+    frag = [(n, by[n].atomtype, by[n].q, (by[n].symbol or n[0]), by[n].x)
+            for n in keep]
+    frag += [("CY", "CT3", -0.27, "C", list(cy))]
+    frag += [(f"HY{i}", "HA3", 0.09, "H", list(h)) for i, h in enumerate(hy, 1)]
+    itp, pdb = str(tmp_path / "f.itp"), str(tmp_path / "f.pdb")
+    nr = {n: i for i, (n, *_ ) in enumerate(frag, 1)}
+    with open(itp, "w") as f:
+        f.write("[ moleculetype ]\nSEP 3\n\n[ atoms ]\n")
+        for i, (n, t, q, el, x) in enumerate(frag, 1):
+            f.write(f"{i} {t} 1 SEP {n} {i} {q:.4f} {mass[el[0]]:.4f}\n")
+        f.write("\n[ bonds ]\n")
+        for a, b in [("CA", "HA"), ("CA", "CB"), ("CB", "HB1"), ("CB", "HB2"),
+                     ("CB", "OG"), ("OG", "P"), ("P", "O1P"), ("P", "O2P"),
+                     ("P", "O3P"), ("O3P", "H3T"), ("CA", "CY"), ("CY", "HY1"),
+                     ("CY", "HY2"), ("CY", "HY3")]:
+            f.write(f"{nr[a]} {nr[b]} 1\n")
+    with open(pdb, "w") as f:
+        for i, (n, t, q, el, x) in enumerate(frag, 1):
+            f.write(f"ATOM  {i:5} {n:<4} SEP A   1    "
+                    f"{x[0]:8.3f}{x[1]:8.3f}{x[2]:8.3f}  1.00  0.00          "
+                    f"{el[0]:>2}\n")
+        f.write("END\n")
+    return itp, pdb
+
+
+def test_mutate_via_itp_fragment(tmp_path):
+    """End-to-end itp path: capped fragment -> hybrid with phosphate dummies."""
+    from pmx.gmx import set_gmxlib
+    from pmx.model import Model
+    from pmx.covalent import TargetResidue, mutate
+    set_gmxlib()
+    itp, pdb = _write_capped_sep_fragment(tmp_path)
+    TargetResidue.from_rtp("SER", FF).write(str(tmp_path / "wt.pdb"))
+    m = Model(str(tmp_path / "wt.pdb"))
+    name = mutate(m, 1, "SEP", FF, itp=itp, structure=pdb,
+                  inplace=True, write_files=False)
+    names = [a.name for a in m.residues[0].atoms]
+    assert name == "S2SE"
+    assert "HN" in names                      # WT backbone H mapped through
+    assert any(a.name == "DP" for a in m.residues[0].atoms)  # phosphate appears
+
+
+def test_protonation_warning_on_hydrogenless_wt(tmp_path):
+    from pmx.gmx import set_gmxlib
+    from pmx.model import Model
+    from pmx.covalent import TargetResidue, mutate
+    set_gmxlib()
+    tr = TargetResidue.from_rtp("SER", FF)
+    tr.residue.atoms = [a for a in tr.residue.atoms if a.symbol != "H"]
+    tr.model.atoms = tr.residue.atoms
+    p = str(tmp_path / "ser_heavy.pdb")
+    tr.model.write(p)
+    m = Model(p)
+    with pytest.warns(UserWarning, match="unprotonated"):
+        mutate(m, 1, "SEP", FF, inplace=True, write_files=False)
+
+
 def test_split_rtp_header():
     from pmx.covalent.mutate import _split_rtp_header
     rtp = "[ bondedtypes ]\nHDR\n\n[ A2SE ] ; x\n[ atoms ]\n  N N\n"

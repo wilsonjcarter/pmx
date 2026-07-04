@@ -21,6 +21,7 @@ Two entry points:
 from __future__ import annotations
 
 import os
+import warnings
 from copy import deepcopy
 from typing import Optional, Tuple
 
@@ -338,6 +339,19 @@ def mutate(model, mut_resid: int, target: str, ff: str,
     _assign_rtp_entries(residue1, rtp, term)
     if not any(getattr(a, "bonds", None) for a in residue1.atoms):
         attach_bonds_from_rtp(residue1, ff)
+
+    # Protonation check: a hydrogen-free WT residue (e.g. a raw crystal
+    # structure) leaves the hybrid's backbone/polar hydrogens as dummies, so an
+    # improper such as (N -C CA HN) references a now-absent atom and pdb2gmx
+    # rejects the topology.  Warn up front rather than fail cryptically later.
+    if not any(_element_of(a) == "H" for a in residue1.atoms):
+        warnings.warn(
+            f"WT residue {mut_resid} ({residue1.resname}) has no hydrogens -- "
+            "the structure appears unprotonated. Its polar/backbone hydrogens "
+            "will be treated as appearing dummies, which yields an invalid "
+            "topology (pdb2gmx will reject a dangling improper). Protonate the "
+            "structure first (e.g. run gmx pdb2gmx on the WT and mutate the "
+            "protonated output).", stacklevel=2)
 
     # build the target residue from the selected front end (RTP / structure / itp)
     residue2 = _build_target_residue(target, ff, rtp, term, residue1,
