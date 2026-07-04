@@ -19,5 +19,6 @@ additively and will progressively host those pieces without changing behaviour.
 """
 
 from .target import TargetResidue
+from .mapping import map_residues, ResidueMapping
 
-__all__ = ["TargetResidue"]
+__all__ = ["TargetResidue", "map_residues", "ResidueMapping"]
