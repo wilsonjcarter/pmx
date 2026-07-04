@@ -35,13 +35,16 @@ from ..library import pmx_data_file
 from .mapping import map_residues, attach_bonds_from_rtp, _element_of
 from .target import TargetResidue
 
-# Reuse the battle-tested emit helpers from nsaa (import, do not modify).
+# Reuse the battle-tested emit + ITP-fragment helpers from nsaa (import, do not
+# modify).
 from ..nsaa import (
     _merge_molecules, _make_bstate_dummies, _make_transition_dics,
     _update_bond_lists, _improps_as_atoms, _generate_dihedral_entries,
     _generate_improp_entries, _make_rtp, _make_mtp, _write_atp_fnb,
     _rtp_terminal, _assign_rtp_entries, _assign_mass_atp,
     _validate_atom_parameters, _get_residue_types, _ARN_CONTENT,
+    _parse_itp_atoms, _parse_itp_bonds, _find_methyl_cap,
+    _prepare_nsaa_fragment, _assign_itp_entries,
 )
 
 
@@ -230,18 +233,94 @@ def build_hybrid_residue(residue1, residue2, ff: str, mut_resname: str,
     return rtp_text, mtp_text, hybrid_name
 
 
+# ── target-residue front ends ─────────────────────────────────────────────────
+
+def _attach_itp_bonds(residue2, itp_file: str) -> None:
+    """Give an ITP-parameterized residue connectivity (for the graph mapper)."""
+    nr2name = {a["nr"]: a["name"] for a in _parse_itp_atoms(itp_file)}
+    by_name = {a.name: a for a in residue2.atoms}
+    for ai, aj in _parse_itp_bonds(itp_file):
+        x, y = by_name.get(nr2name.get(ai)), by_name.get(nr2name.get(aj))
+        if x is not None and y is not None and y not in x.bonds:
+            x.bonds.append(y)
+            y.bonds.append(x)
+
+
+def _build_target_residue(target, ff, rtp, term, residue1,
+                          structure=None, itp=None):
+    """Build the (parameterized, bonded) target residue from the chosen front end.
+
+    Precedence: ``itp`` (arbitrary parameterized fragment) > ``structure``
+    (geometry override, parameters from the RTP) > RTP name (default:
+    parameters + RDKit-embedded geometry from the force-field RTP entry).
+    """
+    if itp is not None:
+        # NSAA capped-fragment workflow: parameters from the ITP, geometry from
+        # the supplied structure (backbone grafted from the WT if the fragment
+        # is capped at CA).  Reuses pmx.nsaa's fragment machinery.
+        if structure is None:
+            raise ValueError(
+                "itp target requires structure= (a PDB/GRO for the fragment).")
+        model2 = Model()
+        model2.read(structure)
+        residue2 = model2.residues[0]
+        residue2.set_resname(target)
+        cap_C, cap_Hs, cap_CA, cap_CA_Hs = _find_methyl_cap(
+            _parse_itp_atoms(itp), _parse_itp_bonds(itp))
+        has_bb = all(any(a.name == n for a in residue2.atoms)
+                     for n in ("N", "C", "O"))
+        if not has_bb:
+            if cap_C is None:
+                raise RuntimeError(
+                    "ITP fragment has no backbone N/C/O and no CH3 cap at CA.")
+            _prepare_nsaa_fragment(residue2, residue1, cap_C, cap_Hs,
+                                   ca_atom_name=cap_CA, ca_H_names=cap_CA_Hs,
+                                   term=term)
+        _assign_itp_entries(residue2, itp, rtp, backbone_resname=residue1.resname)
+        _attach_itp_bonds(residue2, itp)
+        return residue2
+
+    if structure is not None:
+        # geometry from the structure; parameters + connectivity from the RTP
+        model2 = Model()
+        model2.read(structure)
+        residue2 = model2.residues[0]
+        residue2.set_resname(target)
+        _assign_rtp_entries(residue2, rtp, term)
+        if not any(getattr(a, "bonds", None) for a in residue2.atoms):
+            attach_bonds_from_rtp(residue2, ff)
+        return residue2
+
+    # default: parameters + embedded geometry from the RTP entry
+    return TargetResidue.from_rtp(target, ff).residue
+
+
 # ── model-level mutate ────────────────────────────────────────────────────────
 
 def mutate(model, mut_resid: int, target: str, ff: str,
+           structure: Optional[str] = None, itp: Optional[str] = None,
            mut_chain: Optional[str] = None, inplace: bool = False,
            write_files: bool = True, verbose: bool = False):
-    """Mutate ``mut_resid`` in *model* to an RTP-named *target* residue.
+    """Mutate ``mut_resid`` in *model* to *target*, via one of three front ends.
 
-    Builds the hybrid structure and writes ``<hybrid>.rtp`` (into the force
-    field dir) and ``<hybrid>.mtp`` (into the working dir), mirroring
-    :func:`pmx.nsaa.mutate_nsaa` but using the graph-MCS mapper.
+    Parameters
+    ----------
+    target : str
+        Target residue name (also used for the hybrid name and RTP lookup).
+    structure : str, optional
+        PDB/GRO with the target residue's geometry.  Overrides the default
+        RDKit-embedded geometry; parameters still come from the RTP (or from
+        *itp* if given).
+    itp : str, optional
+        GROMACS ITP fragment parameterizing the target (for residues not in the
+        force-field RTP).  Requires *structure*.  Uses the NSAA capped-fragment
+        workflow.
 
-    Returns the hybrid residue name.
+    With neither *structure* nor *itp*, the target is built entirely from the
+    force-field RTP entry (parameters + embedded geometry).
+
+    Accumulates the hybrid into the force field's ``nsaa.rtp``/``nsaa.mtp`` and
+    returns the hybrid residue name.
     """
     rtp, ffpath = _load_rtp(ff)
     bCharmm = "charmm" in ff
@@ -260,8 +339,9 @@ def mutate(model, mut_resid: int, target: str, ff: str,
     if not any(getattr(a, "bonds", None) for a in residue1.atoms):
         attach_bonds_from_rtp(residue1, ff)
 
-    # build the target residue from its RTP entry
-    residue2 = TargetResidue.from_rtp(target, ff).residue
+    # build the target residue from the selected front end (RTP / structure / itp)
+    residue2 = _build_target_residue(target, ff, rtp, term, residue1,
+                                     structure=structure, itp=itp)
 
     rtp_text, mtp_text, hybrid_name = build_hybrid_residue(
         residue1, residue2, ff, target, term=term, write_ff_types=write_files)

@@ -74,6 +74,39 @@ def test_hydroxyl_h_disappears(hybrid):
     assert any("HG" in m[0] for m in gone), "hydroxyl H should disappear"
 
 
+def test_mutate_from_structure_matches_rtp_path(tmp_path):
+    """structure= (geometry from a PDB) yields the same hybrid as the default
+    RTP path -- only coordinates differ."""
+    from pmx.gmx import set_gmxlib
+    from pmx.model import Model
+    from pmx.covalent import TargetResidue, mutate
+    set_gmxlib()
+    ser = str(tmp_path / "ser.pdb")
+    sep = str(tmp_path / "sep.pdb")
+    TargetResidue.from_rtp("SER", FF).write(ser)      # protonated WT
+    TargetResidue.from_rtp("SEP", FF).write(sep)      # target geometry
+
+    m_def = Model(ser)
+    n_def = mutate(m_def, 1, "SEP", FF, inplace=True, write_files=False)
+    m_str = Model(ser)
+    n_str = mutate(m_str, 1, "SEP", FF, structure=sep,
+                   inplace=True, write_files=False)
+
+    assert n_def == n_str == "S2SE"
+    assert sorted(a.name for a in m_def.residues[0].atoms) == \
+        sorted(a.name for a in m_str.residues[0].atoms)
+    # HN common (backbone) and phosphate present as dummies
+    assert any(a.name == "HN" for a in m_str.residues[0].atoms)
+    assert any(a.name == "DP" for a in m_str.residues[0].atoms)
+
+
+def test_itp_target_requires_structure():
+    from pmx.covalent.mutate import _build_target_residue
+    with pytest.raises(ValueError):
+        _build_target_residue("SEP", FF, {}, None, None,
+                              structure=None, itp="frag.itp")
+
+
 def test_split_rtp_header():
     from pmx.covalent.mutate import _split_rtp_header
     rtp = "[ bondedtypes ]\nHDR\n\n[ A2SE ] ; x\n[ atoms ]\n  N N\n"
