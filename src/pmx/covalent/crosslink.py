@@ -125,6 +125,8 @@ def _dual_atom(name, atomtype, q, m, x, symbol,
     a = Atom(name=name, x=list(x), symbol=symbol)
     a.atomtype, a.q, a.m = atomtype, q, m
     a.nameB, a.atomtypeB, a.qB, a.mB = nameB, atomtypeB, qB, mB
+    # mirror onto .type/.typeB too (apply_bond_morph's FF lookup reads these)
+    a.type, a.typeB = atomtype, atomtypeB
     return a
 
 
@@ -221,6 +223,34 @@ def build_crosslink_mtp(wt_res, bound_res, bond_atom_name: str,
     atoms, _bonds = build_split_residue(wt_res, bound_res, bond_atom_name,
                                         boundary_depth)
     return emit_crosslink_mtp(atoms, resname, wt_res.resname, bound_res.resname)
+
+
+def disulfide_edit(cys1_res, cys2_res, bound1_res, bound2_res, mode="form"):
+    """Compose an alchemical disulfide: decouple each Cys + the SG-SG bond.
+
+    ``cysN_res`` are the WT cysteines; ``boundN_res`` the disulfide-Cys targets
+    (``CYS2``/``CYX``).  Returns ``(edit, split1, split2)`` where *edit* is a
+    :class:`~pmx.covalent.edit.CovalentEdit` carrying the SG2-SG2' bond-morph on
+    the bound-branch atoms (dummy in A -> exclusions harmless), and *splitN* are
+    the ``(atoms, bonds)`` of each decoupled residue.
+
+    This is the composition "decouple x2 + bond" of the unified operations.
+    """
+    from .edit import CovalentEdit, disulfide_morph
+
+    split1 = build_split_residue(cys1_res, bound1_res, "SG")
+    split2 = build_split_residue(cys2_res, bound2_res, "SG")
+    d1 = {a.name: a for a in split1[0]}
+    d2 = {a.name: a for a in split2[0]}
+
+    # bond on the BOUND branch (CB2/SG2); CA is the common boundary
+    morph = disulfide_morph(
+        {"CA": d1["CA"], "CB": d1["CB2"], "SG": d1["SG2"]},
+        {"CA": d2["CA"], "CB": d2["CB2"], "SG": d2["SG2"]},
+        mode=mode)
+    edit = CovalentEdit(residues=[cys1_res.resname, cys2_res.resname],
+                        bond_morphs=[morph])
+    return edit, split1, split2
 
 
 def _split_bonds(wt_res, bound_res, reacting_set, boundary):

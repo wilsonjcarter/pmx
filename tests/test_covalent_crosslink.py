@@ -91,3 +91,36 @@ def test_build_crosslink_mtp_emits_c2cd_morphes():
     assert "S" in morphes["SG1"] and "DUM_S" in morphes["SG1"]
     assert "DUM_SM" in morphes["SG2"] and "SM" in morphes["SG2"]
     assert "CT2" in morphes["CB1"] and "DUM_CT2" in morphes["CB1"]
+
+
+class _BP:
+    def get_bond_param(self, *t):     return (1, 2.05, 300.0)
+    def get_angle_param(self, *t):    return (5, 110.0, 50.0, 0.0, 0.0)
+    def get_dihedral_param(self, *t): return [(9, 180.0, 2.0, 2)]
+
+
+class _Topol:
+    def __init__(self):
+        self.bonds, self.angles, self.dihedrals = [], [], []
+        self.BondedParams = _BP()
+
+
+def test_disulfide_edit_composes_decouple_and_bond():
+    """A full disulfide = decouple x2 + bond, on the bound branch."""
+    from pmx.covalent.crosslink import disulfide_edit
+    from pmx.covalent.edit import apply_bond_morph
+    cys = lambda: TargetResidue.from_rtp("CYS", FF).residue      # noqa: E731
+    cys2 = lambda: TargetResidue.from_rtp("CYS2", FF).residue    # noqa: E731
+    edit, s1, s2 = disulfide_edit(cys(), cys(), cys2(), cys2())
+
+    assert len(edit.bond_morphs) == 1
+    morph = edit.bond_morphs[0]
+    bond = next(it for it in morph.interactions if it.kind == "bond")
+    # the SG-SG bond sits on the bound-branch SG2 (dummy in A)
+    assert all(a.name == "SG2" and a.atomtype == "DUM_SM" for a in bond.atoms)
+
+    t = _Topol()
+    apply_bond_morph(t, morph)               # form mode
+    assert t.bonds[0][3][2] == 0.0           # state A off
+    assert t.bonds[0][4][2] == 300.0         # state B on
+    assert len(t.bonds) + len(t.angles) + len(t.dihedrals) == 6
