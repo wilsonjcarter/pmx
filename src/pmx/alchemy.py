@@ -1078,123 +1078,25 @@ def _zero_B_if_has_dummy_dihedral(entry):
 def _add_ss_bonded_terms(topol, r1_atoms, r2_atoms, mode='form'):
     """Append SG2-SG2' bond, CB2-SG2-SG2' angles, and SS dihedrals to topol.
 
-    mode : 'form'  - A-state off (k=0), B-state on.
-           'break' - A-state on, B-state off (k=0).
-           'perma' - both states on.
+    Thin adapter over the unified inter-residue bond-morph applier in
+    :mod:`pmx.covalent.edit` -- the single implementation of this logic (verified
+    byte-equivalent to the former inline version).
+    mode : 'form' | 'break' | 'perma'.
     """
-    get_t = (lambda a: a.typeB) if mode == 'form' else (lambda a: a.type)
-
-    sg1, sg2 = r1_atoms['SG2'], r2_atoms['SG2']
-    func, x0, k = topol.BondedParams.get_bond_param(get_t(sg1), get_t(sg2))
-    k_A = 0.0 if mode == 'form'  else k
-    k_B = 0.0 if mode == 'break' else k
-    topol.bonds.append([sg1, sg2, func, [func, x0, k_A], [func, x0, k_B]])
-
-    for t in ([r1_atoms['CB2'], r1_atoms['SG2'], r2_atoms['SG2']],
-              [r2_atoms['CB2'], r2_atoms['SG2'], r1_atoms['SG2']]):
-        parm = topol.BondedParams.get_angle_param(*[get_t(a) for a in t])
-        if len(parm) != 5:
-            parm += [0, 0]
-        func, th0, kth, r0_ub, kub = parm
-        k_ang_A = 0.0 if mode == 'form'  else kth
-        k_ang_B = 0.0 if mode == 'break' else kth
-        k_ub_A  = 0.0 if mode == 'form'  else kub
-        k_ub_B  = 0.0 if mode == 'break' else kub
-        topol.angles.append(t + [
-            func,
-            [func, th0, k_ang_A, r0_ub, k_ub_A],
-            [func, th0, k_ang_B, r0_ub, k_ub_B],
-        ])
-        _zero_B_if_has_dummy_angle(topol.angles[-1])
-
-    dih_quartets = [
-        [r1_atoms['CB2'], r1_atoms['SG2'], r2_atoms['SG2'], r2_atoms['CB2']],
-        [r1_atoms['CA'],  r1_atoms['CB2'], r1_atoms['SG2'], r2_atoms['SG2']],
-        [r2_atoms['CA'],  r2_atoms['CB2'], r2_atoms['SG2'], r1_atoms['SG2']],
-    ]
-    for q in dih_quartets:
-        terms = topol.BondedParams.get_dihedral_param(*[get_t(a) for a in q], 9)
-        for func, phi0, kphi, mult in terms:
-            k_dih_A = 0.0 if mode == 'form'  else kphi
-            k_dih_B = 0.0 if mode == 'break' else kphi
-            topol.dihedrals.append(q + [
-                func,
-                [func, phi0, k_dih_A, mult],
-                [func, phi0, k_dih_B, mult],
-            ])
-            _zero_B_if_has_dummy_dihedral(topol.dihedrals[-1])
+    from .covalent.edit import apply_bond_morph, disulfide_morph
+    apply_bond_morph(topol, disulfide_morph(r1_atoms, r2_atoms, mode=mode,
+                                            cb='CB2', sg='SG2'))
 
 
 def _add_nos_terms(topol, cys, lys, mode='form'):
-    """Append the cross-residue NOS bonded terms.
+    """Append the cross-residue NOS bonded terms (NZ-OD2 bond + angles/dihedrals).
 
-    mode : 'form'  - A-state off (k=0), B-state on  (Cys/Lys -> NOS).
-           'break' - A-state on, B-state off (k=0).
-           'perma' - both states on.
-
-    Bond:    NZ-OD2
-    Angles:  CE-NZ-OD2, HZ1-NZ-OD2, NZ-OD2-SG2
-    Dihedrals: CD-CE-NZ-OD2, HE1/HE2-CE-NZ-OD2, HZ1-NZ-OD2-SG2,
-               CE-NZ-OD2-SG2, NZ-OD2-SG2-CB2
-    Force constants pulled from topol.BondedParams (the FF ffbonded.itp must
-    contain the CNOS/optimised NG311/OG301/SG301 parameters).
+    Thin adapter over the unified inter-residue bond-morph applier in
+    :mod:`pmx.covalent.edit` -- the single implementation of this logic.
+    mode : 'form' | 'break' | 'perma'.
     """
-    get_t = (lambda a: a.typeB) if mode == 'form' else (lambda a: a.type)
-
-    nz, od2, sg2 = lys['NZ2'], cys['OD2'], cys['SG2']
-    ce, cd, hz1 = lys['CE2'], lys['CD'], lys['HZ21']
-    cb2 = cys['CB2']
-    he1, he2 = lys.get('HE21'), lys.get('HE22')
-
-    # ---- bond NZ-OD2 ----
-    func, x0, k = topol.BondedParams.get_bond_param(get_t(nz), get_t(od2))
-    k_A = 0.0 if mode == 'form' else k
-    k_B = 0.0 if mode == 'break' else k
-    topol.bonds.append([nz, od2, func, [func, x0, k_A], [func, x0, k_B]])
-
-    # ---- angles ----
-    angle_triplets = [[ce, nz, od2], [nz, od2, sg2]]
-    if hz1 is not None:
-        angle_triplets.insert(1, [hz1, nz, od2])
-    for t in angle_triplets:
-        parm = topol.BondedParams.get_angle_param(*[get_t(a) for a in t])
-        if len(parm) != 5:
-            parm = list(parm) + [0, 0]
-        func, th0, kth, r0_ub, kub = parm
-        k_ang_A = 0.0 if mode == 'form' else kth
-        k_ang_B = 0.0 if mode == 'break' else kth
-        k_ub_A = 0.0 if mode == 'form' else kub
-        k_ub_B = 0.0 if mode == 'break' else kub
-        topol.angles.append(t + [
-            func,
-            [func, th0, k_ang_A, r0_ub, k_ub_A],
-            [func, th0, k_ang_B, r0_ub, k_ub_B],
-        ])
-        _zero_B_if_has_dummy_angle(topol.angles[-1])
-
-    # ---- dihedrals ----
-    quartets = [
-        [cd, ce, nz, od2],        # CG321 CG321 NG311 OG301
-        [ce, nz, od2, sg2],       # CG321 NG311 OG301 SG301
-        [nz, od2, sg2, cb2],      # NG311 OG301 SG301 CG321
-    ]
-    if hz1 is not None:
-        quartets.append([hz1, nz, od2, sg2])   # HGP1 NG311 OG301 SG301
-    if he1 is not None:
-        quartets.append([he1, ce, nz, od2])    # HGA2 CG321 NG311 OG301
-    if he2 is not None:
-        quartets.append([he2, ce, nz, od2])
-    for q in quartets:
-        terms = topol.BondedParams.get_dihedral_param(*[get_t(a) for a in q], 9)
-        for func, phi0, kphi, mult in terms:
-            k_dih_A = 0.0 if mode == 'form' else kphi
-            k_dih_B = 0.0 if mode == 'break' else kphi
-            topol.dihedrals.append(q + [
-                func,
-                [func, phi0, k_dih_A, mult],
-                [func, phi0, k_dih_B, mult],
-            ])
-            _zero_B_if_has_dummy_dihedral(topol.dihedrals[-1])
+    from .covalent.edit import apply_bond_morph, nos_morph
+    apply_bond_morph(topol, nos_morph(cys, lys, mode=mode))
 
 
 
