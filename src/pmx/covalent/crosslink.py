@@ -245,12 +245,11 @@ def disulfide_edit(cys1_res, cys2_res, bound1_res, bound2_res, mode="form"):
     (``CYS2``/``CYX``).  Returns ``(edit, split1, split2)``.
     """
     from .edit import CovalentEdit, disulfide_morph
-    a1, at1, b1 = decouple(cys1_res, bound1_res, "SG")
-    a2, at2, b2 = decouple(cys2_res, bound2_res, "SG")
-    morph = disulfide_morph(a1, a2, mode=mode, cb="CB2", sg="SG2")
-    edit = CovalentEdit(residues=[cys1_res.resname, cys2_res.resname],
-                        bond_morphs=[morph])
-    return edit, (at1, b1), (at2, b2)
+    edit = CovalentEdit()
+    a1 = edit.decouple(cys1_res, bound1_res, "SG")
+    a2 = edit.decouple(cys2_res, bound2_res, "SG")
+    edit.bond(disulfide_morph(a1, a2, mode=mode, cb="CB2", sg="SG2"))
+    return edit, edit.decoupled[0][1:], edit.decoupled[1][1:]
 
 
 def nos_edit(cys_res, lys_res, nos_cys_res, nos_lys_res, mode="form"):
@@ -263,12 +262,11 @@ def nos_edit(cys_res, lys_res, nos_cys_res, nos_lys_res, mode="form"):
     ``nos_lys_res`` are the bound NOS targets (e.g. ``CSO``-derived for Cys).
     """
     from .edit import CovalentEdit, nos_morph
-    ac, atc, bc = decouple(cys_res, nos_cys_res, "SG")
-    al, atl, bl = decouple(lys_res, nos_lys_res, "NZ")
-    morph = nos_morph(ac, al, mode=mode)
-    edit = CovalentEdit(residues=[cys_res.resname, lys_res.resname],
-                        bond_morphs=[morph])
-    return edit, (atc, bc), (atl, bl)
+    edit = CovalentEdit()
+    ac = edit.decouple(cys_res, nos_cys_res, "SG")
+    al = edit.decouple(lys_res, nos_lys_res, "NZ")
+    edit.bond(nos_morph(ac, al, mode=mode))
+    return edit, edit.decoupled[0][1:], edit.decoupled[1][1:]
 
 
 def _split_bonds(wt_res, bound_res, reacting_set, boundary):

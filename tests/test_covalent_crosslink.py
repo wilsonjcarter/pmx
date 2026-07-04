@@ -124,3 +124,21 @@ def test_disulfide_edit_composes_decouple_and_bond():
     assert t.bonds[0][3][2] == 0.0           # state A off
     assert t.bonds[0][4][2] == 300.0         # state B on
     assert len(t.bonds) + len(t.angles) + len(t.dihedrals) == 6
+
+
+def test_composable_covalent_edit_api():
+    """Compose a disulfide from the first-class operations: decouple x2 + bond."""
+    from pmx.covalent import CovalentEdit
+    from pmx.covalent.edit import disulfide_morph
+    cys = lambda: TargetResidue.from_rtp("CYS", FF).residue      # noqa: E731
+    cys2 = lambda: TargetResidue.from_rtp("CYS2", FF).residue    # noqa: E731
+
+    edit = CovalentEdit()
+    a1 = edit.decouple(cys(), cys2(), "SG")     # returns name->Atom
+    a2 = edit.decouple(cys(), cys2(), "SG")
+    edit.bond(disulfide_morph(a1, a2, cb="CB2", sg="SG2"))
+
+    assert len(edit.decoupled) == 2 and len(edit.bond_morphs) == 1
+    assert edit.residues == ["CYS", "CYS"]
+    # decouple exposes the bound-branch SG2 (dummy in A) for the bond
+    assert a1["SG2"].atomtype == "DUM_SM"

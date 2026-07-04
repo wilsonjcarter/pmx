@@ -56,11 +56,36 @@ class InterResidueBondMorph:
 class CovalentEdit:
     """A covalent modification spanning one or more residues.
 
-    ``residues`` are the participating hybrid residue names (for detection);
-    ``bond_morphs`` the inter-residue bonded transformations to apply.
+    The unified surface: compose a modification from the operations
+    :meth:`decouple` (split a reacting sidechain for a forming bond) and
+    :meth:`bond` (toggle an inter-residue bond).  A single-residue mutation is a
+    :class:`CovalentEdit` with neither.
+
+    ``residues`` are the participating residue names; ``bond_morphs`` the
+    inter-residue bonded transformations to apply; ``decoupled`` the split-atom
+    residues produced by :meth:`decouple` (each ``(resname, atoms, bonds)``).
     """
     residues: List[str] = field(default_factory=list)
-    bond_morphs: List[InterResidueBondMorph] = field(default_factory=list)
+    bond_morphs: List["InterResidueBondMorph"] = field(default_factory=list)
+    decoupled: List = field(default_factory=list)
+
+    def decouple(self, wt_res, bound_res, bond_atom_name, boundary_depth=2):
+        """Split *wt_res*'s reacting sidechain (WT->bound). Returns name->Atom.
+
+        The returned map lets a caller reference the bound-branch ``*2`` atoms
+        when building the cross-link bond-morph.
+        """
+        from .crosslink import decouple as _decouple
+        amap, atoms, bonds = _decouple(wt_res, bound_res, bond_atom_name,
+                                       boundary_depth)
+        self.residues.append(wt_res.resname)
+        self.decoupled.append((wt_res.resname, atoms, bonds))
+        return amap
+
+    def bond(self, morph: "InterResidueBondMorph") -> "CovalentEdit":
+        """Register an inter-residue bond-morph; returns self for chaining."""
+        self.bond_morphs.append(morph)
+        return self
 
 
 # ── applying a morph to a topology ────────────────────────────────────────────
