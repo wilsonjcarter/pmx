@@ -69,7 +69,10 @@ class CovalentEdit:
     residues: List[str] = field(default_factory=list)
     bond_morphs: List["InterResidueBondMorph"] = field(default_factory=list)
     decoupled: List = field(default_factory=list)
-    hybrids: List = field(default_factory=list)     # (name, mtp_text) per residue
+    hybrids: List = field(default_factory=list)     # (name, mtp_text) per mutate
+    # (name, atoms, resnA, resnB) per decouple; rendered lazily in emit() so the
+    # [ inter_bonds ] section can be derived from bond_morphs added afterwards
+    decoupled_render: List = field(default_factory=list)
 
     def mutate(self, wt_res, target_res) -> "CovalentEdit":
         """Morph one residue WT->target through the common core (=build_hybrid_
@@ -90,14 +93,14 @@ class CovalentEdit:
         The returned map lets a caller reference the bound-branch ``*2`` atoms
         when building the cross-link bond-morph.
         """
-        from .crosslink import decouple as _decouple, emit_crosslink_mtp
+        from .crosslink import decouple as _decouple
         amap, atoms, bonds = _decouple(wt_res, bound_res, bond_atom_name,
                                        boundary_depth)
         name = f"{wt_res.resname[:1]}2{bound_res.resname[:2]}"[:4]
         self.residues.append(wt_res.resname)
         self.decoupled.append((wt_res.resname, atoms, bonds))
-        self.hybrids.append(
-            (name, emit_crosslink_mtp(atoms, name, wt_res.resname, bound_res.resname)))
+        self.decoupled_render.append(
+            (name, atoms, wt_res.resname, bound_res.resname))
         return amap
 
     def bond(self, morph: "InterResidueBondMorph") -> "CovalentEdit":
@@ -105,13 +108,39 @@ class CovalentEdit:
         self.bond_morphs.append(morph)
         return self
 
+    def _inter_bond_seeds_for(self, atoms) -> List:
+        """The ``(mode, self, partner)`` seeds owned by *atoms*.
+
+        A bond is serialized on the residue holding its *first* atom, so each
+        forming bond is declared once; ``gen_hybrid_top`` resolves the partner
+        and derives the induced angles/dihedrals from the graph.
+        """
+        owned = set(id(a) for a in atoms)
+        seeds = []
+        for morph in self.bond_morphs:
+            for it in morph.interactions:
+                if it.kind != "bond":
+                    continue
+                a, b = it.atoms[0], it.atoms[1]
+                if id(a) in owned:
+                    seeds.append((morph.mode, a.name, b.name))
+        return seeds
+
     def emit(self) -> str:
         """MTP text for every residue of the edit (mutated and/or decoupled).
 
         The single emit path for single-residue *and* cross-link modifications.
-        Inter-residue ``bond_morphs`` are applied later by ``gen_hybrid_top``.
+        Each decoupled residue serializes the inter-residue bonds it owns as an
+        ``[ inter_bonds ]`` section; ``gen_hybrid_top`` applies them (deriving the
+        induced angles/dihedrals from the graph) at B-state fill time.
         """
-        return "\n".join(mtp for _, mtp in self.hybrids)
+        from .crosslink import emit_crosslink_mtp
+        parts = [mtp for _, mtp in self.hybrids]
+        for name, atoms, resnA, resnB in self.decoupled_render:
+            seeds = self._inter_bond_seeds_for(atoms)
+            parts.append(emit_crosslink_mtp(atoms, name, resnA, resnB,
+                                            inter_bonds=seeds or None))
+        return "\n".join(parts)
 
 
 # ── applying a morph to a topology ────────────────────────────────────────────
@@ -184,6 +213,107 @@ def apply_edit(topol, edit: CovalentEdit) -> None:
     """Apply all bond morphs of a covalent edit to *topol*."""
     for morph in edit.bond_morphs:
         apply_bond_morph(topol, morph)
+
+
+# ── the generic, graph-derived bond-morph (the unified core) ──────────────────
+
+def induced_bond_morph(new_bonds, adjacency: Dict, mode: str = "form"
+                       ) -> InterResidueBondMorph:
+    """Build an inter-residue bond-morph from *only* the forming bond(s).
+
+    This is the unified replacement for the hand-authored :func:`disulfide_morph`
+    / :func:`nos_morph`: a covalent modification is fully specified by which
+    bonds form, and the induced angles/dihedrals follow deterministically from
+    the molecular graph -- exactly as GROMACS generates bonded terms from the
+    bond list, only here in dual (A/B) state form.
+
+    Given the forming bond(s) and the *union* adjacency of the participating
+    residues (which must already include *new_bonds*), emit:
+
+    * each new bond;
+    * every angle ``x-a-b`` / ``a-b-y`` incident on a new edge ``a-b``;
+    * every proper dihedral whose 4-atom path traverses a new edge.
+
+    Terms are canonicalised so each physical interaction appears once, and their
+    order is deterministic (graph order of *adjacency*), so the output is
+    reproducible.  Force constants are resolved later, in :func:`apply_bond_morph`.
+
+    Parameters
+    ----------
+    new_bonds : iterable of (Atom, Atom)
+        The inter-residue bonds that form (e.g. ``[(SG, SG')]`` for a disulfide,
+        ``[(NZ, OD)]`` for a NOS bridge).
+    adjacency : dict {Atom: set(Atom)}
+        The union bond graph of the participating residues, *including*
+        *new_bonds*.
+    mode : str
+        ``'form'`` | ``'break'`` | ``'perma'``.
+    """
+    new_edges = {frozenset((a, b)) for a, b in new_bonds}
+
+    def _order(node):
+        # deterministic neighbour ordering (by atom id, falling back to name)
+        return sorted(adjacency.get(node, ()),
+                      key=lambda n: (getattr(n, "id", 0) or 0, n.name))
+
+    def _traverses_new(path):
+        return any(frozenset(pair) in new_edges
+                   for pair in zip(path, path[1:]))
+
+    interactions, seen_ang, seen_dih = [], set(), set()
+
+    # bonds
+    for a, b in new_bonds:
+        interactions.append(Interaction("bond", [a, b]))
+
+    # angles + dihedrals: enumerate simple paths of length 2 (angles) and 3
+    # (dihedrals) hanging off each new edge, keeping only those that traverse it.
+    for a, b in new_bonds:
+        for mid_lo, mid_hi in ((a, b), (b, a)):
+            # angle  x - mid_lo - mid_hi
+            for x in _order(mid_lo):
+                if x is mid_hi:
+                    continue
+                key = (frozenset((x, mid_hi)), mid_lo)
+                if key in seen_ang:
+                    continue
+                seen_ang.add(key)
+                interactions.append(Interaction("angle", [x, mid_lo, mid_hi]))
+
+        # dihedrals: every 4-atom simple path containing edge (a, b)
+        for x in _order(a):                       # x - a - b - y  (edge central)
+            if x is b:
+                continue
+            for y in _order(b):
+                if y is a or y is x:
+                    continue
+                _add_dih(interactions, seen_dih, [x, a, b, y])
+        for x in _order(a):                       # y - x - a - b  (edge terminal)
+            if x is b:
+                continue
+            for y in _order(x):
+                if y is a or y is b:
+                    continue
+                _add_dih(interactions, seen_dih, [y, x, a, b])
+        for x in _order(b):                       # a - b - x - y  (edge terminal)
+            if x is a:
+                continue
+            for y in _order(x):
+                if y is b or y is a:
+                    continue
+                _add_dih(interactions, seen_dih, [a, b, x, y])
+
+    return InterResidueBondMorph(mode, interactions)
+
+
+def _add_dih(interactions, seen, quartet):
+    """Append a proper dihedral once (canonicalised against its reverse)."""
+    ids = tuple(a.id for a in quartet)
+    key = min(ids, tuple(reversed(ids)))
+    if key in seen:
+        return
+    seen.add(key)
+    interactions.append(Interaction("dihedral", list(quartet)))
 
 
 # ── constructors (declarative equivalents of the alchemy routines) ────────────

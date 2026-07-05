@@ -1180,8 +1180,15 @@ def _make_rtp(r, ii_list: list, dihi_list: list,
 
 
 def _make_mtp(r, ii_list: list, dihi_list: list,
-              rotations=None) -> List[str]:
-    """Generate MTP file content for the hybrid residue *r*."""
+              rotations=None, inter_bonds=None) -> List[str]:
+    """Generate MTP file content for the hybrid residue *r*.
+
+    *inter_bonds*, if given, is a list of ``(mode, self_atom, partner_atom)``
+    tuples describing the cross-residue bonds this residue forms.  Only the bond
+    and its mode are serialized as an ``[ inter_bonds ]`` section; the induced
+    angles/dihedrals are derived from the graph by ``gen_hybrid_top`` at apply
+    time (see :func:`pmx.covalent.edit.induced_bond_morph`).
+    """
     mtp = [f'\n[ {r.resname} ] ; {r.resnA} -> {r.resnB}\n\n']
 
     mtp.append('\n[ morphes ]\n')
@@ -1210,6 +1217,13 @@ def _make_mtp(r, ii_list: list, dihi_list: list,
 
     _fmt('impropers', ii_list)
     _fmt('dihedrals', dihi_list)
+
+    if inter_bonds:
+        mtp.append('\n[ inter_bonds ]\n')
+        mtp.append('; mode   self-atom   partner-atom\n')
+        for mode, self_atom, partner in inter_bonds:
+            partner = partner if partner.startswith('@') else '@' + partner
+            mtp.append(f'  {mode:6} {self_atom:10} {partner:10}\n')
 
     if rotations:
         mtp.append('\n[ rotations ]\n')

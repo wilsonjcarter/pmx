@@ -500,6 +500,11 @@ def gen_hybrid_top(topol, recursive=True, verbose=False, scaleDih=1.0,
         _add_disulfide_bonded_terms(pmxtop, rlist, rdic, ff)
         _add_nos_bonded_terms(pmxtop, rlist, rdic, ff)
         _terminal_deletion_decouplings(pmxtop, rlist, verbose=verbose)
+        # Declarative cross-links: any hybrid whose MTP carries an
+        # [ inter_bonds ] section is handled generically here (no resname
+        # detector).  Additive: shipped hybrids without the section are left to
+        # the routines above, so there is no double-application.
+        _apply_inter_bonds(pmxtop, rlist, rdic, verbose=verbose)
         return pmxtop
 
     # -------------
@@ -1180,6 +1185,105 @@ def _terminal_deletion_decouplings(topol, rlist, verbose=False):
                   % (r.resname, r.id, del_res.resname, del_res.id,
                      len(interactions)))
         apply_bond_morph(topol, InterResidueBondMorph('decouple', interactions))
+
+
+def _resolve_inter_partner(rlist, self_res, partner_name):
+    """Find the atom *partner_name* in a hybrid residue other than *self_res*.
+
+    Unambiguous for a single cross-link; raises on ambiguity (several candidate
+    residues -- e.g. multiple disulfides on a bare topology, where spatial /
+    LINK-record pairing would be required and is not yet implemented).
+    """
+    hits = []
+    for r in rlist:
+        if r is self_res:
+            continue
+        for a in r.atoms:
+            if a.name == partner_name:
+                hits.append(a)
+    if len(hits) > 1:
+        raise RuntimeError(
+            "ambiguous [ inter_bonds ] partner '%s': %d candidate residues; "
+            "spatial/LINK-based pairing not yet implemented"
+            % (partner_name, len(hits)))
+    return hits[0] if hits else None
+
+
+def _apply_inter_bonds(topol, rlist, rdic, verbose=False):
+    """Apply declarative ``[ inter_bonds ]`` cross-residue bond-morphs.
+
+    For every hybrid residue whose MTP entry carries an ``[ inter_bonds ]``
+    section, resolve the forming bond (self atom in this residue, partner atom in
+    another participating residue) against the parsed topology, derive the
+    induced angles/dihedrals from the union bond graph (the same rule GROMACS
+    uses to generate bonded terms from bonds -- see
+    :func:`pmx.covalent.edit.induced_bond_morph`), and apply the dual-state
+    morph.
+
+    This is the unified, chemistry-agnostic replacement for the resname-keyed
+    :func:`_add_disulfide_bonded_terms` / :func:`_add_nos_bonded_terms`: any
+    cross-link that declares its forming bond in the MTP is handled here with no
+    bespoke per-chemistry code.
+    """
+    from .covalent.edit import induced_bond_morph, apply_bond_morph
+
+    decls = []
+    for r in rlist:
+        entry = rdic.get(r.resname)
+        spec = getattr(entry[0], 'inter_bonds', None) if entry else None
+        if spec:
+            decls.append((r, spec))
+    if not decls:
+        return
+
+    # union bond graph over the parsed topology (Atom-object adjacency)
+    adjacency = {}
+    for b in topol.bonds:
+        a1, a2 = b[0], b[1]
+        adjacency.setdefault(a1, set()).add(a2)
+        adjacency.setdefault(a2, set()).add(a1)
+
+    # 1. resolve every declared forming bond to its two topology atoms
+    applied = set()   # dedup by the pair of bonded atom ids (symmetric decls)
+    forming = []      # (self_atom, partner_atom, mode)
+    for r, spec in decls:
+        by_name = {a.name: a for a in r.atoms}
+        for seed in spec:
+            self_atom = by_name.get(seed['self'])
+            if self_atom is None:
+                raise RuntimeError("[ inter_bonds ] %s: residue has no atom %s"
+                                   % (r.resname, seed['self']))
+            partner_atom = _resolve_inter_partner(rlist, r, seed['partner'])
+            if partner_atom is None:
+                raise RuntimeError(
+                    "[ inter_bonds ] %s: no partner residue carries atom %s"
+                    % (r.resname, seed['partner']))
+            key = frozenset((self_atom.id, partner_atom.id))
+            if key in applied:
+                continue
+            applied.add(key)
+            forming.append((self_atom, partner_atom, seed['mode']))
+    if not forming:
+        return
+
+    # 2. add ALL forming edges to the graph *before* enumerating, so induced
+    #    terms shared between bonds (e.g. an OD-NZ-OD' angle in a SONOS bridge,
+    #    where two forming bonds meet at the same nitrogen) are generated.
+    for a, b, _ in forming:
+        adjacency.setdefault(a, set()).add(b)
+        adjacency.setdefault(b, set()).add(a)
+
+    # 3. one induced_bond_morph per mode (its internal dedup then covers the
+    #    cross-bond terms), applied to the topology.
+    by_mode = {}
+    for a, b, mode in forming:
+        by_mode.setdefault(mode, []).append((a, b))
+    for mode, bonds in by_mode.items():
+        morph = induced_bond_morph(bonds, adjacency, mode=mode)
+        if verbose:
+            print('log_> [ inter_bonds ] %d bond(s) mode=%s -> %d terms'
+                  % (len(bonds), mode, len(morph.interactions)))
+        apply_bond_morph(topol, morph)
 
 
 def _find_bonded_entries(topol, verbose=False):

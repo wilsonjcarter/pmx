@@ -65,7 +65,7 @@ def read_new_mtp_entry(entry, filename='mutres.mtp'):
     lst = kickOutComments(lst, ';')
     key = '[ '+entry+' ]'
     keyw = ('[ morphes ]', '[ atoms ]', '[ impropers ]', '[ dihedrals ]',
-            '[ rotations ]', '[ coords ]')
+            '[ rotations ]', '[ coords ]', '[ inter_bonds ]')
     res = []
     for i, line in enumerate(lst):
         if line.startswith(key):
@@ -130,6 +130,21 @@ def read_new_mtp_entry(entry, filename='mutres.mtp'):
         rotdic[key] = rot[1:]
 
     mol.morphes = morphes
+    # inter-residue bond seeds: one line per forming bond, "mode self @partner".
+    # Only the bond + mode are serialized; the induced angles/dihedrals are
+    # derived from the graph at apply time (covalent.edit.induced_bond_morph).
+    inter_bonds = []
+    for line in readSection(res, '[ inter_bonds ]', '['):
+        entr = line.split()
+        if len(entr) < 3:
+            continue
+        mode, self_atom, partner = entr[0], entr[1], entr[2]
+        inter_bonds.append({
+            'mode': mode,
+            'self': self_atom,
+            'partner': partner.lstrip('@'),
+        })
+    mol.inter_bonds = inter_bonds
     bonds = []
     return mol, bonds, imps, diheds, rotdic
 

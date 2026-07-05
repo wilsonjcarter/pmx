@@ -226,25 +226,31 @@ def _backbone_impropers(atom_map):
 
 
 def emit_crosslink_mtp(atoms: List[Atom], resname: str,
-                       resnA: str, resnB: str) -> str:
+                       resnA: str, resnB: str, inter_bonds=None) -> str:
     """Emit the split-atom cross-link residue as MTP text (reuses _make_mtp).
 
-    Emits [ morphes ]/[ atoms ]/[ coords ] plus the common backbone impropers.
+    Emits [ morphes ]/[ atoms ]/[ coords ] plus the common backbone impropers,
+    and -- when *inter_bonds* is given -- an ``[ inter_bonds ]`` section listing
+    the cross-residue bonds this residue forms as ``(mode, self, partner)``
+    tuples (``gen_hybrid_top`` derives the induced angles/dihedrals at apply
+    time).
     """
     from ..nsaa import _make_mtp
     for i, a in enumerate(atoms, 1):
         a.id = i
     r = _SplitResidue(atoms, resname, resnA, resnB)
     ii = _backbone_impropers({a.name: a for a in atoms})
-    return "".join(_make_mtp(r, ii, [], rotations=None))
+    return "".join(_make_mtp(r, ii, [], rotations=None, inter_bonds=inter_bonds))
 
 
 def build_crosslink_mtp(wt_res, bound_res, bond_atom_name: str,
-                        resname: str, boundary_depth: int = 2) -> str:
+                        resname: str, boundary_depth: int = 2,
+                        inter_bonds=None) -> str:
     """Walk + duplicate + emit: the split-atom cross-link hybrid as MTP text."""
     atoms, _bonds = build_split_residue(wt_res, bound_res, bond_atom_name,
                                         boundary_depth)
-    return emit_crosslink_mtp(atoms, resname, wt_res.resname, bound_res.resname)
+    return emit_crosslink_mtp(atoms, resname, wt_res.resname, bound_res.resname,
+                              inter_bonds=inter_bonds)
 
 
 def decouple(wt_res, bound_res, bond_atom_name: str, boundary_depth: int = 2):
