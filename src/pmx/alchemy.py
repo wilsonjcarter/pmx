@@ -118,8 +118,8 @@ def mutate(m, mut_resid, mut_resname, ff, mut_chain=None,
         if target is not None:
             from .covalent import mutate as _generative_mutate
             _generative_mutate(m2, mut_resid=mut_resid, target=target, ff=ff,
-                               structure=structure, itp=itp, mut_chain=mut_chain,
-                               inplace=True, verbose=verbose)
+                               structure=structure, itp=itp, refB=refB,
+                               mut_chain=mut_chain, inplace=True, verbose=verbose)
         else:
             new_aa_name = _convert_aa_name(mut_resname)
             apply_aa_mutation(m=m2, residue=residue, new_aa_name=new_aa_name,

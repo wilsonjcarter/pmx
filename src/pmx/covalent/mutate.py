@@ -301,8 +301,26 @@ def _build_target_residue(target, ff, rtp, term, residue1,
 
 # ── model-level mutate ────────────────────────────────────────────────────────
 
+def _apply_ref_geometry(residue2, ref_path, mut_resid, mut_chain):
+    """Override the target residue's coordinates from a reference (state-B)
+    structure's residue at the same position, matched by atom name.
+
+    This is the generative-path equivalent of the classic ``-fB``: the modified
+    residue's B-state geometry follows a supplied structure of the modified
+    state rather than the RDKit-embedded / fragment geometry.  Atoms absent from
+    the reference keep their built geometry.
+    """
+    mB = Model(ref_path, bPDBTER=True, rename_atoms=True, scale_coords='A')
+    resB = mB.fetch_residue(idx=mut_resid, chain=mut_chain)
+    byname = {a.name: a for a in resB.atoms}
+    for a in residue2.atoms:
+        if a.name in byname:
+            a.x = list(byname[a.name].x)
+
+
 def mutate(model, mut_resid: int, target: str, ff: str,
            structure: Optional[str] = None, itp: Optional[str] = None,
+           refB: Optional[str] = None,
            mut_chain: Optional[str] = None, inplace: bool = False,
            write_files: bool = True, verbose: bool = False):
     """Mutate ``mut_resid`` in *model* to *target*, via one of three front ends.
@@ -359,6 +377,11 @@ def mutate(model, mut_resid: int, target: str, ff: str,
     # build the target residue from the selected front end (RTP / structure / itp)
     residue2 = _build_target_residue(target, ff, rtp, term, residue1,
                                      structure=structure, itp=itp)
+
+    # optional state-B reference (classic -fB): take the modified residue's
+    # geometry from a supplied structure of the mutated state at this position.
+    if refB is not None:
+        _apply_ref_geometry(residue2, refB, mut_resid, mut_chain)
 
     rtp_text, mtp_text, hybrid_name = build_hybrid_residue(
         residue1, residue2, ff, target, term=term, write_ff_types=write_files)
