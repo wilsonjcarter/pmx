@@ -92,7 +92,8 @@ def _check_residue_name(res):
         if res.has_atom('HE2'):
             res.set_resname('GLH')
     elif res.resname == 'CYS':
-        if not res.has_atom('HG'):
+        # thiol H is 'HG' (AMBER) or 'HG1' (CHARMM); absent only if SS-bonded
+        if not (res.has_atom('HG') or res.has_atom('HG1')):
             print(' Cannot mutate SS-bonded Cys %d' % res.id, file=sys.stderr)
 
 

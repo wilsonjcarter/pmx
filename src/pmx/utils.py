@@ -236,9 +236,13 @@ def get_mtp_file(residue, ff):
     # RNA mutation
     elif residue.moltype == 'rna':
         mtp_file = os.path.join(ffpath, 'mutres_rna.mtp')
-    # Protein mutation
+    # Protein mutation.  Disulfide/NOS hybrids historically live in a dedicated
+    # disulfide.mtp; where a force field has consolidated them into mutres.mtp
+    # (no disulfide.mtp present), fall back to mutres.mtp.
     elif residue.resname in ["C2CD","C2VD","U2CN","CN2U","C2CN","CN2C","K2KN","O2KN","KN2O","KN2K"]:
-        mtp_file = os.path.join(ffpath,'disulfide.mtp')        
+        disulfide = os.path.join(ffpath, 'disulfide.mtp')
+        mtp_file = disulfide if os.path.isfile(disulfide) \
+            else os.path.join(ffpath, 'mutres.mtp')
     elif residue.moltype == 'protein':
         mtp_file = os.path.join(ffpath, 'mutres.mtp')
     else:

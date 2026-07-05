@@ -806,14 +806,18 @@ def _set_conformation(old_res, new_res, rotdic):
         # Skip atoms already placed by the rotation algorithm (D/HV prefix)
         if (atom.name[0] == 'D') or atom.name.startswith('HV'):
             continue
-        # Copy position from old_res; handle split-atom name mapping
-        if new_res.resname in ["O2CN","CN2O","C2CN","CN2C","O2KN","KN2O","K2KN","KN2K"]:
+        # Copy position from old_res; handle split-atom name mapping.
+        # C2CD/D2DC (disulfide) and the NOS hybrids all split CB/SG (and CE/NZ)
+        # into duplicated branches whose coordinates come from the single WT atom.
+        if new_res.resname in ["C2CD", "D2DC",
+                               "O2CN", "CN2O", "C2CN", "CN2C",
+                               "O2KN", "KN2O", "K2KN", "KN2K"]:
             src_name = _SPLIT_ATOM_NAME_MAP.get(atom.name, atom.name)
         else:
             src_name = atom.name
         try:
             atom.x = old_res[src_name].x
-        except (KeyError, AttributeError):
+        except (KeyError, AttributeError, IndexError):
             pass  # keep MTP/bb_super position if source atom not found
 
 
