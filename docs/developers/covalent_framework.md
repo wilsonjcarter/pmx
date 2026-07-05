@@ -4,21 +4,33 @@
 
 ## Thesis
 
-A single **common core** expresses the universe of covalent modifications.
-Every modification decomposes into:
+The entire universe of covalent modifications is expressed by **one intermediate
+representation** (a dual-state hybrid residue + inter-residue bond-morphs) and
+**three composable operations** on it. Every modification is a *composition* of
+these — there is no per-feature engine, only a per-feature recipe.
 
-> **N per-residue morphs** (through the shared graph-MCS engine)
-> **+ M inter-residue bond-morphs** (through the shared applier).
+**The three operations** (each a small transform on the shared IR):
 
-| Modification | (residue morphs, inter-residue morphs) | Feature-specific code |
+| Operation | Meaning | Shared machinery |
 |---|---|---|
-| Point mutation / PTM / NSAA | (1, 0) | — |
-| Disulfide form/break | (2, 1) | constructor + bond-forming handling |
-| NOS bridge | (2, 2–3) | constructor + bridge target |
-| Terminal deletion | (2, 1 decouple) | constructor + cap/dummy targets |
+| `mutate(res, target)` | morph one residue WT→target | graph-MCS map → dummy gen → emit |
+| `decouple(res, atoms)` | split reacting atoms into two branches so a forming bond's topological exclusions are harmless (dummy-in-off-state) | the same dummy machinery |
+| `bond(atomA, atomB, mode)` | toggle an inter-residue bond (+induced angles/dihedrals) A↔B | `apply_bond_morph` |
 
-Only the constructor and (where needed) a target-residue definition are
-per-feature; mapping, dummy generation, emit, and B-state filling are shared.
+**Every modification is a composition:**
+
+| Modification | Composition |
+|---|---|
+| Point mutation / PTM / NSAA | `mutate` |
+| Disulfide form/break | `mutate×2 + decouple×2 + bond` |
+| NOS bridge | `mutate×2 + decouple×2 + bond×2` |
+| Terminal deletion | `mutate×2` (one WT→all-dummy) `+ decouple` |
+
+`decouple` is *not* a separate builder: it is `mutate` (the WT→bound morph
+through the common core) followed by splitting the reacting morphing atoms into
+their A-only and B-only halves. So a cross-link is literally "a mutation, plus
+decouple the reacting atoms, plus a bond" — maximal reuse of one core. The only
+per-feature code is the recipe (which atoms react, which bond forms).
 
 ## Layered architecture
 
@@ -100,7 +112,28 @@ precise `[ pairs ]` set + their A/B parameters; how the vsite + pairs are
 serialized alongside `[ inter_bonds ]`; validation that the resulting ΔG matches
 the split-atom reference.
 
-## Inter-residue bond serialization: `[ inter_bonds ]`
+## Inter-residue bond serialization: `[ inter_bonds ]` — deferred (not needed)
+
+**Decision (2026-07):** do *not* add an `[ inter_bonds ]` MTP section. The
+inter-residue bond references specific `Atom` objects; in the CLI split
+(`pdb2gmx` -> `gen_hybrid_top`) the topology is freshly parsed, so its atoms are
+a different object graph than any in-memory `CovalentEdit`.  Two paths cover
+every case without a new file format:
+
+* **CLI path** (shipped disulfide/NOS): the resname detectors re-extract atoms
+  *from the parsed topology* and delegate to `apply_bond_morph` -- no
+  serialization needed.
+* **Python path** (any cross-link): the `CovalentEdit` applies its bond-morphs
+  to its own in-memory topology directly.
+
+`[ inter_bonds ]` would only help *arbitrary new* cross-links driven through the
+CLI split, and even then it is just "resname detection with the names in the
+MTP instead of a detector" -- not worth a format change other pmx tools must
+parse.  Revisit only if arbitrary CLI-driven cross-links become a requirement.
+
+The sketch below is retained for reference only.
+
+### (reference-only) `[ inter_bonds ]` sketch
 
 The MTP gains an optional section describing the cross-residue morphs of an
 edit, so `gen_hybrid_top` applies them declaratively instead of detecting hybrid
