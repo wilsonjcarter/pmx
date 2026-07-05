@@ -206,6 +206,17 @@ def parse_options():
 # ============
 
 def main(args):
+    # ── Deprecation notice ────────────────────────────────────────────────────
+    print(
+        "\n*** DEPRECATED: `pmx mutate_nsaa` is superseded by `pmx mutate`, "
+        "which is now generative for any target residue. ***\n"
+        "    Target already in the force field:  pmx mutate ... --script "
+        "'<resid> <RESNAME>'\n"
+        "    Novel residue (capped ITP fragment):  pmx mutate ... --script "
+        "'<resid> <RESNAME>' --itp frag.itp --structure frag.pdb\n"
+        "  The hybrid is written to nsaa.{rtp,mtp}; pmx gentop reads it "
+        "automatically (no --extra_mtp).\n", file=sys.stderr)
+
     # ── Force-field selection ─────────────────────────────────────────────────
     ff = args.ff
     if ff is None:
