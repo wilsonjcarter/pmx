@@ -25,8 +25,23 @@ _NOS_LYS_HYBRIDS = {'KNOS', 'K2KN'}   # NOS-Lys (carries NZ2)
 # ==============
 # Main Functions
 # ==============
+# Codes the pre-built library path owns (standard cross-links + Cys/Tyr
+# specials): these stay on the classic path.  PTM codes (P1/P2/me*) are caught
+# earlier by ptm.target_for and routed to the generative engine.
+_CLASSIC_SPECIAL = {'CM', 'CD', 'DC', 'YM', 'CN', 'KN'}
+
+
+def _is_classic_mutation(mut_resname):
+    """True if *mut_resname* is a standard AA / protonation / cross-link code the
+    pre-built library path handles; False for PTMs and arbitrary NSAA targets,
+    which the generative engine (covalent.mutate) builds on the fly."""
+    aa = mut_resname.upper()
+    return (aa in _CLASSIC_SPECIAL or len(aa) == 1
+            or aa in library._ext_one_letter)
+
+
 def mutate(m, mut_resid, mut_resname, ff, mut_chain=None,
-           refB=None, inplace=False, verbose=False):
+           refB=None, inplace=False, verbose=False, itp=None, structure=None):
     """Creates an hybrid structure file.
 
     Parameters
@@ -85,9 +100,25 @@ def mutate(m, mut_resid, mut_resname, ff, mut_chain=None,
         apply_terminal_deletion(m=m2, residue=residue, ff=ff, verbose=verbose)
     # Mutation if Protein
     elif residue.moltype == 'protein':
-        new_aa_name = _convert_aa_name(mut_resname)
-        apply_aa_mutation(m=m2, residue=residue, new_aa_name=new_aa_name,
-                          mtp_file=mtp_file, refB=refB, verbose=verbose)
+        # PTM aliases (P1/P2, me1/2/3), a direct PTM/NSAA target name, or an
+        # --itp fragment go through the generative engine (covalent.mutate),
+        # which builds the hybrid on the fly and accumulates it into nsaa.{rtp,
+        # mtp}.  Standard mutations, protonation changes and cross-links (CD/CN/
+        # KN) keep the pre-built library path.
+        from .covalent import ptm
+        target = ptm.target_for(residue.resname, mut_resname)
+        if target is None and (itp is not None
+                               or not _is_classic_mutation(mut_resname)):
+            target = mut_resname
+        if target is not None:
+            from .covalent import mutate as _generative_mutate
+            _generative_mutate(m2, mut_resid=mut_resid, target=target, ff=ff,
+                               structure=structure, itp=itp, mut_chain=mut_chain,
+                               inplace=True, verbose=verbose)
+        else:
+            new_aa_name = _convert_aa_name(mut_resname)
+            apply_aa_mutation(m=m2, residue=residue, new_aa_name=new_aa_name,
+                              mtp_file=mtp_file, refB=refB, verbose=verbose)
     # Mutation if DNA or RNA
     elif residue.moltype in ['dna', 'rna']:
         new_nuc_name = mut_resname.upper()

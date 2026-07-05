@@ -45,6 +45,11 @@ _DELTA_Q = {"p1": -1, "p2": -2, "me1": 0, "me2": 0, "me3": 0}
 # digit is mandatory: bare 'p' collides with proline, bare 'me' is ambiguous.
 _CODE_RE = re.compile(r"^(?:p[12]|me[123])$")
 
+# every PTM target residue name (the single source of truth, no scattered dicts)
+TARGET_RESNAMES = frozenset(
+    tgt for table in (_PHOSPHO, _METHYL)
+    for codes in table.values() for tgt in codes.values())
+
 
 def is_ptm_code(token: str) -> bool:
     """True if *token* is a recognised PTM shorthand (case-insensitive)."""
@@ -78,3 +83,20 @@ def resolve(wt_resname: str, code: str) -> Optional[Tuple[str, int]]:
             f"PTM code '{code}' ({family}) is not defined for residue "
             f"'{wt_resname}'.  Supported: {supported}.")
     return table[wt][c], _DELTA_Q[c]
+
+
+def target_for(wt_resname: str, token: str) -> Optional[str]:
+    """Target residue for *token* (a PTM code *or* a direct PTM target name),
+    or ``None`` if *token* is neither -- so callers route PTMs through the
+    generative engine and fall back to their normal path otherwise.
+
+    This is the single dispatch point that lets ``mutate`` recognise a
+    phosphorylation/methylation and hand it to the generative builder instead of
+    a hand-authored library entry.
+    """
+    if is_ptm_code(token):
+        r = resolve(wt_resname, token)          # may raise for an ill-matched WT
+        return r[0] if r else None
+    if token.strip().upper() in TARGET_RESNAMES:
+        return token.strip().upper()
+    return None

@@ -424,6 +424,19 @@ different protonation states. Use the --resinfo flag to print the dictionary.
                         help='Show the list of 3-letter -> 1-letter residues',
                         default=False,
                         action='store_true')
+    parser.add_argument('--itp',
+                        dest='itp',
+                        help='ITP fragment (CH3-capped at CA) parameterizing a '
+                             'target residue that is not in the force-field RTP '
+                             '(a novel NSAA/PTM). The hybrid is generated on the '
+                             'fly. Requires --structure.',
+                        default=None)
+    parser.add_argument('--structure',
+                        dest='structure',
+                        help='PDB/GRO with the target residue geometry (used '
+                             'with --itp, or to override the default embedded '
+                             'geometry for a generative target).',
+                        default=None)
 
     args, unknown = parser.parse_known_args()
     check_unknown_cmd(unknown)
@@ -535,7 +548,9 @@ def main(args):
                    ff=ff,
                    refB=infileB,
                    inplace=True,
-                   verbose=True)
+                   verbose=True,
+                   itp=args.itp,
+                   structure=args.structure)
 
     # if script not provided, interactive selection
     # ---------------------------------------------
