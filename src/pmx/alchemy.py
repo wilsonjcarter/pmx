@@ -497,13 +497,13 @@ def gen_hybrid_top(topol, recursive=True, verbose=False, scaleDih=1.0,
         # also decouple all dihedrals with [CD and N] and [CB and Calpha] for proline
         _proline_dihedral_decouplings(pmxtop, rlist, rdic)
 
-        _add_disulfide_bonded_terms(pmxtop, rlist, rdic, ff)
-        _add_nos_bonded_terms(pmxtop, rlist, rdic, ff)
+        # All bond-forming cross-links (disulfide, NOS, and any MTP-declared
+        # cross-link) go through the one graph consumer below -- the bespoke
+        # resname detectors are retired.  Terminal deletion is a structural
+        # decoupling (depends on the runtime chain, not a named-atom bond), so
+        # it keeps its own detector, which already delegates to the unified
+        # apply_bond_morph(mode='decouple').
         _terminal_deletion_decouplings(pmxtop, rlist, verbose=verbose)
-        # Declarative cross-links: any hybrid whose MTP carries an
-        # [ inter_bonds ] section is handled generically here (no resname
-        # detector).  Additive: shipped hybrids without the section are left to
-        # the routines above, so there is no double-application.
         _apply_inter_bonds(pmxtop, rlist, rdic, verbose=verbose)
         return pmxtop
 
@@ -1084,67 +1084,12 @@ def _zero_B_if_has_dummy_dihedral(entry):
         entry[6] = [B[0], B[1], 0.0] + B[3:]
 
 
-def _add_ss_bonded_terms(topol, r1_atoms, r2_atoms, mode='form'):
-    """Append SG2-SG2' bond, CB2-SG2-SG2' angles, and SS dihedrals to topol.
-
-    Thin adapter over the unified inter-residue bond-morph applier in
-    :mod:`pmx.covalent.edit` -- the single implementation of this logic (verified
-    byte-equivalent to the former inline version).
-    mode : 'form' | 'break' | 'perma'.
-    """
-    from .covalent.edit import apply_bond_morph, disulfide_morph
-    apply_bond_morph(topol, disulfide_morph(r1_atoms, r2_atoms, mode=mode,
-                                            cb='CB2', sg='SG2'))
-
-
-def _add_nos_terms(topol, cys, lys, mode='form'):
-    """Append the cross-residue NOS bonded terms (NZ-OD2 bond + angles/dihedrals).
-
-    Thin adapter over the unified inter-residue bond-morph applier in
-    :mod:`pmx.covalent.edit` -- the single implementation of this logic.
-    mode : 'form' | 'break' | 'perma'.
-    """
-    from .covalent.edit import apply_bond_morph, nos_morph
-    apply_bond_morph(topol, nos_morph(cys, lys, mode=mode))
-
-
-
-def _add_disulfide_bonded_terms(topol, rlist, rdic, ff):
-    """Add cross-residue SG2-SG2' bonded terms for alchemical disulfide pairs.
-
-    Expects exactly 0 or 2 disulfide hybrid residues (C2CD / D2DC) in rlist.
-    With 0, this is a no-op. With 2, adds A-state-off / B-state-on SS terms.
-    """
-    disulfide_pair = [r for r in rlist if r.resname in library._disulfide_hybrids]
-    n = len(disulfide_pair)
-    if n == 0:
-        return
-    if n != 2:
-        raise RuntimeError(
-            f"Need exactly 2 disulfide partner residues in rlist, got {n}.")
-    _add_ss_bonded_terms(topol,
-                         extract_atoms(disulfide_pair[0]),
-                         extract_atoms(disulfide_pair[1]),
-                         mode='form')
-
-
-def _add_nos_bonded_terms(topol, rlist, rdic, ff):
-    """Add cross-residue N-O-S bonded terms for an alchemical NOS pair.
-
-    Expects exactly one NOS-Cys (C2CO) and one NOS-Lys (K2KO) hybrid in rlist,
-    or none (no-op). With one of each, adds A-state-off / B-state-on NOS terms.
-    """
-
-    lys = [r for r in rlist if r.resname in library._nos_hybrids and r.resname in ["K2KN","O2KN"]]
-    cys = [r for r in rlist if r.resname in library._nos_hybrids and r.resname in ["U2CN","C2CN"]]
-    if not cys and not lys:
-        return
-    if len(cys) != 1 or len(lys) != 1:
-        raise RuntimeError(
-            "Need exactly one C2CO (Cys) and one K2KO (Lys) NOS hybrid in "
-            f"rlist, got {len(cys)} Cys and {len(lys)} Lys.")
-    c_atoms, l_atoms = extract_nos_atoms(cys[0], lys[0])
-    _add_nos_terms(topol, c_atoms, l_atoms, mode='form')
+# The bespoke disulfide/NOS bonded-term detectors (_add_ss_bonded_terms /
+# _add_nos_terms and their _add_*_bonded_terms drivers) were retired: all
+# bond-forming cross-links now flow through _apply_inter_bonds + the graph rule
+# induced_bond_morph, driven by the [ inter_bonds ] MTP section or the
+# _LEGACY_INTER_BONDS recipe table.  The declarative equivalents disulfide_morph
+# / nos_morph live in pmx.covalent.edit.
 
 
 
@@ -1213,21 +1158,38 @@ def _resolve_inter_partner(rlist, self_res, partner_name):
     return hits[0] if hits else None
 
 
+# Forming-bond recipes for the shipped legacy cross-link hybrids (disulfide
+# C2CD/D2DC, NOS K2KN/O2KN).  Newly generated hybrids instead carry their own
+# [ inter_bonds ] section in the MTP; this small declarative table covers the
+# pre-existing residues across every force field without editing each FF's data.
+# It replaces the former bespoke detectors _add_disulfide_bonded_terms /
+# _add_nos_bonded_terms -- same forming bonds, now driven through the one graph
+# consumer below.  Only the NOS lysine declares the bond (its partner OD2 lives
+# on the paired Cys, resolved by name).
+_LEGACY_INTER_BONDS = {
+    "C2CD": [{"mode": "form", "self": "SG2", "partner": "SG2"}],
+    "D2DC": [{"mode": "form", "self": "SG2", "partner": "SG2"}],
+    "K2KN": [{"mode": "form", "self": "NZ2", "partner": "OD2"}],
+    "O2KN": [{"mode": "form", "self": "NZ2", "partner": "OD2"}],
+}
+
+
 def _apply_inter_bonds(topol, rlist, rdic, verbose=False):
     """Apply declarative ``[ inter_bonds ]`` cross-residue bond-morphs.
 
     For every hybrid residue whose MTP entry carries an ``[ inter_bonds ]``
-    section, resolve the forming bond (self atom in this residue, partner atom in
+    section (or, for the shipped legacy hybrids, a :data:`_LEGACY_INTER_BONDS`
+    recipe), resolve the forming bond (self atom in this residue, partner atom in
     another participating residue) against the parsed topology, derive the
     induced angles/dihedrals from the union bond graph (the same rule GROMACS
     uses to generate bonded terms from bonds -- see
     :func:`pmx.covalent.edit.induced_bond_morph`), and apply the dual-state
     morph.
 
-    This is the unified, chemistry-agnostic replacement for the resname-keyed
-    :func:`_add_disulfide_bonded_terms` / :func:`_add_nos_bonded_terms`: any
-    cross-link that declares its forming bond in the MTP is handled here with no
-    bespoke per-chemistry code.
+    This is the single, chemistry-agnostic path for all cross-links: it replaces
+    the former bespoke resname-keyed detectors (disulfide / NOS) -- any
+    cross-link, whether it declares its bond in the MTP or is a known legacy
+    hybrid, is handled here with no per-chemistry code.
     """
     from .covalent.edit import induced_bond_morph, apply_bond_morph
 
@@ -1235,6 +1197,8 @@ def _apply_inter_bonds(topol, rlist, rdic, verbose=False):
     for r in rlist:
         entry = rdic.get(r.resname)
         spec = getattr(entry[0], 'inter_bonds', None) if entry else None
+        if not spec:                                    # legacy shipped hybrids
+            spec = _LEGACY_INTER_BONDS.get(r.resname)
         if spec:
             decls.append((r, spec))
     if not decls:

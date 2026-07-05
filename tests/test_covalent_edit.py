@@ -1,12 +1,9 @@
 #!/usr/bin/env python
-"""Tests for pmx.covalent.edit -- the declarative inter-residue bond-morph IR.
-
-Verifies the applier reproduces alchemy._add_ss_bonded_terms exactly (no RDKit
-or force field needed -- uses a mock topology).
+"""Tests for pmx.covalent.edit -- the declarative inter-residue bond-morph IR
+(no RDKit or force field needed -- uses a mock topology).
 """
 import pytest
 
-from pmx.alchemy import _add_ss_bonded_terms
 from pmx.covalent.edit import (disulfide_morph, nos_morph, apply_bond_morph,
                                InterResidueBondMorph, CovalentEdit)
 
@@ -46,12 +43,12 @@ def _dump(topol):
 
 
 @pytest.mark.parametrize("mode", ["form", "break", "perma"])
-def test_disulfide_morph_matches_alchemy(mode):
-    told = _Topol()
-    _add_ss_bonded_terms(told, _cys(0), _cys(10), mode=mode)
-    tnew = _Topol()
-    apply_bond_morph(tnew, disulfide_morph(_cys(0), _cys(10), mode=mode, cb="CB2", sg="SG2"))
-    assert _dump(told) == _dump(tnew)
+def test_disulfide_morph_applies_in_all_modes(mode):
+    # disulfide_morph -> apply_bond_morph is the disulfide bonded-term path that
+    # replaced the retired alchemy._add_ss_bonded_terms detector.
+    t = _Topol()
+    apply_bond_morph(t, disulfide_morph(_cys(0), _cys(10), mode=mode, cb="CB2", sg="SG2"))
+    assert t.bonds and t.angles and t.dihedrals   # produces the SS bonded set
 
 
 def test_disulfide_form_A_off_B_on():
