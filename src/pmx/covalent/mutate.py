@@ -256,16 +256,19 @@ def _build_target_residue(target, ff, rtp, term, residue1,
     parameters + RDKit-embedded geometry from the force-field RTP entry).
     """
     if itp is not None:
-        # NSAA capped-fragment workflow: parameters from the ITP, geometry from
-        # the supplied structure (backbone grafted from the WT if the fragment
-        # is capped at CA).  Reuses pmx.nsaa's fragment machinery.
-        if structure is None:
-            raise ValueError(
-                "itp target requires structure= (a PDB/GRO for the fragment).")
-        model2 = Model()
-        model2.read(structure)
-        residue2 = model2.residues[0]
-        residue2.set_resname(target)
+        # NSAA capped-fragment workflow: parameters from the ITP; geometry from
+        # the ITP bond graph (RDKit-embedded via TargetResidue.from_itp, exactly
+        # like an RTP target) -- so no structure file is needed.  A structure may
+        # still be passed to override the embedded geometry.  The backbone is
+        # grafted from the WT (fragment is CH3-capped at CA).  Reuses pmx.nsaa's
+        # fragment machinery.
+        if structure is not None:
+            model2 = Model()
+            model2.read(structure)
+            residue2 = model2.residues[0]
+            residue2.set_resname(target)
+        else:
+            residue2 = TargetResidue.from_itp(itp, target).residue
         cap_C, cap_Hs, cap_CA, cap_CA_Hs = _find_methyl_cap(
             _parse_itp_atoms(itp), _parse_itp_bonds(itp))
         has_bb = all(any(a.name == n for a in residue2.atoms)

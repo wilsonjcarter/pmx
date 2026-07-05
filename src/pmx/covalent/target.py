@@ -332,16 +332,61 @@ class TargetResidue:
         return cls(model, resname or res.resname, "structure")
 
     @classmethod
-    def from_itp(cls, *args, **kwargs) -> "TargetResidue":
-        """Planned: build a target residue from a capped ITP fragment.
+    def from_itp(cls, itp_file: str, resname: str, seed: int = 0xC0DE,
+                 verbose: bool = False) -> "TargetResidue":
+        """Build a 3-D target residue from a GROMACS ITP fragment alone.
 
-        The capped-fragment logic currently lives in
-        ``pmx.nsaa._prepare_nsaa_fragment`` / ``_find_methyl_cap``; it will be
-        lifted here as the ITP front end.
+        Reads the ITP's ``[atoms]`` (names, types, charges, masses) and
+        ``[bonds]`` (connectivity), infers elements from the atom masses, and
+        generates 3-D coordinates by RDKit distance-geometry embedding of the
+        bond graph -- exactly as :meth:`from_rtp` does for RTP residues.  An ITP
+        carries no coordinates, so this makes a separate structure file
+        unnecessary: the geometry is built from the connectivity, and the
+        backbone is grafted from the WT during hybrid construction (the fragment
+        is CH3-capped at CA).
+
+        Parameters
+        ----------
+        itp_file : str
+            GROMACS ITP fragment parameterizing the target residue.
+        resname : str
+            Name to assign the built residue (the hybrid target name).
         """
-        raise NotImplementedError(
-            "from_itp is not implemented yet; use pmx.nsaa.mutate_nsaa with an "
-            "itp= argument for the capped-fragment workflow.")
+        from ..nsaa import _parse_itp_atoms, _parse_itp_bonds
+        atom_rows = _parse_itp_atoms(itp_file)
+        bonds_raw = _parse_itp_bonds(itp_file)
+        if not atom_rows:
+            raise ValueError(f"no [ atoms ] parsed from ITP: {itp_file}")
+
+        nr2idx = {a['nr']: i for i, a in enumerate(atom_rows)}
+        names = [a['name'] for a in atom_rows]
+        elements = [_mass_to_element(a['mass']) if a['mass'] > 0.0
+                    else _element_for_type(a['type'], {}) for a in atom_rows]
+        bond_idx = [(nr2idx[i], nr2idx[j]) for i, j in bonds_raw
+                    if i in nr2idx and j in nr2idx]
+
+        coords = _embed_coords(elements, bond_idx, seed=seed)
+
+        atoms = []
+        for i, row in enumerate(atom_rows):
+            a = Atom(name=names[i], resname=resname, x=list(coords[i]),
+                     symbol=elements[i], id=i + 1)
+            a.resnr = 1
+            a.chain_id = "A"
+            a.atomtype = row['type']
+            a.q = row['charge']
+            a.m = row['mass']
+            atoms.append(a)
+
+        for i, j in bond_idx:
+            atoms[i].bonds.append(atoms[j])
+            atoms[j].bonds.append(atoms[i])
+
+        model = cls._model_from_atoms(atoms, resname)
+        if verbose:
+            print(f"TargetResidue.from_itp: {resname} <- {itp_file} -> "
+                  f"{len(atoms)} atoms, {len(bond_idx)} bonds")
+        return cls(model, resname, "itp")
 
     # -- helpers ---------------------------------------------------------------
 

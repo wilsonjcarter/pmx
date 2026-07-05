@@ -25,9 +25,14 @@ _NOS_LYS_HYBRIDS = {'KNOS', 'K2KN'}   # NOS-Lys (carries NZ2)
 # ==============
 # Main Functions
 # ==============
-# Codes the pre-built library path owns (standard cross-links + Cys/Tyr
-# specials): these stay on the classic path.  PTM codes (P1/P2/me*) are caught
-# earlier by ptm.target_for and routed to the generative engine.
+# Cross-link and Cys/Tyr special codes that stay on the pre-built library path.
+# NOTE: CD/DC (disulfide) and CN/KN (NOS) are cross-links -- they need the
+# decouple+bond composition (disulfide_edit/nos_edit), not the single-residue
+# `mutate` that covalent.mutate performs.  That generative cross-link path exists
+# in pmx.covalent but is not wired to the CLI yet, so these still use the shipped
+# split-atom hybrids (C2CD/C2CN/K2KN).  This is temporary: once the cross-link
+# recipes are wired to `pmx mutate`, these become generative too and the entries
+# retire -- the split here is "what's wired", not a classic-vs-generative divide.
 _CLASSIC_SPECIAL = {'CM', 'CD', 'DC', 'YM', 'CN', 'KN'}
 
 

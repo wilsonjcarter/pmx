@@ -429,13 +429,14 @@ different protonation states. Use the --resinfo flag to print the dictionary.
                         help='ITP fragment (CH3-capped at CA) parameterizing a '
                              'target residue that is not in the force-field RTP '
                              '(a novel NSAA/PTM). The hybrid is generated on the '
-                             'fly. Requires --structure.',
+                             'fly; geometry is embedded from the ITP bond graph, '
+                             'so no structure is needed.',
                         default=None)
     parser.add_argument('--structure',
                         dest='structure',
-                        help='PDB/GRO with the target residue geometry (used '
-                             'with --itp, or to override the default embedded '
-                             'geometry for a generative target).',
+                        help='Optional PDB/GRO with the target residue geometry, '
+                             'to override the default embedded geometry for a '
+                             'generative (--itp or RTP) target.',
                         default=None)
 
     args, unknown = parser.parse_known_args()
