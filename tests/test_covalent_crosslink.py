@@ -91,6 +91,9 @@ def test_build_crosslink_mtp_emits_c2cd_morphes():
     assert "S" in morphes["SG1"] and "DUM_S" in morphes["SG1"]
     assert "DUM_SM" in morphes["SG2"] and "SM" in morphes["SG2"]
     assert "CT2" in morphes["CB1"] and "DUM_CT2" in morphes["CB1"]
+    # backbone impropers emitted (as in C2CD)
+    assert "[ impropers ]" in mtp
+    assert "N      -C     CA     HN" in mtp and "C      CA     +N     O" in mtp
 
 
 class _BP:

@@ -203,18 +203,40 @@ class _SplitResidue:
         self.resnB = resnB
 
 
+class _RefAtom:
+    """Placeholder for an inter-residue improper marker (``-C`` / ``+N``)."""
+    def __init__(self, name):
+        self.name = name
+
+
+def _backbone_impropers(atom_map):
+    """The standard protein backbone impropers, on the common backbone atoms.
+
+    ``N -C CA HN`` and ``C CA +N O`` -- as in the shipped C2CD.  ``-C``/``+N``
+    are inter-residue markers (placeholders); the rest resolve to this residue.
+    """
+    imps = []
+    for quartet in (["N", "-C", "CA", "HN"], ["C", "CA", "+N", "O"]):
+        own = [n for n in quartet if not n.startswith(("+", "-"))]
+        if not all(n in atom_map for n in own):
+            continue
+        atoms = [atom_map[n] if n in atom_map else _RefAtom(n) for n in quartet]
+        imps.append(atoms + ["default-A", "default-B"])
+    return imps
+
+
 def emit_crosslink_mtp(atoms: List[Atom], resname: str,
                        resnA: str, resnB: str) -> str:
     """Emit the split-atom cross-link residue as MTP text (reuses _make_mtp).
 
-    Impropers/dihedrals are left empty here (added from the RTP by the caller);
-    this covers [ morphes ] / [ atoms ] / [ coords ] -- the dual-state core.
+    Emits [ morphes ]/[ atoms ]/[ coords ] plus the common backbone impropers.
     """
     from ..nsaa import _make_mtp
     for i, a in enumerate(atoms, 1):
         a.id = i
     r = _SplitResidue(atoms, resname, resnA, resnB)
-    return "".join(_make_mtp(r, [], [], rotations=None))
+    ii = _backbone_impropers({a.name: a for a in atoms})
+    return "".join(_make_mtp(r, ii, [], rotations=None))
 
 
 def build_crosslink_mtp(wt_res, bound_res, bond_atom_name: str,
