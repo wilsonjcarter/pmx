@@ -1160,31 +1160,26 @@ def _terminal_deletion_decouplings(topol, rlist, verbose=False):
         else:
             continue
 
+        from .covalent.edit import (apply_bond_morph, InterResidueBondMorph,
+                                     Interaction)
         neighbor_ids = set(a.id for a in r.atoms)
         del_ids = set(a.id for a in del_res.atoms)
 
+        # collect the dihedrals spanning the deletion boundary, then hand them
+        # to the unified applier in 'decouple' mode (zeros their B-state) -- the
+        # same zeroing logic as the disulfide/NOS path, one implementation.
+        interactions = [
+            Interaction('dihedral', [dih[0], dih[1], dih[2], dih[3]])
+            for dih in topol.dihedrals
+            if ({dih[0].id, dih[1].id, dih[2].id, dih[3].id} & neighbor_ids
+                and {dih[0].id, dih[1].id, dih[2].id, dih[3].id} & del_ids)
+        ]
         if verbose:
             print('log_> Decoupling cross-residue dihedrals: '
-                  '%s (res %d) -- %s (res %d)'
-                  % (r.resname, r.id, del_res.resname, del_res.id))
-
-        dih_count = 0
-        for dih in topol.dihedrals:
-            ids = {dih[0].id, dih[1].id, dih[2].id, dih[3].id}
-            if ids & neighbor_ids and ids & del_ids:
-                if dih[5] == 'NULL' or dih[6] == 'NULL':
-                    continue
-                func = dih[4]
-                if func == 3:
-                    dih[6] = [func, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
-                elif func == 2:
-                    dih[6] = [func, dih[6][1], 0.0]
-                else:
-                    dih[6] = [func, dih[6][1], 0.0, dih[6][-1]]
-                dih_count += 1
-
-        if verbose:
-            print('log_> Zeroed B-state for %d dihedrals' % dih_count)
+                  '%s (res %d) -- %s (res %d): %d dihedrals'
+                  % (r.resname, r.id, del_res.resname, del_res.id,
+                     len(interactions)))
+        apply_bond_morph(topol, InterResidueBondMorph('decouple', interactions))
 
 
 def _find_bonded_entries(topol, verbose=False):
