@@ -2099,6 +2099,16 @@ def _get_hybrid_residues(m, ff, version='new', verbose=False,
                 if name not in extra_name_map:
                     extra_name_map[name] = mtp_path
 
+    # Auto-discover the force field's nsaa.mtp: the generative engine
+    # (covalent.mutate) accumulates every runtime-built hybrid there, so
+    # gen_hybrid_top resolves them with no --extra_mtp.  Explicit extra_mtp_files
+    # still win (added first, first-hit-wins).
+    from .utils import get_ff_path
+    nsaa_mtp = os.path.join(get_ff_path(ff), 'nsaa.mtp')
+    if os.path.isfile(nsaa_mtp):
+        for name in _read_mtp_names(nsaa_mtp):
+            extra_name_map.setdefault(name, nsaa_mtp)
+
     rdic = {}
     rlist = []
     for res in m.residues:
