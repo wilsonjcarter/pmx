@@ -124,6 +124,39 @@ def test_gentop_bond_multibond_sonos():
     assert cross                                       # ODa-NZ2-ODb cross-angle
 
 
+def test_gentop_bond_covalent_inhibitor_boundary():
+    """A targeted covalent inhibitor (TCI): a clawed-back Cys SG bonds a ligand
+    warhead carbon.  gentop --bond forms the thioether and the graph generates
+    every protein-ligand boundary term -- ligand atom as partner, no per-chemistry
+    code.  Plain names: '73:SG' -> bound branch SG2; the ligand atom is unsplit."""
+    from pmx.alchemy import _apply_inter_bonds
+
+    cys = {n: Atom(name=n, id=i) for i, n in enumerate(["CA", "CB2", "SG2"], 1)}
+    lig = {n: Atom(name=n, id=i)
+           for i, n in enumerate(["CW", "CX", "OW", "HW1", "HW2"], 10)}
+    for a in cys.values():
+        a.type = a.typeB = "X"; a.resname = "C2CX"
+    for a in lig.values():
+        a.type = a.typeB = "X"; a.resname = "LIG"
+    rc = _Res("C2CX", list(cys.values()), 73)
+    rl = _Res("LIG", list(lig.values()), 500)
+    bonds = [[cys["CA"], cys["CB2"], 1], [cys["CB2"], cys["SG2"], 1],
+             [lig["CW"], lig["CX"], 1], [lig["CW"], lig["HW1"], 1],
+             [lig["CW"], lig["HW2"], 1], [lig["CX"], lig["OW"], 1]]
+    topol = _Topol(bonds)
+    _apply_inter_bonds(topol, [rc, rl], [
+        {"resid_a": 73, "atom_a": "SG", "resid_b": 500, "atom_b": "CW",
+         "mode": "form"}])
+    nb = topol.bonds[-1]
+    assert {nb[0].name, nb[1].name} == {"SG2", "CW"}   # thioether formed
+    assert nb[3][2] == 0.0 and nb[4][2] > 0.0          # state A off, B on
+    # boundary angles on both sides of the new SG2-CW edge
+    ang = {tuple(a[i].name for i in range(3)) for a in topol.angles}
+    assert ("CB2", "SG2", "CW") in ang                 # protein side
+    assert any(a[1] == "CW" and "SG2" in a for a in ang)   # ligand side
+    assert len(topol.dihedrals) > 0
+
+
 def test_gentop_bond_noop_without_bonds():
     from pmx.alchemy import _apply_inter_bonds
     r1, a1 = _mkres("SOME", 1, 5)
