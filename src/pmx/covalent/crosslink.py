@@ -243,6 +243,33 @@ def emit_crosslink_mtp(atoms: List[Atom], resname: str,
     return "".join(_make_mtp(r, ii, [], rotations=None, inter_bonds=inter_bonds))
 
 
+def emit_crosslink_rtp(atoms: List[Atom], bonds, resname: str,
+                       resnA: str, resnB: str, ff: str) -> str:
+    """Emit the split-atom cross-link residue as RTP text (reuses nsaa._make_rtp).
+
+    *bonds* is the list of ``(name, name)`` intra-residue bond pairs from
+    :func:`build_split_residue`; they are attached to the atoms as connectivity
+    so ``_make_rtp`` can emit the ``[ bonds ]`` section.  The common backbone
+    impropers, the peptide neighbour bond, and (for CHARMM) the backbone cmap
+    are added so pdb2gmx accepts the residue.
+    """
+    from ..nsaa import _make_rtp
+    by = {a.name: a for a in atoms}
+    for a in atoms:
+        a.bonds = []
+    for n1, n2 in bonds:
+        if n1 in by and n2 in by and by[n2] not in by[n1].bonds:
+            by[n1].bonds.append(by[n2])
+            by[n2].bonds.append(by[n1])
+    for i, a in enumerate(atoms, 1):
+        a.id = i
+    r = _SplitResidue(atoms, resname, resnA, resnB)
+    ii = _backbone_impropers(by)
+    neigh = [("C", "+N")]                       # peptide bond to the next residue
+    cmap = ["-C   N    CA     C    +N"] if "charmm" in ff else []
+    return "".join(_make_rtp(r, ii, [], neigh, cmap, ff))
+
+
 def build_crosslink_mtp(wt_res, bound_res, bond_atom_name: str,
                         resname: str, boundary_depth: int = 2,
                         inter_bonds=None) -> str:

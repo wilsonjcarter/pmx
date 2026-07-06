@@ -162,3 +162,18 @@ def test_covalent_edit_unified_emit_single_and_crosslink():
                 TargetResidue.from_rtp("CYS2", FF).residue, "SG")
     m2 = e2.emit()
     assert "SG1" in m2 and "SG2" in m2
+
+
+def test_emit_crosslink_rtp_builds_c2cd_entry():
+    """emit_crosslink_rtp produces a valid split-atom RTP entry (for pdb2gmx)."""
+    from pmx.covalent.crosslink import decouple, emit_crosslink_rtp
+    cys = TargetResidue.from_rtp("CYS", FF).residue
+    cys2 = TargetResidue.from_rtp("CYS2", FF).residue
+    _amap, atoms, bonds = decouple(cys, cys2, "SG")
+    rtp = emit_crosslink_rtp(atoms, bonds, "C2CD", "CYS", "CYS2", FF)
+    assert "[ C2CD ]" in rtp
+    for sec in ("[ atoms ]", "[ bonds ]", "[ impropers ]"):
+        assert sec in rtp
+    # split branches present in the atom block
+    for n in ("CB1", "CB2", "SG1", "SG2"):
+        assert n in rtp
