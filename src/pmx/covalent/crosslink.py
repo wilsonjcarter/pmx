@@ -518,6 +518,86 @@ def crosslink(model, resid1, resid2, ff, target1, target2=None,
     return hybrid_name
 
 
+def decouple_mutate(model, resid, target, ff, react_atom, chain=None,
+                    boundary_depth=2, inter_bond=None, inplace=False,
+                    write_files=True, verbose=False):
+    """Mutate one residue to a bound-state cross-link endpoint, with clawback.
+
+    This is the per-residue half of a cross-link: it morphs *resid* to *target*
+    (the reacted species, e.g. ``CN0``/``KN0``/``KS0``) AND splits the reacting
+    sidechain (``react_atom``) into two branches so a forming inter-residue bond's
+    1-4 exclusions are harmless.  It does *not* form the bond -- that is applied
+    later (``gentop --bond``, or distance auto-detection).  A SONOS bridge is just
+    ``decouple_mutate`` on the Lys plus one on each Cys.
+
+    Parameters
+    ----------
+    react_atom : str
+        the reacting sidechain atom to split (``SG`` for Cys, ``NZ`` for Lys).
+    inter_bond : tuple, optional
+        ``(mode, self_atom, partner_atom[, cutoff])`` to serialize as an
+        ``[ inter_bonds ]`` rule for distance auto-detection.  Omit to rely on an
+        explicit ``gentop --bond`` instead (the deterministic path).
+
+    Returns the generated hybrid residue name.
+    """
+    from copy import deepcopy
+    from ..utils import list2file
+    from ..library import pmx_data_file
+    from ..nsaa import (_assign_rtp_entries, _get_residue_types, _ARN_CONTENT,
+                        _write_atp_fnb, _assign_mass_atp)
+    from .mutate import _load_rtp, _upsert_entry, _split_rtp_header
+    from .target import TargetResidue
+
+    rtp, ffpath = _load_rtp(ff)
+    bCharmm = "charmm" in ff
+    m = model if inplace else deepcopy(model)
+    if m.unity == "nm":
+        m.nm2a()
+
+    wt = m.fetch_residue(idx=resid, chain=chain)
+    resnA = wt.resname
+    _assign_rtp_entries(wt, rtp, None)
+    if not any(getattr(a, "bonds", None) for a in wt.atoms):
+        attach_bonds_from_rtp(wt, ff)
+    bound = TargetResidue.from_rtp(target, ff).residue
+    _assign_mass_atp(wt, bound, os.path.join(ffpath, "atomtypes.atp"))
+    _superpose_by_name(bound, wt)
+    amap, atoms, bonds = decouple(wt, bound, react_atom, boundary_depth)
+    name = f"{resnA[:1]}2{target[:2]}"[:4]
+
+    if write_files:
+        seeds = [inter_bond] if inter_bond else None
+        mtp_text = emit_crosslink_mtp(list(atoms), name, resnA, target,
+                                      inter_bonds=seeds)
+        rtp_text = emit_crosslink_rtp(list(atoms), bonds, name, resnA, target, ff)
+        _write_atp_fnb("atomtypes.atp", "ffnonbonded.itp",
+                       _SplitResidue(atoms, name, resnA, target), ffpath)
+        rtp_header, rtp_entry = _split_rtp_header(rtp_text, name)
+        _upsert_entry(os.path.join(ffpath, "nsaa.rtp"), name, rtp_entry,
+                      header=rtp_header)
+        _upsert_entry(os.path.join(ffpath, "nsaa.mtp"), name, mtp_text)
+        if bCharmm:
+            arn = os.path.join(ffpath, "nsaa.arn")
+            if not os.path.isfile(arn):
+                list2file([_ARN_CONTENT], arn)
+        fn_restypes = pmx_data_file("mutff/residuetypes.dat")
+        if name not in _get_residue_types(fn_restypes):
+            need_nl = (os.path.isfile(fn_restypes)
+                       and os.path.getsize(fn_restypes) > 0
+                       and open(fn_restypes, "rb").read()[-1:] != b"\n")
+            with open(fn_restypes,
+                      "a" if os.path.isfile(fn_restypes) else "w") as f:
+                f.write(("\n" if need_nl else "") + f"{name:<6} Protein\n")
+
+    _place_split_residue(m, wt, atoms, name)
+    if verbose:
+        print(f"log_> covalent.decouple_mutate: {resnA}{resid} -> {name} "
+              f"(split at {react_atom}); MTP -> "
+              f"{os.path.join(ffpath, 'nsaa.mtp')}")
+    return name
+
+
 def _split_bonds(wt_res, bound_res, reacting_set, boundary):
     """Reconnect the two branches: each reacting bond is duplicated per branch;
     a bond crossing the reacting/common boundary connects to both branches.

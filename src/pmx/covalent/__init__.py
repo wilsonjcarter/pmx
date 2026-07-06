@@ -27,7 +27,7 @@ from .edit import (CovalentEdit, InterResidueBondMorph, Interaction,
 from .crosslink import (walk_reacting_atoms, build_split_residue, decouple,
                         emit_crosslink_mtp, emit_crosslink_rtp,
                         build_crosslink_mtp, disulfide_edit, nos_edit,
-                        crosslink)
+                        crosslink, decouple_mutate)
 from . import ptm
 
 __all__ = ["TargetResidue", "map_residues", "ResidueMapping",
@@ -38,6 +38,6 @@ __all__ = ["TargetResidue", "map_residues", "ResidueMapping",
            # cross-link (dual-topology) API
            "walk_reacting_atoms", "build_split_residue", "decouple",
            "emit_crosslink_mtp", "emit_crosslink_rtp", "build_crosslink_mtp",
-           "disulfide_edit", "nos_edit", "crosslink",
+           "disulfide_edit", "nos_edit", "crosslink", "decouple_mutate",
            # PTM shorthand resolver
            "ptm"]
