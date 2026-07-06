@@ -10,7 +10,42 @@ These tests use hand-built graphs (no RDKit / force field needed) so they pin
 the enumeration rule directly.
 """
 from pmx.atom import Atom
-from pmx.covalent.edit import induced_bond_morph, disulfide_morph
+from pmx.covalent.edit import (induced_bond_morph, InterResidueBondMorph,
+                               Interaction as _I)
+
+
+# Reference hand-authored constructors, kept here as the equivalence baseline for
+# induced_bond_morph (they used to live in pmx.covalent.edit but the graph rule
+# replaced them; the tests below prove the graph reproduces them).
+def disulfide_morph(cys1, cys2, mode="form", ca="CA", cb="CB", sg="SG"):
+    ca1, cb1, sg1 = cys1[ca], cys1[cb], cys1[sg]
+    ca2, cb2, sg2 = cys2[ca], cys2[cb], cys2[sg]
+    return InterResidueBondMorph(mode, [
+        _I("bond", [sg1, sg2]),
+        _I("angle", [cb1, sg1, sg2]), _I("angle", [cb2, sg2, sg1]),
+        _I("dihedral", [cb1, sg1, sg2, cb2]),
+        _I("dihedral", [ca1, cb1, sg1, sg2]),
+        _I("dihedral", [ca2, cb2, sg2, sg1]),
+    ])
+
+
+def nos_morph(cys, lys, mode="form"):
+    nz, od2, sg2 = lys["NZ2"], cys["OD2"], cys["SG2"]
+    ce, cd, cb2 = lys["CE2"], lys["CD"], cys["CB2"]
+    hz1, he1, he2 = lys.get("HZ21"), lys.get("HE21"), lys.get("HE22")
+    ii = [_I("bond", [nz, od2]), _I("angle", [ce, nz, od2])]
+    if hz1 is not None:
+        ii.append(_I("angle", [hz1, nz, od2]))
+    ii.append(_I("angle", [nz, od2, sg2]))
+    ii += [_I("dihedral", [cd, ce, nz, od2]), _I("dihedral", [ce, nz, od2, sg2]),
+           _I("dihedral", [nz, od2, sg2, cb2])]
+    if hz1 is not None:
+        ii.append(_I("dihedral", [hz1, nz, od2, sg2]))
+    if he1 is not None:
+        ii.append(_I("dihedral", [he1, ce, nz, od2]))
+    if he2 is not None:
+        ii.append(_I("dihedral", [he2, ce, nz, od2]))
+    return InterResidueBondMorph(mode, ii)
 
 
 def _mk(name, i):
@@ -100,7 +135,6 @@ def test_induced_is_deterministic():
 def test_nos_single_bond_reproduces_nos_morph():
     """A NOS bridge is one inter-residue bond (NZ2-OD2); the whole nos_morph
     interaction set falls out of the graph from that single edge."""
-    from pmx.covalent.edit import nos_morph
     edges = [
         # Lys bound branch
         ("CD", "CE2"), ("CE2", "NZ2"), ("CE2", "HE21"), ("CE2", "HE22"),

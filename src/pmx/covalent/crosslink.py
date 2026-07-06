@@ -273,14 +273,6 @@ def emit_crosslink_rtp(atoms: List[Atom], bonds, resname: str,
     return "".join(_make_rtp(r, ii, [], neigh, cmap, ff))
 
 
-def build_crosslink_mtp(wt_res, bound_res, bond_atom_name: str,
-                        resname: str, boundary_depth: int = 2) -> str:
-    """Walk + duplicate + emit: the split-atom cross-link hybrid as MTP text."""
-    atoms, _bonds = build_split_residue(wt_res, bound_res, bond_atom_name,
-                                        boundary_depth)
-    return emit_crosslink_mtp(atoms, resname, wt_res.resname, bound_res.resname)
-
-
 def decouple(wt_res, bound_res, bond_atom_name: str, boundary_depth: int = 2):
     """The unified 'decouple' operation: split a residue's reacting sidechain.
 
@@ -292,37 +284,6 @@ def decouple(wt_res, bound_res, bond_atom_name: str, boundary_depth: int = 2):
     atoms, bonds = build_split_residue(wt_res, bound_res, bond_atom_name,
                                        boundary_depth)
     return {a.name: a for a in atoms}, atoms, bonds
-
-
-def disulfide_edit(cys1_res, cys2_res, bound1_res, bound2_res, mode="form"):
-    """Alchemical disulfide = decouple x2 + SG-SG bond on the bound branch.
-
-    ``cysN_res`` = WT cysteines; ``boundN_res`` = disulfide-Cys targets
-    (``CYS2``/``CYX``).  Returns ``(edit, split1, split2)``.
-    """
-    from .edit import CovalentEdit, disulfide_morph
-    edit = CovalentEdit()
-    a1 = edit.decouple(cys1_res, bound1_res, "SG")
-    a2 = edit.decouple(cys2_res, bound2_res, "SG")
-    edit.bond(disulfide_morph(a1, a2, mode=mode, cb="CB2", sg="SG2"))
-    return edit, edit.decoupled[0][1:], edit.decoupled[1][1:]
-
-
-def nos_edit(cys_res, lys_res, nos_cys_res, nos_lys_res, mode="form"):
-    """Alchemical N-O-S bridge = decouple Cys + decouple Lys + NZ-OD/OD-SG bonds.
-
-    Same two primitives as the disulfide (``decouple`` + a bond-morph), just a
-    different recipe: the Cys reacts at ``SG`` (its bound target gains the
-    bridging ``OD``), the Lys reacts at ``NZ``.  ``nos_morph`` already reads the
-    bound-branch ``*2`` names, so no remapping is needed.  ``nos_cys_res`` /
-    ``nos_lys_res`` are the bound NOS targets (e.g. ``CSO``-derived for Cys).
-    """
-    from .edit import CovalentEdit, nos_morph
-    edit = CovalentEdit()
-    ac = edit.decouple(cys_res, nos_cys_res, "SG")
-    al = edit.decouple(lys_res, nos_lys_res, "NZ")
-    edit.bond(nos_morph(ac, al, mode=mode))
-    return edit, edit.decoupled[0][1:], edit.decoupled[1][1:]
 
 
 # ── model-level cross-link placement ──────────────────────────────────────────
@@ -358,153 +319,6 @@ def _place_split_residue(model, wt_residue, split_atoms, hybrid_name):
     return new
 
 
-def crosslink(model, resid1, resid2, ff, target1, target2=None,
-              bond_atom1="SG", bond_atom2=None, link_atom1=None, link_atom2=None,
-              boundary_depth=2, mode="form", chain1=None, chain2=None,
-              inplace=False, write_files=True, verbose=False):
-    """Place a bond-forming cross-link (disulfide / NOS / ...) into *model*.
-
-    The composition the framework's thesis prescribes: ``decouple`` each reacting
-    residue (split its sidechain into a state-A-real free branch and a
-    state-B-real bound branch) and declare **one** forming bond.  Because the
-    inter-residue bond lives on the bound branch -- a dummy in state A -- its
-    GROMACS topological exclusions are harmless in the free state.
-
-    The inter-residue bond is not part of the residue definition: the user
-    declares it at gentop (``pmx gentop --bond``), and
-    :func:`pmx.alchemy._apply_inter_bonds` derives the induced angles/dihedrals
-    from the union bond graph, resolving force constants from the force field at
-    ``gen_hybrid_top`` time.
-
-    Parameters
-    ----------
-    model : Model
-        structure to modify (protonate the WT first -- see :func:`covalent.mutate`).
-    resid1, resid2 : int
-        residue IDs of the two reacting residues.
-    ff : str
-        force field name.
-    target1, target2 : str
-        bound-state target residue names (``target2`` defaults to ``target1``).
-        Disulfide: ``CYS2`` (CHARMM) / ``CYX`` (AMBER) for both.
-    bond_atom1, bond_atom2 : str
-        the *reacting* atom on each residue -- the one whose sidechain is walked
-        and decoupled (``bond_atom2`` defaults to ``bond_atom1``).  Disulfide:
-        ``SG``/``SG``; NOS: ``SG`` (Cys) / ``NZ`` (Lys).
-    link_atom1, link_atom2 : str, optional
-        the atom on each residue's bound branch that actually forms the
-        inter-residue bond, when it differs from the reacting atom.  Defaults to
-        the reacting atom (disulfide: ``SG``-``SG``).  For a NOS bridge the Cys
-        reacts at ``SG`` but bonds through its bridging ``OD`` -- so
-        ``link_atom1='OD'`` (Cys), ``link_atom2='NZ'`` (Lys) gives the forming
-        bond ``OD2``-``NZ2``.
-    mode : str
-        bond mode (``form`` / ``break`` / ``perma``).
-
-    Returns
-    -------
-    str
-        the hybrid residue name for residue 1 (both sites share it for a homo
-        cross-link such as a disulfide; they differ for a hetero one like NOS).
-    """
-    from copy import deepcopy
-    from ..utils import list2file
-    from ..library import pmx_data_file
-    from ..nsaa import (_assign_rtp_entries, _get_residue_types, _ARN_CONTENT,
-                        _write_atp_fnb, _assign_mass_atp)
-    from .mutate import _load_rtp, _upsert_entry, _split_rtp_header
-    from .target import TargetResidue
-
-    target2 = target2 or target1
-    bond_atom2 = bond_atom2 or bond_atom1
-    link_atom1 = link_atom1 or bond_atom1
-    link_atom2 = link_atom2 or bond_atom2
-
-    rtp, ffpath = _load_rtp(ff)
-    bCharmm = "charmm" in ff
-
-    m = model if inplace else deepcopy(model)
-    if m.unity == "nm":
-        m.nm2a()
-
-    # 1. decouple each reacting residue (params + geometry, in the WT frame)
-    sites = []
-    for resid, chain, target, batom in (
-            (resid1, chain1, target1, bond_atom1),
-            (resid2, chain2, target2, bond_atom2)):
-        wt = m.fetch_residue(idx=resid, chain=chain)
-        resnA = wt.resname
-        _assign_rtp_entries(wt, rtp, None)
-        if not any(getattr(a, "bonds", None) for a in wt.atoms):
-            attach_bonds_from_rtp(wt, ff)
-        if not any(_element_of(a) == "H" for a in wt.atoms):
-            import warnings
-            warnings.warn(
-                f"WT residue {resid} ({resnA}) has no hydrogens -- the structure "
-                "appears unprotonated; the hybrid's polar/backbone hydrogens will "
-                "become dummies and pdb2gmx will reject a dangling improper. "
-                "Protonate the structure first.", stacklevel=2)
-        bound = TargetResidue.from_rtp(target, ff).residue
-        # assign real masses (from atomtypes.atp) to the WT atoms; the target's
-        # masses already come from from_rtp.  Without this the split atoms'
-        # state-A masses would emit as 0.
-        _assign_mass_atp(wt, bound, os.path.join(ffpath, "atomtypes.atp"))
-        _superpose_by_name(bound, wt)
-        amap, atoms, bonds = decouple(wt, bound, batom, boundary_depth)
-        name = f"{resnA[:1]}2{target[:2]}"[:4]
-        sites.append({"wt": wt, "resnA": resnA, "resnB": target,
-                      "atoms": atoms, "bonds": bonds, "amap": amap,
-                      "name": name, "bond_atom": batom})
-
-    hybrid_name = sites[0]["name"]
-
-    # The forming bond, in bound-branch (``*2``) naming.  It is declared once, on
-    # 2. emit each distinct hybrid definition BEFORE placement -- emitting sets
-    #    local atom ids/bonds, which model renumbering would otherwise clobber.
-    #    Homo cross-links (disulfide) share one entry; hetero ones (NOS) emit two.
-    #    The inter-residue bond is declared later at gentop (pmx gentop --bond).
-    if write_files:
-        fn_restypes = pmx_data_file("mutff/residuetypes.dat")
-        emitted = set()
-        for i, s in enumerate(sites):
-            name = s["name"]
-            if name in emitted:
-                continue
-            emitted.add(name)
-            mtp_text = emit_crosslink_mtp(list(s["atoms"]), name,
-                                          s["resnA"], s["resnB"])
-            rtp_text = emit_crosslink_rtp(list(s["atoms"]), s["bonds"], name,
-                                          s["resnA"], s["resnB"], ff)
-            _write_atp_fnb("atomtypes.atp", "ffnonbonded.itp",
-                           _SplitResidue(s["atoms"], name,
-                                         s["resnA"], s["resnB"]), ffpath)
-            rtp_header, rtp_entry = _split_rtp_header(rtp_text, name)
-            _upsert_entry(os.path.join(ffpath, "nsaa.rtp"), name, rtp_entry,
-                          header=rtp_header)
-            _upsert_entry(os.path.join(ffpath, "nsaa.mtp"), name, mtp_text)
-            if bCharmm:
-                arn = os.path.join(ffpath, "nsaa.arn")
-                if not os.path.isfile(arn):
-                    list2file([_ARN_CONTENT], arn)
-            if name not in _get_residue_types(fn_restypes):
-                need_nl = (os.path.isfile(fn_restypes)
-                           and os.path.getsize(fn_restypes) > 0
-                           and open(fn_restypes, "rb").read()[-1:] != b"\n")
-                with open(fn_restypes,
-                          "a" if os.path.isfile(fn_restypes) else "w") as f:
-                    f.write(("\n" if need_nl else "") + f"{name:<6} Protein\n")
-
-    # 3. place each split residue into the model
-    for s in sites:
-        _place_split_residue(m, s["wt"], s["atoms"], s["name"])
-
-    if verbose:
-        print(f"log_> covalent.crosslink: {sites[0]['name']}/{sites[1]['name']} "
-              f"({sites[0]['resnA']}{resid1}-{sites[1]['resnA']}{resid2}); "
-              f"bond {mode} {link_atom1}2@{resid1} - {link_atom2}2@{resid2}; "
-              f"MTP -> {os.path.join(ffpath, 'nsaa.mtp')}")
-
-    return hybrid_name
 
 
 def decouple_mutate(model, resid, target, ff, react_atom, chain=None,
