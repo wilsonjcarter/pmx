@@ -139,10 +139,12 @@ def read_new_mtp_entry(entry, filename='mutres.mtp'):
         if len(entr) < 3:
             continue
         mode, self_atom, partner = entr[0], entr[1], entr[2]
+        cutoff = float(entr[3]) if len(entr) > 3 else None
         inter_bonds.append({
             'mode': mode,
             'self': self_atom,
             'partner': partner.lstrip('@'),
+            'cutoff': cutoff,
         })
     mol.inter_bonds = inter_bonds
     bonds = []

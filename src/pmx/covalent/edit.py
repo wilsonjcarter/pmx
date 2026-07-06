@@ -162,14 +162,20 @@ def apply_bond_morph(topol, morph: InterResidueBondMorph) -> None:
 
     fA, fB = _MODE_FACTORS[morph.mode]
     bp = topol.BondedParams
+    missing = []
     for it in morph.interactions:
         types = [_state_type(a, morph.mode) for a in it.atoms]
         if it.kind == "bond":
-            func, x0, k = bp.get_bond_param(*types)
+            parm = bp.get_bond_param(*types)
+            if parm is None:
+                missing.append(("bond", tuple(types))); continue
+            func, x0, k = parm
             topol.bonds.append(list(it.atoms) +
                                [func, [func, x0, k * fA], [func, x0, k * fB]])
         elif it.kind == "angle":
             parm = bp.get_angle_param(*types)
+            if parm is None:
+                missing.append(("angle", tuple(types))); continue
             if len(parm) != 5:
                 parm = list(parm) + [0, 0]
             func, th0, kth, r0_ub, kub = parm
@@ -180,7 +186,10 @@ def apply_bond_morph(topol, morph: InterResidueBondMorph) -> None:
             ])
             _zero_B_if_has_dummy_angle(topol.angles[-1])
         elif it.kind == "dihedral":
-            for func, phi0, kphi, mult in bp.get_dihedral_param(*types, 9):
+            dparm = bp.get_dihedral_param(*types, 9)
+            if not dparm:
+                missing.append(("dihedral", tuple(types))); continue
+            for func, phi0, kphi, mult in dparm:
                 topol.dihedrals.append(list(it.atoms) + [
                     func,
                     [func, phi0, kphi * fA, mult],
@@ -189,6 +198,15 @@ def apply_bond_morph(topol, morph: InterResidueBondMorph) -> None:
                 _zero_B_if_has_dummy_dihedral(topol.dihedrals[-1])
         else:
             raise ValueError(f"unknown interaction kind: {it.kind!r}")
+    if missing:
+        import warnings
+        uniq = sorted(set(missing))
+        warnings.warn(
+            "apply_bond_morph: %d induced term(s) have no force-field parameter "
+            "and were SKIPPED (the cross-link topology is incomplete until these "
+            "are added): %s" % (len(uniq),
+                                 "; ".join("%s %s" % (k, "-".join(t))
+                                           for k, t in uniq)), stacklevel=2)
 
 
 def _apply_decouple(topol, morph: InterResidueBondMorph) -> None:

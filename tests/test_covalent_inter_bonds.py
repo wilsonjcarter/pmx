@@ -51,7 +51,7 @@ def test_parser_reads_inter_bonds_roundtrip():
     r = _R(atoms, "C2CY", "CYS", "CYS2")
     txt = "".join(_make_mtp(r, [], [], inter_bonds=[("form", "SG2", "SG2")]))
     mol, _b, _i, _d, _rot = read_new_mtp_entry("C2CY", filename=io.StringIO(txt))
-    assert mol.inter_bonds == [{"mode": "form", "self": "SG2", "partner": "SG2"}]
+    assert mol.inter_bonds == [{"mode": "form", "self": "SG2", "partner": "SG2", "cutoff": None}]
 
 
 # ── consumer: _apply_inter_bonds over a synthetic topology ────────────────────
@@ -137,7 +137,7 @@ def test_covalent_edit_emit_serializes_inter_bonds_section():
     txt = edit.emit()
     assert txt.count("[ inter_bonds ]") == 1        # declared once, on the owner
     mol, *_ = read_new_mtp_entry("C2CY", filename=io.StringIO(txt))
-    assert mol.inter_bonds == [{"mode": "form", "self": "SG2", "partner": "SG2"}]
+    assert mol.inter_bonds == [{"mode": "form", "self": "SG2", "partner": "SG2", "cutoff": None}]
 
 
 def test_apply_inter_bonds_multibond_sonos():
@@ -185,6 +185,65 @@ def test_apply_inter_bonds_multibond_sonos():
     # the ODA-NZ2-ODB cross-angle (both bonds meet at NZ2) is generated
     ang_names = {frozenset((a[0].name, a[2].name)) for a in topol.angles}
     assert frozenset(("ODA", "ODB")) in ang_names
+
+
+def test_apply_inter_bonds_explicit_gentop_bond():
+    """gentop --bond forms a bond deterministically by (resid, atom), even with
+    no [ inter_bonds ] section -- the reliable path for far-apart reacting atoms."""
+    from pmx.alchemy import _apply_inter_bonds
+
+    r1, a1 = _mkres("C2QN", 1); r1.id = 32
+    r2, a2 = _mkres("C2QN", 100); r2.id = 35
+    for a in (a1, a2):
+        a["CA"].resnr = None
+    bonds = []
+    for a in (a1, a2):
+        bonds += [[a["CA"], a["CB2"], 1], [a["CB2"], a["SG2"], 1]]
+    topol = _Topol(bonds)
+    rlist = [r1, r2]
+    rdic = {"C2QN": (_Entry([]), [], [], [], {})}   # no rule -> only --bond drives it
+
+    n0 = len(topol.bonds)
+    # plain atom name "SG" maps to the bound branch "SG2"
+    _apply_inter_bonds(topol, rlist, rdic, explicit_bonds=[
+        {"resid_a": 32, "atom_a": "SG", "resid_b": 35, "atom_b": "SG",
+         "mode": "form"}])
+    assert len(topol.bonds) == n0 + 1               # the SG2-SG2 bond was formed
+    formed = topol.bonds[-1]
+    assert {formed[0].name, formed[1].name} == {"SG2"}
+
+
+def test_apply_bond_morph_skips_missing_param_with_warning():
+    """A generated induced term with no FF parameter is skipped + warned, not a
+    crash (surfaces gaps cleanly when params are incomplete/placeholder)."""
+    import warnings
+    from pmx.covalent.edit import (apply_bond_morph, InterResidueBondMorph,
+                                   Interaction)
+
+    class _BPNone:
+        def get_bond_param(self, *t):     return (1, 2.0, 300.0)
+        def get_angle_param(self, *t):    return None      # missing
+        def get_dihedral_param(self, *t): return []
+
+    class _T:
+        def __init__(self):
+            self.bonds, self.angles, self.dihedrals = [], [], []
+            self.BondedParams = _BPNone()
+
+    a = _atom("NZ2", 1, "NG301", "NG301")
+    b = _atom("OD2", 2, "OG301", "OG301")
+    c = _atom("OD2", 3, "OG301", "OG301")
+    morph = InterResidueBondMorph("form", [
+        Interaction("bond", [a, b]),
+        Interaction("angle", [b, a, c]),          # OD-NZ-OD, no FF param
+    ])
+    topol = _T()
+    with warnings.catch_warnings(record=True) as w:
+        warnings.simplefilter("always")
+        apply_bond_morph(topol, morph)
+    assert len(topol.bonds) == 1                   # the bond still formed
+    assert len(topol.angles) == 0                  # the unparameterised angle skipped
+    assert any("SKIPPED" in str(x.message) for x in w)
 
 
 def test_apply_inter_bonds_noop_without_section():

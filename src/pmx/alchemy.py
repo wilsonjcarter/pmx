@@ -385,7 +385,8 @@ def get_nuc_hybrid_resname(residue, new_nuc_name):
 
 
 def gen_hybrid_top(topol, recursive=True, verbose=False, scaleDih=1.0,
-                   extra_mtp_files=None, supplement_bonded_files=None):
+                   extra_mtp_files=None, supplement_bonded_files=None,
+                   inter_bonds=None, coords=None):
     """Fills the bstate of a topology file containing pmx hybrid residues. This
     can be either a top or itp file. If the file contains other itp files via
     include statements, the function can iterate through them if the recursive
@@ -544,7 +545,12 @@ def gen_hybrid_top(topol, recursive=True, verbose=False, scaleDih=1.0,
         # it keeps its own detector, which already delegates to the unified
         # apply_bond_morph(mode='decouple').
         _terminal_deletion_decouplings(pmxtop, rlist, verbose=verbose)
-        _apply_inter_bonds(pmxtop, rlist, rdic, verbose=verbose)
+        # load structure coords onto the topology atoms so distance-based
+        # [ inter_bonds ] rules can pair partners by proximity (gentop -c).
+        if coords is not None:
+            _load_coords_onto_topol(pmxtop, coords)
+        _apply_inter_bonds(pmxtop, rlist, rdic, verbose=verbose,
+                           explicit_bonds=inter_bonds)
         return pmxtop
 
     # -------------
@@ -1176,26 +1182,77 @@ def _terminal_deletion_decouplings(topol, rlist, verbose=False):
         apply_bond_morph(topol, InterResidueBondMorph('decouple', interactions))
 
 
-def _resolve_inter_partner(rlist, self_res, partner_name):
-    """Find the atom *partner_name* in a hybrid residue other than *self_res*.
+def _load_coords_onto_topol(topol, coords):
+    """Copy coordinates from a structure onto the topology atoms (by index).
 
-    Unambiguous for a single cross-link; raises on ambiguity (several candidate
-    residues -- e.g. multiple disulfides on a bare topology, where spatial /
-    LINK-record pairing would be required and is not yet implemented).
+    *coords* is a path to a GRO/PDB (or a Model).  The topology and structure
+    come from the same pdb2gmx run, so their atom orders match.  Coordinates are
+    stored in nm (GROMACS native) so distance cutoffs are in nm.
     """
-    hits = []
-    for r in rlist:
-        if r is self_res:
-            continue
-        for a in r.atoms:
-            if a.name == partner_name:
-                hits.append(a)
+    if isinstance(coords, str):
+        m = Model(coords, bPDBTER=True, rename_atoms=True)
+    else:
+        m = coords
+    matoms = m.atoms
+    if m.unity == 'a':          # Model reads PDB in A; store nm to match cutoffs
+        scale = 0.1
+    else:
+        scale = 1.0
+    if len(matoms) != len(topol.atoms):
+        raise RuntimeError(
+            "gentop -c: structure has %d atoms but topology has %d -- they must "
+            "come from the same pdb2gmx run" % (len(matoms), len(topol.atoms)))
+    for ta, ma in zip(topol.atoms, matoms):
+        ta.x = [c * scale for c in ma.x]
+
+
+def _resolve_inter_partners(rlist, self_res, self_atom, partner_name,
+                            cutoff=None):
+    """Partner atoms named *partner_name* on residues other than *self_res*.
+
+    - **No cutoff:** the unique match (a list of length 0 or 1); raises on >1
+      candidate -- an ambiguous multi-cross-link that needs either a cutoff on
+      the ``[ inter_bonds ]`` rule or an explicit ``gentop --bond``.
+    - **With cutoff (nm):** every candidate within *cutoff* of *self_atom* by
+      coordinates -- so one reactive atom binds several neighbours (e.g. a SONOS
+      nitrogen bonding its two nearby cysteine oxygens) while distant residues
+      are excluded.  Requires coordinates on the atoms (gentop ``-c``).  Note the
+      cutoff is a *disambiguation radius* ("which partner is near"), not the bond
+      length: in the free/reduced starting state the reacting atoms are several A
+      apart, so it must be generous (~0.6-0.9 nm).
+    """
+    hits = [a for r in rlist if r is not self_res
+            for a in r.atoms if a.name == partner_name]
+    if cutoff is not None:
+        import numpy as np
+        sx = np.array(self_atom.x, dtype=float)
+        return [a for a in hits
+                if np.linalg.norm(np.array(a.x, dtype=float) - sx) <= cutoff]
     if len(hits) > 1:
         raise RuntimeError(
-            "ambiguous [ inter_bonds ] partner '%s': %d candidate residues; "
-            "spatial/LINK-based pairing not yet implemented"
-            % (partner_name, len(hits)))
-    return hits[0] if hits else None
+            "ambiguous [ inter_bonds ] partner '%s' on %s: %d candidates; add a "
+            "cutoff to the rule (with gentop -c) or pass an explicit "
+            "gentop --bond r1:atom-r2:atom" % (partner_name, self_res.resname,
+                                               len(hits)))
+    return hits
+
+
+def _find_topol_atom(rlist, resid, chain, atom_name):
+    """Locate an atom by (resid, chain, name) in the parsed topology residues.
+
+    Prefers the bound-branch split name (``NZ`` -> ``NZ2``) so a user can name the
+    plain reacting atom in ``gentop --bond`` without knowing the split naming.
+    """
+    for r in rlist:
+        if r.id != resid:
+            continue
+        if chain and getattr(r, 'chain_id', '') not in ('', None, chain):
+            continue
+        by = {a.name: a for a in r.atoms}
+        for cand in (atom_name + '2', atom_name):
+            if cand in by:
+                return by[cand]
+    return None
 
 
 # Forming-bond recipes for the shipped legacy cross-link hybrids (disulfide
@@ -1214,7 +1271,7 @@ _LEGACY_INTER_BONDS = {
 }
 
 
-def _apply_inter_bonds(topol, rlist, rdic, verbose=False):
+def _apply_inter_bonds(topol, rlist, rdic, verbose=False, explicit_bonds=None):
     """Apply declarative ``[ inter_bonds ]`` cross-residue bond-morphs.
 
     For every hybrid residue whose MTP entry carries an ``[ inter_bonds ]``
@@ -1241,7 +1298,7 @@ def _apply_inter_bonds(topol, rlist, rdic, verbose=False):
             spec = _LEGACY_INTER_BONDS.get(r.resname)
         if spec:
             decls.append((r, spec))
-    if not decls:
+    if not decls and not explicit_bonds:
         return
 
     # union bond graph over the parsed topology (Atom-object adjacency)
@@ -1254,6 +1311,14 @@ def _apply_inter_bonds(topol, rlist, rdic, verbose=False):
     # 1. resolve every declared forming bond to its two topology atoms
     applied = set()   # dedup by the pair of bonded atom ids (symmetric decls)
     forming = []      # (self_atom, partner_atom, mode)
+
+    def _add(self_atom, partner_atom, mode):
+        key = frozenset((self_atom.id, partner_atom.id))
+        if key in applied:
+            return
+        applied.add(key)
+        forming.append((self_atom, partner_atom, mode))
+
     for r, spec in decls:
         by_name = {a.name: a for a in r.atoms}
         for seed in spec:
@@ -1261,16 +1326,25 @@ def _apply_inter_bonds(topol, rlist, rdic, verbose=False):
             if self_atom is None:
                 raise RuntimeError("[ inter_bonds ] %s: residue has no atom %s"
                                    % (r.resname, seed['self']))
-            partner_atom = _resolve_inter_partner(rlist, r, seed['partner'])
-            if partner_atom is None:
-                raise RuntimeError(
-                    "[ inter_bonds ] %s: no partner residue carries atom %s"
-                    % (r.resname, seed['partner']))
-            key = frozenset((self_atom.id, partner_atom.id))
-            if key in applied:
-                continue
-            applied.add(key)
-            forming.append((self_atom, partner_atom, seed['mode']))
+            # a cutoff on the rule -> distance disambiguation (bind every partner
+            # within the radius); otherwise the unique name match.
+            partners = _resolve_inter_partners(
+                rlist, r, self_atom, seed['partner'], cutoff=seed.get('cutoff'))
+            for partner_atom in partners:
+                _add(self_atom, partner_atom, seed['mode'])
+
+    # explicit gentop --bond pairs: deterministic override/addition, resolved by
+    # (resid, chain, atom) -- the reliable path when reacting atoms are too far
+    # apart for a distance radius (alchemical formation) or to force a pairing.
+    for eb in (explicit_bonds or []):
+        a = _find_topol_atom(rlist, eb['resid_a'], eb.get('chain_a'), eb['atom_a'])
+        b = _find_topol_atom(rlist, eb['resid_b'], eb.get('chain_b'), eb['atom_b'])
+        if a is None or b is None:
+            raise RuntimeError(
+                "gentop --bond: could not resolve %s:%s or %s:%s in the topology"
+                % (eb['resid_a'], eb['atom_a'], eb['resid_b'], eb['atom_b']))
+        _add(a, b, eb.get('mode', 'form'))
+
     if not forming:
         return
 

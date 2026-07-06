@@ -1220,10 +1220,15 @@ def _make_mtp(r, ii_list: list, dihi_list: list,
 
     if inter_bonds:
         mtp.append('\n[ inter_bonds ]\n')
-        mtp.append('; mode   self-atom   partner-atom\n')
-        for mode, self_atom, partner in inter_bonds:
+        mtp.append('; mode   self-atom   partner-atom   [cutoff/nm]\n')
+        for seed in inter_bonds:
+            mode, self_atom, partner = seed[0], seed[1], seed[2]
+            cutoff = seed[3] if len(seed) > 3 else None
             partner = partner if partner.startswith('@') else '@' + partner
-            mtp.append(f'  {mode:6} {self_atom:10} {partner:10}\n')
+            line = f'  {mode:6} {self_atom:10} {partner:10}'
+            if cutoff is not None:
+                line += f' {cutoff:8.4f}'
+            mtp.append(line + '\n')
 
     if rotations:
         mtp.append('\n[ rotations ]\n')
