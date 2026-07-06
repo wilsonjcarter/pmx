@@ -19,6 +19,41 @@ def _gmxlib():
     set_gmxlib()
 
 
+def _two_residue_model(resname, resids=(1, 2), gap=6.0):
+    """Build a minimal 2-residue Model from a force-field RTP residue.
+
+    Writes the residue's atoms twice (translated by *gap*) to a temporary PDB
+    and reads it back -- enough for the model-level cross-link placement path
+    without needing gmx/pdb2gmx.
+    """
+    import os
+    import tempfile
+    import numpy as np
+    from pmx.model import Model
+
+    res = TargetResidue.from_rtp(resname, FF).residue
+
+    def line(serial, name, resid, x):
+        nm = name if len(name) == 4 else " " + name
+        return (f"ATOM  {serial:>5} {nm:<4} {resname:>3} A{resid:>4}    "
+                f"{x[0]:8.3f}{x[1]:8.3f}{x[2]:8.3f}  1.00  0.00\n")
+
+    lines, serial = [], 1
+    for i, resid in enumerate(resids):
+        shift = np.array([gap * i, 0.0, 0.0])
+        for a in res.atoms:
+            lines.append(line(serial, a.name, resid, np.array(a.x) + shift))
+            serial += 1
+    lines.append("TER\nEND\n")
+    fn = tempfile.mktemp(suffix=".pdb")
+    with open(fn, "w") as fh:
+        fh.writelines(lines)
+    try:
+        return Model(fn, bPDBTER=True, rename_atoms=True)
+    finally:
+        os.remove(fn)
+
+
 def test_disulfide_walk_matches_c2cd_boundary():
     """CYS/SG depth 2 -> duplicate {CB, SG} + H, boundary CA (as in C2CD)."""
     r = TargetResidue.from_rtp("CYS", FF).residue
@@ -177,3 +212,107 @@ def test_emit_crosslink_rtp_builds_c2cd_entry():
     # split branches present in the atom block
     for n in ("CB1", "CB2", "SG1", "SG2"):
         assert n in rtp
+
+
+def test_split_branches_colocated_on_wt():
+    """Each split atom (free X1 / bound X2) sits exactly on its WT counterpart.
+
+    The bound branch represents the same physical atom as the free branch, so
+    both must reuse the WT coordinate -- otherwise the classic split placement
+    (which co-locates CB1/CB2, SG1/SG2) is not reproduced.
+    """
+    import numpy as np
+    from pmx.covalent.crosslink import build_split_residue
+    cys = TargetResidue.from_rtp("CYS", FF).residue
+    cys2 = TargetResidue.from_rtp("CYS2", FF).residue
+    wt = {a.name: np.array(a.x) for a in cys.atoms}
+    atoms, _ = build_split_residue(cys, cys2, "SG")
+    by = {a.name: np.array(a.x) for a in atoms}
+    for base in ("CB", "SG"):
+        assert np.allclose(by[base + "1"], by[base + "2"])   # branches coincident
+        assert np.allclose(by[base + "1"], wt[base])         # and on the WT atom
+
+
+def test_crosslink_places_split_residue_in_model():
+    """Model-level crosslink: both cysteines become the split hybrid in place."""
+    import numpy as np
+    from pmx.covalent import crosslink
+    m = _two_residue_model("CYS")
+    # write_files=False -> no force-field writes (side-effect free test)
+    name = crosslink(m, 1, 2, FF, target1="CYS2", inplace=True,
+                     write_files=False)
+    assert name == "C2CY"
+    for resid in (1, 2):
+        r = m.fetch_residue(idx=resid)
+        assert r.resname == name
+        by = {a.name: np.array(a.x) for a in r.atoms}
+        for n in ("CB1", "CB2", "SG1", "SG2", "HG11"):
+            assert n in by, f"resid {resid} missing {n}"
+        # split branches co-located; state-A masses assigned (not zero)
+        assert np.allclose(by["SG1"], by["SG2"])
+        assert np.allclose(by["CB1"], by["CB2"])
+        assert all(a.m > 0 for a in r.atoms)
+
+
+def test_split_bonds_names_bound_only_bridging_atom():
+    """A target-only bridging atom (e.g. a NOS/sulfenyl OD) is a branch-2 atom.
+
+    Its bonds must carry the branch-2 suffix, and a bond between two bound-only
+    atoms (OD-HD) must not be dropped -- otherwise the emitted connectivity
+    references a nonexistent 'OD' or loses the O-H bond.
+    """
+    from pmx.covalent.crosslink import decouple
+    cys = TargetResidue.from_rtp("CYS", FF).residue
+    cso = TargetResidue.from_rtp("CSO", FF).residue   # Cys-sulfenic: SG-OD-HD
+    _amap, atoms, bonds = decouple(cys, cso, "SG")
+    names = {a.name for a in atoms}
+    assert "OD2" in names and "HD2" in names          # bound-only atoms suffixed
+    assert not any(b[0] not in names or b[1] not in names for b in bonds)
+    assert any(set(b) == {"OD2", "SG2"} for b in bonds)   # sulfenyl bond named
+    assert any(set(b) == {"OD2", "HD2"} for b in bonds)   # O-H bond not dropped
+
+
+def test_crosslink_hetero_emits_two_entries(tmp_path):
+    """A hetero cross-link (NOS-shaped: Cys vs Lys) places two distinct hybrids,
+    with the forming bond declared once via an explicit link atom.
+
+    Uses CSO/LYN as bound-target proxies to exercise the machinery (two entries,
+    link_atom != reacting atom, bond on residue 1); the chemically-correct NOS
+    target is a separate force-field data question.
+    """
+    from pmx.covalent import crosslink
+    # build a CYS + LYS model on the fly
+    import os
+    import numpy as np
+    from pmx.model import Model
+    cys = TargetResidue.from_rtp("CYS", FF).residue
+    lys = TargetResidue.from_rtp("LYS", FF).residue
+
+    def block(res, resname, resid, shift, start):
+        out = []
+        for i, a in enumerate(res.atoms):
+            nm = a.name if len(a.name) == 4 else " " + a.name
+            x = np.array(a.x) + shift
+            out.append(f"ATOM  {start + i:>5} {nm:<4} {resname:>3} A{resid:>4}    "
+                       f"{x[0]:8.3f}{x[1]:8.3f}{x[2]:8.3f}  1.00  0.00\n")
+        return out
+
+    lines = block(cys, "CYS", 1, np.zeros(3), 1)
+    lines += block(lys, "LYS", 2, np.array([8.0, 0, 0]), len(cys.atoms) + 1)
+    lines.append("TER\nEND\n")
+    fn = str(tmp_path / "cyslys.pdb")
+    with open(fn, "w") as fh:
+        fh.writelines(lines)
+    m = Model(fn, bPDBTER=True, rename_atoms=True)
+
+    crosslink(m, 1, 2, FF, target1="CSO", target2="LYN",
+              bond_atom1="SG", bond_atom2="NZ",
+              link_atom1="OD", link_atom2="NZ",
+              inplace=True, write_files=False)
+    n1 = m.fetch_residue(idx=1).resname
+    n2 = m.fetch_residue(idx=2).resname
+    assert n1 != n2                                    # hetero: distinct hybrids
+    by1 = {a.name for a in m.fetch_residue(idx=1).atoms}
+    by2 = {a.name for a in m.fetch_residue(idx=2).atoms}
+    assert "OD2" in by1                                # Cys bridging atom placed
+    assert "NZ2" in by2                                # Lys reacting atom placed

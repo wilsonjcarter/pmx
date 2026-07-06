@@ -25,8 +25,9 @@ from .edit import (CovalentEdit, InterResidueBondMorph, Interaction,
                    apply_edit, apply_bond_morph, induced_bond_morph,
                    disulfide_morph, nos_morph)
 from .crosslink import (walk_reacting_atoms, build_split_residue, decouple,
-                        emit_crosslink_mtp, build_crosslink_mtp,
-                        disulfide_edit, nos_edit)
+                        emit_crosslink_mtp, emit_crosslink_rtp,
+                        build_crosslink_mtp, disulfide_edit, nos_edit,
+                        crosslink)
 from . import ptm
 
 __all__ = ["TargetResidue", "map_residues", "ResidueMapping",
@@ -36,7 +37,7 @@ __all__ = ["TargetResidue", "map_residues", "ResidueMapping",
            "disulfide_morph", "nos_morph",
            # cross-link (dual-topology) API
            "walk_reacting_atoms", "build_split_residue", "decouple",
-           "emit_crosslink_mtp", "build_crosslink_mtp",
-           "disulfide_edit", "nos_edit",
+           "emit_crosslink_mtp", "emit_crosslink_rtp", "build_crosslink_mtp",
+           "disulfide_edit", "nos_edit", "crosslink",
            # PTM shorthand resolver
            "ptm"]

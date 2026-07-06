@@ -445,6 +445,25 @@ different protonation states. Use the --resinfo flag to print the dictionary.
                              'the hybrid on the fly instead of using mutres.mtp).',
                         default=False,
                         action='store_true')
+    parser.add_argument('--bond',
+                        dest='bond',
+                        action='append',
+                        default=None,
+                        metavar='"r1[:atom]-r2[:atom]"',
+                        help='Form a bond-forming cross-link (disulfide/NOS/...) '
+                             'between two residues via the generative split-atom '
+                             '(decouple) engine, instead of a per-residue '
+                             'mutation. Spec: "r1:atom-r2:atom" (e.g. '
+                             '"32:SG-35:SG" for a Cys32-Cys35 disulfide); the '
+                             'atom defaults to SG. Repeat --bond for multiple '
+                             'cross-links. Use --bond-target to set the bound '
+                             'target residue(s) (default CYS2/CYX for SG-SG).')
+    parser.add_argument('--bond-target',
+                        dest='bond_target',
+                        default=None,
+                        help='Bound-state target residue for --bond (e.g. CYS2). '
+                             'Defaults to the disulfide Cys (CYS2 for CHARMM, CYX '
+                             'for AMBER) when the reacting atom is SG.')
 
     args, unknown = parser.parse_known_args()
     check_unknown_cmd(unknown)
@@ -497,6 +516,36 @@ different protonation states. Use the --resinfo flag to print the dictionary.
     return args
 
 
+def _parse_bond_spec(spec):
+    """Parse a --bond spec ``"r1[:atom]-r2[:atom]"`` -> (r1, a1, r2, a2).
+
+    The reacting atom defaults to ``SG`` (disulfide) when omitted.
+    """
+    try:
+        left, right = spec.split('-')
+    except ValueError:
+        raise ValueError(f"--bond spec must be 'r1:atom-r2:atom', got {spec!r}")
+
+    def one(side):
+        if ':' in side:
+            resid, atom = side.split(':')
+        else:
+            resid, atom = side, 'SG'
+        return int(resid), atom.strip()
+
+    r1, a1 = one(left)
+    r2, a2 = one(right)
+    return r1, a1, r2, a2
+
+
+def _disulfide_target(ff, atom):
+    """Default bound target residue for a --bond cross-link."""
+    if atom.upper() == 'SG':
+        return 'CYS2' if 'charmm' in ff else 'CYX'
+    raise ValueError(f"--bond-target required: no default bound target for a "
+                     f"reacting atom '{atom}' (only SG=disulfide has one).")
+
+
 def main(args):
 
     # input variables
@@ -516,6 +565,23 @@ def main(args):
     if ref_infile is not None:
         ref_m = Model(ref_infile, renumber_residues=False,
                       bPDBTER=True, rename_atoms=True, scale_coords='A')
+
+    # if --bond is provided, form bond-forming cross-links (disulfide/NOS/...)
+    # via the generative split-atom engine, then finish.
+    # ----------------------------------------------------
+    if getattr(args, 'bond', None):
+        from pmx.covalent import crosslink
+        for spec in args.bond:
+            r1, a1, r2, a2 = _parse_bond_spec(spec)
+            target1 = args.bond_target or _disulfide_target(ff, a1)
+            target2 = args.bond_target or _disulfide_target(ff, a2)
+            crosslink(m, resid1=r1, resid2=r2, ff=ff,
+                      target1=target1, target2=target2,
+                      bond_atom1=a1, bond_atom2=a2,
+                      inplace=True, verbose=True)
+        m.write(outfile)
+        print('\ncross-link(s) done...........\n')
+        return
 
     # if script is provided, do the mutations in that file
     # ----------------------------------------------------
