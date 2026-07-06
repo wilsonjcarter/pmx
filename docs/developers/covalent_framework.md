@@ -76,7 +76,8 @@ per-feature code is the recipe (which atoms react, which bond forms).
 - **NEXT:** ΔG-validate the consumer against the split-atom `C2CD` reference
   (the 4 H-torsions), *then* retire `_add_ss_bonded_terms` / `_add_nos_terms` /
   `_terminal_deletion_decouplings`; multi-cross-link partner pairing.
-- **PLANNED:** bond-forming exclusion handling (below).
+- **CHOSEN:** bond-forming exclusion handling via generated split-atom
+  dual-topology (`decouple`); see below.
 
 ## The exclusion constraint (why bond-forming is special)
 
@@ -90,36 +91,32 @@ wrong** — in state A (free thiols, no disulfide) the real `SG` loses its true
 1-4 interactions with the partner residue. A single shared `SG` cannot be both
 "bonded (excluded) in B" and "free (interacting) in A".
 
-Two correct solutions:
+### The solution: generated split-atom dual-topology (`decouple`)
 
-### (a) Split-atom (current, shipped prebuilt)
-Duplicate the reacting sidechain into two branches. In `C2CD`:
+Duplicate the reacting sidechain into two decoupled branches. In `C2CD`:
 `CB1/HB11/HB12 + SG1/HG1` are the state-A free-thiol branch (dummy in B);
 `CB2/HB21/HB22 + SG2` are the state-B disulfide branch (dummy in A). The
 `SG2–SG2'` bond sits on the branch that is a **dummy in state A**, so its
-topological exclusions are harmless there. Required today; **not** producible by
-a 1:1 graph map (it duplicates atoms). These hybrids are shipped prebuilt (see
-`disulfide.mtp`, routed via `utils.get_mtp_file` for `C2CD/C2VD/…`).
+topological exclusions are harmless there — the LJ/charge the real atom loses to
+those exclusions is "clawed back" by the *other* branch, which is real in that
+state.
 
-### (b) Vsite + [ pairs ] (chosen direction — lighter, generatable)
-Instead of duplicating the whole sidechain, per reacting atom (`SG`, and `CB`
-as needed):
+This is **not** a hand-built special case: `decouple(res, reacting_atoms)` walks
+the sidechain from the bond atom, dummifies, and generates exactly this
+two-branch split from the same dummy machinery `mutate` uses. So the shipped
+`C2CD`/`C2VD/…` split residues are reproducible — and *any* new cross-link is
+too — with no per-chemistry code. It is the general mechanism, so it is the one
+we build on.
 
-- the **free-state charge** is carried by a **virtual site** co-located with
-  the atom but **not** part of the SG–SG bond graph (so it is not excluded);
-- the **real atom** carries the **bound-state charge** (charge morphs A→B);
-- the LJ interactions removed by the bond's topological exclusions are **added
-  back via explicit `[ pairs ]`** entries (state-resolved).
-
-Advantages: only a vsite + a few pairs per reacting atom (not a duplicated
-sidechain), and it can be **generated from the inter-residue bond definition**
-("detect vsites/pairs from the interbond") rather than hand-built — pushing more
-of disulfide/NOS into the shared core.
-
-Open details to work out: exact vsite construction (position/type) and the
-precise `[ pairs ]` set + their A/B parameters; how the vsite + pairs are
-serialized alongside `[ inter_bonds ]`; validation that the resulting ΔG matches
-the split-atom reference.
+**Why not virtual sites + `[ pairs ]`.** An alternative was considered: keep a
+single reacting atom, carry the free-state charge on a co-located zero-LJ virtual
+site (outside the bond graph, so not excluded), morph the charge onto the real
+atom in the bound state, and add back the excluded LJ via explicit state-resolved
+`[ pairs ]`. It is lighter on particle count, but it is **rejected**: it needs
+new, fiddly machinery (vsite construction records, a hand-tuned `[ pairs ]` set
+with A/B parameters, local exclusion bookkeeping) that is harder to validate and
+does not generalize. The dummy-clawback split reuses the core dummy mechanism and
+covers every bond-forming case uniformly, so it is strictly more general.
 
 ## Inter-residue bond serialization: `[ inter_bonds ]`
 
@@ -183,8 +180,7 @@ declares only participants + mode (`form`/`break`/`perma`/`decouple`).
 |---|---|
 | Target front ends + graph mapper + hybrid emit | ✅ |
 | Inter-residue bond formalism (`apply_bond_morph`, `[ inter_bonds ]`, consumer) | ✅ (disulfide / NOS / terminal) |
-| Split-atom disulfide/NOS *residues* | ❌ physics-required; shipped prebuilt |
-| Vsite + `[ pairs ]` generation (if adopted) | ✅ generatable from the bond morph |
+| Split-atom disulfide/NOS *residues* (`decouple`) | ✅ generated from the reacting-atom set; the shipped prebuilts are reproduced, not special |
 
 Terminal deletion forms **no** new bond, so it has no exclusion issue and folds
 into the core most directly (target → all-dummy, neighbour → cap dummies, plus a
@@ -197,7 +193,7 @@ into the core most directly (target → all-dummy, neighbour → cap dummies, pl
    bespoke `alchemy.py` functions (additive → validate byte-equivalence →
    remove).
 3. Terminal deletion through the core (no exclusions).
-4. Vsite + `[ pairs ]` generation for bond-forming (disulfide/NOS); validate ΔG
-   against the split-atom prebuilt reference. Keep split-atom prebuilt as the
-   fallback/reference.
+4. `decouple`-generated split residues for bond-forming (disulfide/NOS);
+   validate the generated hybrids reproduce the shipped split-atom prebuilts,
+   then generate rather than ship them.
 5. End-to-end examples per modification class; retire superseded code.
