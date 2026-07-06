@@ -386,7 +386,7 @@ def get_nuc_hybrid_resname(residue, new_nuc_name):
 
 def gen_hybrid_top(topol, recursive=True, verbose=False, scaleDih=1.0,
                    extra_mtp_files=None, supplement_bonded_files=None,
-                   inter_bonds=None, coords=None):
+                   inter_bonds=None):
     """Fills the bstate of a topology file containing pmx hybrid residues. This
     can be either a top or itp file. If the file contains other itp files via
     include statements, the function can iterate through them if the recursive
@@ -538,19 +538,14 @@ def gen_hybrid_top(topol, recursive=True, verbose=False, scaleDih=1.0,
         # also decouple all dihedrals with [CD and N] and [CB and Calpha] for proline
         _proline_dihedral_decouplings(pmxtop, rlist, rdic)
 
-        # All bond-forming cross-links (disulfide, NOS, and any MTP-declared
-        # cross-link) go through the one graph consumer below -- the bespoke
-        # resname detectors are retired.  Terminal deletion is a structural
-        # decoupling (depends on the runtime chain, not a named-atom bond), so
-        # it keeps its own detector, which already delegates to the unified
-        # apply_bond_morph(mode='decouple').
+        # Inter-residue cross-link bonds (disulfide, NOS, SONOS, ...) are formed
+        # from the user's gentop --bond declarations through the one graph
+        # consumer below -- no resname auto-detection.  Terminal deletion is a
+        # structural decoupling (depends on the runtime chain, not a named-atom
+        # bond), so it keeps its own detector, which already delegates to the
+        # unified apply_bond_morph(mode='decouple').
         _terminal_deletion_decouplings(pmxtop, rlist, verbose=verbose)
-        # load structure coords onto the topology atoms so distance-based
-        # [ inter_bonds ] rules can pair partners by proximity (gentop -c).
-        if coords is not None:
-            _load_coords_onto_topol(pmxtop, coords)
-        _apply_inter_bonds(pmxtop, rlist, rdic, verbose=verbose,
-                           explicit_bonds=inter_bonds)
+        _apply_inter_bonds(pmxtop, rlist, inter_bonds, verbose=verbose)
         return pmxtop
 
     # -------------
@@ -1182,61 +1177,6 @@ def _terminal_deletion_decouplings(topol, rlist, verbose=False):
         apply_bond_morph(topol, InterResidueBondMorph('decouple', interactions))
 
 
-def _load_coords_onto_topol(topol, coords):
-    """Copy coordinates from a structure onto the topology atoms (by index).
-
-    *coords* is a path to a GRO/PDB (or a Model).  The topology and structure
-    come from the same pdb2gmx run, so their atom orders match.  Coordinates are
-    stored in nm (GROMACS native) so distance cutoffs are in nm.
-    """
-    if isinstance(coords, str):
-        m = Model(coords, bPDBTER=True, rename_atoms=True)
-    else:
-        m = coords
-    matoms = m.atoms
-    if m.unity == 'a':          # Model reads PDB in A; store nm to match cutoffs
-        scale = 0.1
-    else:
-        scale = 1.0
-    if len(matoms) != len(topol.atoms):
-        raise RuntimeError(
-            "gentop -c: structure has %d atoms but topology has %d -- they must "
-            "come from the same pdb2gmx run" % (len(matoms), len(topol.atoms)))
-    for ta, ma in zip(topol.atoms, matoms):
-        ta.x = [c * scale for c in ma.x]
-
-
-def _resolve_inter_partners(rlist, self_res, self_atom, partner_name,
-                            cutoff=None):
-    """Partner atoms named *partner_name* on residues other than *self_res*.
-
-    - **No cutoff:** the unique match (a list of length 0 or 1); raises on >1
-      candidate -- an ambiguous multi-cross-link that needs either a cutoff on
-      the ``[ inter_bonds ]`` rule or an explicit ``gentop --bond``.
-    - **With cutoff (nm):** every candidate within *cutoff* of *self_atom* by
-      coordinates -- so one reactive atom binds several neighbours (e.g. a SONOS
-      nitrogen bonding its two nearby cysteine oxygens) while distant residues
-      are excluded.  Requires coordinates on the atoms (gentop ``-c``).  Note the
-      cutoff is a *disambiguation radius* ("which partner is near"), not the bond
-      length: in the free/reduced starting state the reacting atoms are several A
-      apart, so it must be generous (~0.6-0.9 nm).
-    """
-    hits = [a for r in rlist if r is not self_res
-            for a in r.atoms if a.name == partner_name]
-    if cutoff is not None:
-        import numpy as np
-        sx = np.array(self_atom.x, dtype=float)
-        return [a for a in hits
-                if np.linalg.norm(np.array(a.x, dtype=float) - sx) <= cutoff]
-    if len(hits) > 1:
-        raise RuntimeError(
-            "ambiguous [ inter_bonds ] partner '%s' on %s: %d candidates; add a "
-            "cutoff to the rule (with gentop -c) or pass an explicit "
-            "gentop --bond r1:atom-r2:atom" % (partner_name, self_res.resname,
-                                               len(hits)))
-    return hits
-
-
 def _find_topol_atom(rlist, resid, chain, atom_name):
     """Locate an atom by (resid, chain, name) in the parsed topology residues.
 
@@ -1255,51 +1195,24 @@ def _find_topol_atom(rlist, resid, chain, atom_name):
     return None
 
 
-# Forming-bond recipes for the shipped legacy cross-link hybrids (disulfide
-# C2CD/D2DC, NOS K2KN/O2KN).  Newly generated hybrids instead carry their own
-# [ inter_bonds ] section in the MTP; this small declarative table covers the
-# pre-existing residues across every force field without editing each FF's data.
-# It replaces the former bespoke detectors _add_disulfide_bonded_terms /
-# _add_nos_bonded_terms -- same forming bonds, now driven through the one graph
-# consumer below.  Only the NOS lysine declares the bond (its partner OD2 lives
-# on the paired Cys, resolved by name).
-_LEGACY_INTER_BONDS = {
-    "C2CD": [{"mode": "form", "self": "SG2", "partner": "SG2"}],
-    "D2DC": [{"mode": "form", "self": "SG2", "partner": "SG2"}],
-    "K2KN": [{"mode": "form", "self": "NZ2", "partner": "OD2"}],
-    "O2KN": [{"mode": "form", "self": "NZ2", "partner": "OD2"}],
-}
+def _apply_inter_bonds(topol, rlist, explicit_bonds, verbose=False):
+    """Form the user-declared inter-residue cross-link bonds (``gentop --bond``).
 
+    Each bond is a pair of atoms named by ``(resid, chain, atom)``.  The reacting
+    residues must already be clawed back into their dual-topology split (via
+    ``pmx mutate --react`` or a shipped split hybrid) so the bond lands on a
+    state-A dummy branch and its 1-4 exclusions are harmless.  The induced angles
+    and dihedrals follow from the union bond graph -- the same rule GROMACS uses
+    to generate bonded terms from bonds -- emitted in dual (A/B) state form
+    (:func:`pmx.covalent.edit.induced_bond_morph`).
 
-def _apply_inter_bonds(topol, rlist, rdic, verbose=False, explicit_bonds=None):
-    """Apply declarative ``[ inter_bonds ]`` cross-residue bond-morphs.
-
-    For every hybrid residue whose MTP entry carries an ``[ inter_bonds ]``
-    section (or, for the shipped legacy hybrids, a :data:`_LEGACY_INTER_BONDS`
-    recipe), resolve the forming bond (self atom in this residue, partner atom in
-    another participating residue) against the parsed topology, derive the
-    induced angles/dihedrals from the union bond graph (the same rule GROMACS
-    uses to generate bonded terms from bonds -- see
-    :func:`pmx.covalent.edit.induced_bond_morph`), and apply the dual-state
-    morph.
-
-    This is the single, chemistry-agnostic path for all cross-links: it replaces
-    the former bespoke resname-keyed detectors (disulfide / NOS) -- any
-    cross-link, whether it declares its bond in the MTP or is a known legacy
-    hybrid, is handled here with no per-chemistry code.
+    This is the single, chemistry-agnostic way an inter-residue bond is added:
+    the user names the atom pair, nothing is auto-detected by residue name.
+    (A resname->default-bond recognition layer could sit on top of this later.)
     """
-    from .covalent.edit import induced_bond_morph, apply_bond_morph
-
-    decls = []
-    for r in rlist:
-        entry = rdic.get(r.resname)
-        spec = getattr(entry[0], 'inter_bonds', None) if entry else None
-        if not spec:                                    # legacy shipped hybrids
-            spec = _LEGACY_INTER_BONDS.get(r.resname)
-        if spec:
-            decls.append((r, spec))
-    if not decls and not explicit_bonds:
+    if not explicit_bonds:
         return
+    from .covalent.edit import induced_bond_morph, apply_bond_morph
 
     # union bond graph over the parsed topology (Atom-object adjacency)
     adjacency = {}
@@ -1308,62 +1221,35 @@ def _apply_inter_bonds(topol, rlist, rdic, verbose=False, explicit_bonds=None):
         adjacency.setdefault(a1, set()).add(a2)
         adjacency.setdefault(a2, set()).add(a1)
 
-    # 1. resolve every declared forming bond to its two topology atoms
-    applied = set()   # dedup by the pair of bonded atom ids (symmetric decls)
-    forming = []      # (self_atom, partner_atom, mode)
-
-    def _add(self_atom, partner_atom, mode):
-        key = frozenset((self_atom.id, partner_atom.id))
-        if key in applied:
-            return
-        applied.add(key)
-        forming.append((self_atom, partner_atom, mode))
-
-    for r, spec in decls:
-        by_name = {a.name: a for a in r.atoms}
-        for seed in spec:
-            self_atom = by_name.get(seed['self'])
-            if self_atom is None:
-                raise RuntimeError("[ inter_bonds ] %s: residue has no atom %s"
-                                   % (r.resname, seed['self']))
-            # a cutoff on the rule -> distance disambiguation (bind every partner
-            # within the radius); otherwise the unique name match.
-            partners = _resolve_inter_partners(
-                rlist, r, self_atom, seed['partner'], cutoff=seed.get('cutoff'))
-            for partner_atom in partners:
-                _add(self_atom, partner_atom, seed['mode'])
-
-    # explicit gentop --bond pairs: deterministic override/addition, resolved by
-    # (resid, chain, atom) -- the reliable path when reacting atoms are too far
-    # apart for a distance radius (alchemical formation) or to force a pairing.
-    for eb in (explicit_bonds or []):
+    # resolve each --bond pair to its two topology atoms (plain name -> *2 branch)
+    applied, forming = set(), []
+    for eb in explicit_bonds:
         a = _find_topol_atom(rlist, eb['resid_a'], eb.get('chain_a'), eb['atom_a'])
         b = _find_topol_atom(rlist, eb['resid_b'], eb.get('chain_b'), eb['atom_b'])
         if a is None or b is None:
             raise RuntimeError(
                 "gentop --bond: could not resolve %s:%s or %s:%s in the topology"
                 % (eb['resid_a'], eb['atom_a'], eb['resid_b'], eb['atom_b']))
-        _add(a, b, eb.get('mode', 'form'))
+        key = frozenset((a.id, b.id))
+        if key in applied:
+            continue
+        applied.add(key)
+        forming.append((a, b, eb.get('mode', 'form')))
 
-    if not forming:
-        return
-
-    # 2. add ALL forming edges to the graph *before* enumerating, so induced
-    #    terms shared between bonds (e.g. an OD-NZ-OD' angle in a SONOS bridge,
-    #    where two forming bonds meet at the same nitrogen) are generated.
+    # add all forming edges to the graph *before* enumerating, so terms shared
+    # between bonds (a SONOS ODa-NZ-ODb cross-angle, both bonds meeting at NZ)
+    # are generated.
     for a, b, _ in forming:
         adjacency.setdefault(a, set()).add(b)
         adjacency.setdefault(b, set()).add(a)
 
-    # 3. one induced_bond_morph per mode (its internal dedup then covers the
-    #    cross-bond terms), applied to the topology.
     by_mode = {}
     for a, b, mode in forming:
         by_mode.setdefault(mode, []).append((a, b))
     for mode, bonds in by_mode.items():
         morph = induced_bond_morph(bonds, adjacency, mode=mode)
         if verbose:
-            print('log_> [ inter_bonds ] %d bond(s) mode=%s -> %d terms'
+            print('log_> gentop --bond: %d bond(s) mode=%s -> %d terms'
                   % (len(bonds), mode, len(morph.interactions)))
         apply_bond_morph(topol, morph)
 

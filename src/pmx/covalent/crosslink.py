@@ -231,21 +231,19 @@ def _backbone_impropers(atom_map):
 
 
 def emit_crosslink_mtp(atoms: List[Atom], resname: str,
-                       resnA: str, resnB: str, inter_bonds=None) -> str:
+                       resnA: str, resnB: str) -> str:
     """Emit the split-atom cross-link residue as MTP text (reuses _make_mtp).
 
-    Emits [ morphes ]/[ atoms ]/[ coords ] plus the common backbone impropers,
-    and -- when *inter_bonds* is given -- an ``[ inter_bonds ]`` section listing
-    the cross-residue bonds this residue forms as ``(mode, self, partner)``
-    tuples (``gen_hybrid_top`` derives the induced angles/dihedrals at apply
-    time).
+    Emits [ morphes ]/[ atoms ]/[ coords ] plus the common backbone impropers.
+    The inter-residue bond is not part of the residue definition -- it is
+    declared by the user at gentop (``pmx gentop --bond``).
     """
     from ..nsaa import _make_mtp
     for i, a in enumerate(atoms, 1):
         a.id = i
     r = _SplitResidue(atoms, resname, resnA, resnB)
     ii = _backbone_impropers({a.name: a for a in atoms})
-    return "".join(_make_mtp(r, ii, [], rotations=None, inter_bonds=inter_bonds))
+    return "".join(_make_mtp(r, ii, [], rotations=None))
 
 
 def emit_crosslink_rtp(atoms: List[Atom], bonds, resname: str,
@@ -276,13 +274,11 @@ def emit_crosslink_rtp(atoms: List[Atom], bonds, resname: str,
 
 
 def build_crosslink_mtp(wt_res, bound_res, bond_atom_name: str,
-                        resname: str, boundary_depth: int = 2,
-                        inter_bonds=None) -> str:
+                        resname: str, boundary_depth: int = 2) -> str:
     """Walk + duplicate + emit: the split-atom cross-link hybrid as MTP text."""
     atoms, _bonds = build_split_residue(wt_res, bound_res, bond_atom_name,
                                         boundary_depth)
-    return emit_crosslink_mtp(atoms, resname, wt_res.resname, bound_res.resname,
-                              inter_bonds=inter_bonds)
+    return emit_crosslink_mtp(atoms, resname, wt_res.resname, bound_res.resname)
 
 
 def decouple(wt_res, bound_res, bond_atom_name: str, boundary_depth: int = 2):
@@ -374,10 +370,10 @@ def crosslink(model, resid1, resid2, ff, target1, target2=None,
     inter-residue bond lives on the bound branch -- a dummy in state A -- its
     GROMACS topological exclusions are harmless in the free state.
 
-    Nothing about the induced angles/dihedrals is written here: the emitted MTP
-    carries only an ``[ inter_bonds ]`` line (``mode self @partner``);
-    :func:`pmx.alchemy._apply_inter_bonds` derives the induced terms from the
-    union bond graph and resolves their force constants from the force field at
+    The inter-residue bond is not part of the residue definition: the user
+    declares it at gentop (``pmx gentop --bond``), and
+    :func:`pmx.alchemy._apply_inter_bonds` derives the induced angles/dihedrals
+    from the union bond graph, resolving force constants from the force field at
     ``gen_hybrid_top`` time.
 
     Parameters
@@ -463,16 +459,10 @@ def crosslink(model, resid1, resid2, ff, target1, target2=None,
     hybrid_name = sites[0]["name"]
 
     # The forming bond, in bound-branch (``*2``) naming.  It is declared once, on
-    # residue 1 (which owns the self atom): ``form <link1>2 @<link2>2``.  For a
-    # disulfide that is ``form SG2 @SG2``; for a NOS bridge ``form OD2 @NZ2``.
-    # gen_hybrid_top resolves the partner in the other residue and derives the
-    # induced angles/dihedrals from the graph.
-    seed = (mode, f"{link_atom1}2", f"{link_atom2}2")
-
     # 2. emit each distinct hybrid definition BEFORE placement -- emitting sets
     #    local atom ids/bonds, which model renumbering would otherwise clobber.
-    #    Homo cross-links (disulfide) share one entry; hetero ones (NOS: Cys vs
-    #    Lys) emit two.  The bond seed rides on residue 1's entry.
+    #    Homo cross-links (disulfide) share one entry; hetero ones (NOS) emit two.
+    #    The inter-residue bond is declared later at gentop (pmx gentop --bond).
     if write_files:
         fn_restypes = pmx_data_file("mutff/residuetypes.dat")
         emitted = set()
@@ -481,9 +471,8 @@ def crosslink(model, resid1, resid2, ff, target1, target2=None,
             if name in emitted:
                 continue
             emitted.add(name)
-            seeds = [seed] if i == 0 else None
             mtp_text = emit_crosslink_mtp(list(s["atoms"]), name,
-                                          s["resnA"], s["resnB"], inter_bonds=seeds)
+                                          s["resnA"], s["resnB"])
             rtp_text = emit_crosslink_rtp(list(s["atoms"]), s["bonds"], name,
                                           s["resnA"], s["resnB"], ff)
             _write_atp_fnb("atomtypes.atp", "ffnonbonded.itp",
@@ -519,25 +508,21 @@ def crosslink(model, resid1, resid2, ff, target1, target2=None,
 
 
 def decouple_mutate(model, resid, target, ff, react_atom, chain=None,
-                    boundary_depth=2, inter_bond=None, inplace=False,
+                    boundary_depth=2, inplace=False,
                     write_files=True, verbose=False):
     """Mutate one residue to a bound-state cross-link endpoint, with clawback.
 
     This is the per-residue half of a cross-link: it morphs *resid* to *target*
     (the reacted species, e.g. ``CN0``/``KN0``/``KS0``) AND splits the reacting
     sidechain (``react_atom``) into two branches so a forming inter-residue bond's
-    1-4 exclusions are harmless.  It does *not* form the bond -- that is applied
-    later (``gentop --bond``, or distance auto-detection).  A SONOS bridge is just
+    1-4 exclusions are harmless.  It does *not* form the bond -- that is declared
+    by the user later (``pmx gentop --bond``).  A SONOS bridge is just
     ``decouple_mutate`` on the Lys plus one on each Cys.
 
     Parameters
     ----------
     react_atom : str
         the reacting sidechain atom to split (``SG`` for Cys, ``NZ`` for Lys).
-    inter_bond : tuple, optional
-        ``(mode, self_atom, partner_atom[, cutoff])`` to serialize as an
-        ``[ inter_bonds ]`` rule for distance auto-detection.  Omit to rely on an
-        explicit ``gentop --bond`` instead (the deterministic path).
 
     Returns the generated hybrid residue name.
     """
@@ -567,9 +552,7 @@ def decouple_mutate(model, resid, target, ff, react_atom, chain=None,
     name = f"{resnA[:1]}2{target[:2]}"[:4]
 
     if write_files:
-        seeds = [inter_bond] if inter_bond else None
-        mtp_text = emit_crosslink_mtp(list(atoms), name, resnA, target,
-                                      inter_bonds=seeds)
+        mtp_text = emit_crosslink_mtp(list(atoms), name, resnA, target)
         rtp_text = emit_crosslink_rtp(list(atoms), bonds, name, resnA, target, ff)
         _write_atp_fnb("atomtypes.atp", "ffnonbonded.itp",
                        _SplitResidue(atoms, name, resnA, target), ffpath)

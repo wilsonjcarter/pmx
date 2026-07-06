@@ -18,7 +18,6 @@ Each morph carries a ``mode``:
 Force constants come from the force field at apply time (via
 ``topol.BondedParams``), exactly as the original routines did -- the morph
 only declares *which* atoms and interactions participate, not the numbers.
-This is what the ``[ inter_bonds ]`` MTP section will serialize.
 """
 
 from __future__ import annotations
@@ -108,38 +107,18 @@ class CovalentEdit:
         self.bond_morphs.append(morph)
         return self
 
-    def _inter_bond_seeds_for(self, atoms) -> List:
-        """The ``(mode, self, partner)`` seeds owned by *atoms*.
-
-        A bond is serialized on the residue holding its *first* atom, so each
-        forming bond is declared once; ``gen_hybrid_top`` resolves the partner
-        and derives the induced angles/dihedrals from the graph.
-        """
-        owned = set(id(a) for a in atoms)
-        seeds = []
-        for morph in self.bond_morphs:
-            for it in morph.interactions:
-                if it.kind != "bond":
-                    continue
-                a, b = it.atoms[0], it.atoms[1]
-                if id(a) in owned:
-                    seeds.append((morph.mode, a.name, b.name))
-        return seeds
-
     def emit(self) -> str:
         """MTP text for every residue of the edit (mutated and/or decoupled).
 
         The single emit path for single-residue *and* cross-link modifications.
-        Each decoupled residue serializes the inter-residue bonds it owns as an
-        ``[ inter_bonds ]`` section; ``gen_hybrid_top`` applies them (deriving the
-        induced angles/dihedrals from the graph) at B-state fill time.
+        The residues carry only their own (dual-state) definition; the
+        inter-residue bond is declared by the user at gentop (``pmx gentop
+        --bond``), not baked into the residue.
         """
         from .crosslink import emit_crosslink_mtp
         parts = [mtp for _, mtp in self.hybrids]
         for name, atoms, resnA, resnB in self.decoupled_render:
-            seeds = self._inter_bond_seeds_for(atoms)
-            parts.append(emit_crosslink_mtp(atoms, name, resnA, resnB,
-                                            inter_bonds=seeds or None))
+            parts.append(emit_crosslink_mtp(atoms, name, resnA, resnB))
         return "\n".join(parts)
 
 

@@ -1180,15 +1180,8 @@ def _make_rtp(r, ii_list: list, dihi_list: list,
 
 
 def _make_mtp(r, ii_list: list, dihi_list: list,
-              rotations=None, inter_bonds=None) -> List[str]:
-    """Generate MTP file content for the hybrid residue *r*.
-
-    *inter_bonds*, if given, is a list of ``(mode, self_atom, partner_atom)``
-    tuples describing the cross-residue bonds this residue forms.  Only the bond
-    and its mode are serialized as an ``[ inter_bonds ]`` section; the induced
-    angles/dihedrals are derived from the graph by ``gen_hybrid_top`` at apply
-    time (see :func:`pmx.covalent.edit.induced_bond_morph`).
-    """
+              rotations=None) -> List[str]:
+    """Generate MTP file content for the hybrid residue *r*."""
     mtp = [f'\n[ {r.resname} ] ; {r.resnA} -> {r.resnB}\n\n']
 
     mtp.append('\n[ morphes ]\n')
@@ -1217,18 +1210,6 @@ def _make_mtp(r, ii_list: list, dihi_list: list,
 
     _fmt('impropers', ii_list)
     _fmt('dihedrals', dihi_list)
-
-    if inter_bonds:
-        mtp.append('\n[ inter_bonds ]\n')
-        mtp.append('; mode   self-atom   partner-atom   [cutoff/nm]\n')
-        for seed in inter_bonds:
-            mode, self_atom, partner = seed[0], seed[1], seed[2]
-            cutoff = seed[3] if len(seed) > 3 else None
-            partner = partner if partner.startswith('@') else '@' + partner
-            line = f'  {mode:6} {self_atom:10} {partner:10}'
-            if cutoff is not None:
-                line += f' {cutoff:8.4f}'
-            mtp.append(line + '\n')
 
     if rotations:
         mtp.append('\n[ rotations ]\n')

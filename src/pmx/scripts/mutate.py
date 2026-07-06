@@ -473,14 +473,15 @@ different protonation states. Use the --resinfo flag to print the dictionary.
                         action='append',
                         default=None,
                         metavar='"r1[:atom]-r2[:atom]"',
-                        help='Form a bond-forming cross-link (disulfide/NOS/...) '
-                             'between two residues via the generative split-atom '
-                             '(decouple) engine, instead of a per-residue '
-                             'mutation. Spec: "r1:atom-r2:atom" (e.g. '
-                             '"32:SG-35:SG" for a Cys32-Cys35 disulfide); the '
-                             'atom defaults to SG. Repeat --bond for multiple '
-                             'cross-links. Use --bond-target to set the bound '
-                             'target residue(s) (default CYS2/CYX for SG-SG).')
+                        help='Disulfide shortcut: decouple (clawback) both '
+                             'residues of a cross-link in one spec, e.g. '
+                             '"32:SG-35:SG" mutates Cys32+Cys35 to CYS2 and '
+                             'splits their SG.  Equivalent to two --react '
+                             'mutations.  The bond itself is still declared at '
+                             'gentop (pmx gentop --bond "32:SG-35:SG"); this flag '
+                             'only prepares the split residues.  Repeatable; '
+                             'use --bond-target to override the bound target '
+                             '(default CYS2/CYX for SG-SG).')
     parser.add_argument('--bond-target',
                         dest='bond_target',
                         default=None,

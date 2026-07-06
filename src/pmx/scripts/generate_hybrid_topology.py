@@ -129,15 +129,6 @@ mutate, and after having passed that mutated structure through pdb2gmx.
                         'cross-boundary AMBER<->GAFF bonded terms and ITP-internal '
                         'GAFF terms needed when filling B states for NSAA hybrids.')
 
-    parser.add_argument('-c',
-                        metavar='coords',
-                        dest='coords',
-                        default=None,
-                        help='Structure (GRO/PDB from pdb2gmx) whose coordinates '
-                        'let distance-based [ inter_bonds ] rules pair cross-link '
-                        'partners by proximity.  Needed only for multi-cross-link '
-                        'auto-detection (e.g. SONOS); single cross-links resolve '
-                        'by name without it.')
     parser.add_argument('--bond',
                         dest='bond',
                         action='append',
@@ -218,8 +209,7 @@ def main(args):
                                      verbose=True, scaleDih=scaleDih,
                                      extra_mtp_files=args.extra_mtp,
                                      supplement_bonded_files=args.supplement_bonded,
-                                     inter_bonds=inter_bonds,
-                                     coords=args.coords)
+                                     inter_bonds=inter_bonds)
 
     # get the base path for the .itp file output
     basepath = os.path.abspath(outfile).rsplit('/',1)[0]
