@@ -46,7 +46,8 @@ def _is_classic_mutation(mut_resname):
 
 
 def mutate(m, mut_resid, mut_resname, ff, mut_chain=None,
-           refB=None, inplace=False, verbose=False, itp=None, structure=None):
+           refB=None, inplace=False, verbose=False, itp=None, structure=None,
+           generative=False):
     """Creates an hybrid structure file.
 
     Parameters
@@ -111,8 +112,11 @@ def mutate(m, mut_resid, mut_resname, ff, mut_chain=None,
         # mtp}.  Standard mutations, protonation changes and cross-links (CD/CN/
         # KN) keep the pre-built library path.
         from .covalent import ptm
+        # Detection funnel: a PTM alias, an --itp fragment, a target not shipped
+        # as a pre-built 20x20 hybrid, or an explicit --generative override all
+        # go through the generative engine; otherwise use the shipped hybrid.
         target = ptm.target_for(residue.resname, mut_resname)
-        if target is None and (itp is not None
+        if target is None and (itp is not None or generative
                                or not _is_classic_mutation(mut_resname)):
             target = mut_resname
         if target is not None:

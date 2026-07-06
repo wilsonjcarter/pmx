@@ -438,6 +438,13 @@ different protonation states. Use the --resinfo flag to print the dictionary.
                              'to override the default embedded geometry for a '
                              'generative (--itp or RTP) target.',
                         default=None)
+    parser.add_argument('--generative',
+                        dest='generative',
+                        help='Force the generative engine even for standard '
+                             'mutations that ship as pre-built hybrids (build '
+                             'the hybrid on the fly instead of using mutres.mtp).',
+                        default=False,
+                        action='store_true')
 
     args, unknown = parser.parse_known_args()
     check_unknown_cmd(unknown)
@@ -551,7 +558,8 @@ def main(args):
                    inplace=True,
                    verbose=True,
                    itp=args.itp,
-                   structure=args.structure)
+                   structure=args.structure,
+                   generative=args.generative)
 
     # if script not provided, interactive selection
     # ---------------------------------------------
