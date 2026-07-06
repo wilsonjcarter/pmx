@@ -525,7 +525,14 @@ def decouple_mutate(model, resid, target, ff, react_atom, chain=None,
         the reacting sidechain atom to split (``SG`` for Cys, ``NZ`` for Lys).
 
     Returns the generated hybrid residue name.
+
+    Raises
+    ------
+    ValueError
+        if the residue/atom selection is invalid, the residue is not a protein
+        residue, or the cross-link target is not in the force field.
     """
+    import warnings
     from copy import deepcopy
     from ..utils import list2file
     from ..library import pmx_data_file
@@ -540,12 +547,58 @@ def decouple_mutate(model, resid, target, ff, react_atom, chain=None,
     if m.unity == "nm":
         m.nm2a()
 
+    # fetch_residue raises a clear ValueError for a bad/ambiguous resid or chain
     wt = m.fetch_residue(idx=resid, chain=chain)
     resnA = wt.resname
+
+    # cross-links act on protein sidechains
+    if getattr(wt, "moltype", None) not in (None, "", "protein", "unknown"):
+        raise ValueError(
+            "pmx mutate --react: residue %s %d is '%s' (%s), but a cross-link "
+            "endpoint must be a protein residue." % (resnA, resid,
+                                                     wt.moltype, resnA))
+
     _assign_rtp_entries(wt, rtp, None)
     if not any(getattr(a, "bonds", None) for a in wt.atoms):
         attach_bonds_from_rtp(wt, ff)
-    bound = TargetResidue.from_rtp(target, ff).residue
+
+    # the reacting atom must exist in the residue being clawed back
+    if not any(a.name == react_atom for a in wt.atoms):
+        raise ValueError(
+            "pmx mutate --react: residue %s %d has no atom '%s' to react at. "
+            "Atoms present: %s" % (resnA, resid, react_atom,
+                                   ", ".join(a.name for a in wt.atoms)))
+
+    # a hydrogen-free WT leaves polar/backbone H as appearing dummies, which
+    # pdb2gmx rejects (dangling improper) -- warn up front, as covalent.mutate does
+    if not any(_element_of(a) == "H" for a in wt.atoms):
+        warnings.warn(
+            "pmx mutate --react: residue %s %d has no hydrogens -- the structure "
+            "appears unprotonated; the hybrid's polar/backbone hydrogens become "
+            "dummies and pdb2gmx will reject a dangling improper. Protonate the "
+            "structure first (e.g. run gmx pdb2gmx on the WT and mutate that)."
+            % (resnA, resid), stacklevel=2)
+
+    # build the bound-state target; a missing residue is the endpoint-construction
+    # gap (the bound species that defines the clawed-back branch).
+    try:
+        bound = TargetResidue.from_rtp(target, ff).residue
+    except KeyError as e:
+        raise ValueError(
+            "pmx mutate --react: cross-link target '%s' is not in force field "
+            "'%s'. The bound-state residue must exist before you can react into "
+            "it -- e.g. CYS2/CYX for a disulfide. For NOS/SONOS/thioether, "
+            "construct and ship the endpoint residue first (see CN0/KN0/KS0)."
+            % (target, ff)) from e
+
+    # the reacting atom must have a bound-state counterpart to split into
+    if not any(a.name == react_atom for a in bound.atoms):
+        raise ValueError(
+            "pmx mutate --react: reacting atom '%s' is absent from the bound "
+            "target '%s' (its atoms: %s) -- the clawback has no bound branch to "
+            "split into." % (react_atom, target,
+                             ", ".join(a.name for a in bound.atoms)))
+
     _assign_mass_atp(wt, bound, os.path.join(ffpath, "atomtypes.atp"))
     _superpose_by_name(bound, wt)
     amap, atoms, bonds = decouple(wt, bound, react_atom, boundary_depth)

@@ -254,6 +254,33 @@ def test_crosslink_places_split_residue_in_model():
         assert all(a.m > 0 for a in r.atoms)
 
 
+def test_decouple_mutate_rejects_bad_react_atom():
+    """A reacting atom absent from the residue is a clear ValueError."""
+    from pmx.covalent import decouple_mutate
+    m = _two_residue_model("CYS")
+    with pytest.raises(ValueError, match="no atom 'ZZ'"):
+        decouple_mutate(m, 1, "CYS2", FF, react_atom="ZZ",
+                        inplace=True, write_files=False)
+
+
+def test_decouple_mutate_rejects_missing_target():
+    """A cross-link target not in the force field points at endpoint construction."""
+    from pmx.covalent import decouple_mutate
+    m = _two_residue_model("CYS")
+    with pytest.raises(ValueError, match="not in force field"):
+        decouple_mutate(m, 1, "NOPE", FF, react_atom="SG",
+                        inplace=True, write_files=False)
+
+
+def test_decouple_mutate_rejects_atom_missing_from_target():
+    """The reacting atom must have a bound-state counterpart to split into."""
+    from pmx.covalent import decouple_mutate
+    m = _two_residue_model("CYS")
+    with pytest.raises(ValueError, match="absent from the bound target"):
+        decouple_mutate(m, 1, "ALA", FF, react_atom="SG",
+                        inplace=True, write_files=False)
+
+
 def test_split_bonds_names_bound_only_bridging_atom():
     """A target-only bridging atom (e.g. a NOS/sulfenyl OD) is a branch-2 atom.
 
