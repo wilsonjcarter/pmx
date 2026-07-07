@@ -1071,7 +1071,12 @@ def _find_topol_atom(rlist, resid, chain, atom_name):
         if chain and getattr(r, 'chain_id', '') not in ('', None, chain):
             continue
         by = {a.name: a for a in r.atoms}
-        for cand in (atom_name + '2', atom_name):
+        # Try the exact name first (a ligand/partner atom named e.g. "C1"), then
+        # the bound-branch split name ("SG" -> "SG2").  Split hybrid residues have
+        # no plain reacting-atom name (only X1/X2), so a disulfide/NOS "SG"/"NZ"
+        # still falls through to SG2/NZ2; but a covalent-inhibitor ligand atom
+        # "C1" resolves to itself instead of grabbing an aromatic "C12".
+        for cand in (atom_name, atom_name + '2'):
             if cand in by:
                 return by[cand]
     return None
@@ -1103,11 +1108,16 @@ def _apply_inter_bonds(topol, rlist, explicit_bonds, verbose=False):
         adjacency.setdefault(a1, set()).add(a2)
         adjacency.setdefault(a2, set()).add(a1)
 
-    # resolve each --bond pair to its two topology atoms (plain name -> *2 branch)
+    # resolve each --bond pair to its two topology atoms (plain name -> *2 branch).
+    # Search ALL residues of this molecule, not just the clawed-back hybrids: a
+    # targeted-covalent-inhibitor bond joins a hybrid Cys to a NON-hybrid ligand
+    # residue, which is absent from the hybrid-only rlist.  A bond belonging to
+    # another chain still has neither endpoint here and is skipped below.
+    all_res = getattr(topol, 'residues', None) or rlist
     applied, forming = set(), []
     for eb in explicit_bonds:
-        a = _find_topol_atom(rlist, eb['resid_a'], eb.get('chain_a'), eb['atom_a'])
-        b = _find_topol_atom(rlist, eb['resid_b'], eb.get('chain_b'), eb['atom_b'])
+        a = _find_topol_atom(all_res, eb['resid_a'], eb.get('chain_a'), eb['atom_a'])
+        b = _find_topol_atom(all_res, eb['resid_b'], eb.get('chain_b'), eb['atom_b'])
         if a is None and b is None:
             # Neither endpoint is in this molecule -- the bond belongs to another
             # chain (e.g. the protein in a doublebox; this rlist is the reference
