@@ -154,6 +154,8 @@ def _upsert_entry(path: str, name: str, entry_text: str, header: str = "") -> No
 
 def build_hybrid_residue(residue1, residue2, ff: str, mut_resname: str,
                          term: Optional[str] = None,
+                         term_b: Optional[str] = "__same__",
+                         hybrid_name: Optional[str] = None,
                          write_ff_types: bool = True) -> Tuple[str, str, str]:
     """Build a hybrid residue from two parameterized residues via graph mapping.
 
@@ -162,10 +164,18 @@ def build_hybrid_residue(residue1, residue2, ff: str, mut_resname: str,
     residue can be prepared with :func:`_assign_rtp_entries` +
     :func:`attach_bonds_from_rtp`).
 
+    *term* patches state A's RTP bonded terms; *term_b* patches state B's (it
+    defaults to *term*, so a plain mutation passes only *term*).  A terminal
+    deletion's neighbour is the asymmetric case ``term=None, term_b='C'|'N'`` --
+    an internal residue in state A that becomes a terminus in state B.
+    *hybrid_name* overrides the generated ``X2Y`` name (e.g. ``VdeC``).
+
     Returns ``(rtp_text, mtp_text, hybrid_name)``.  If *write_ff_types*, new
     ``DUM_`` atom types are appended to the force field's ``atomtypes.atp`` /
     ``ffnonbonded.itp``.
     """
+    if term_b == "__same__":
+        term_b = term
     rtp, ffpath = _load_rtp(ff)
     bCharmm = "charmm" in ff
 
@@ -206,7 +216,7 @@ def build_hybrid_residue(residue1, residue2, ff: str, mut_resname: str,
     entr1 = _rtp_terminal(rtp[residue1.resname], term) if term \
         else rtp[residue1.resname]
     if residue2.resname in rtp:
-        entr2 = _rtp_terminal(rtp[residue2.resname], term) if term \
+        entr2 = _rtp_terminal(rtp[residue2.resname], term_b) if term_b \
             else rtp[residue2.resname]
     else:
         entr2 = {"atoms": [], "bonds": [], "diheds": [], "improps": [], "cmap": []}
@@ -223,8 +233,10 @@ def build_hybrid_residue(residue1, residue2, ff: str, mut_resname: str,
     bond_neigh = _inter_residue_bonds(rtp, residue1.resnA if hasattr(
         residue1, "resnA") else residue1.resname, term)
 
-    one_letter = library._one_letter.get(residue1.resname, residue1.resname[0])
-    hybrid_name = (one_letter + "2" + mut_resname.upper())[:4]
+    if hybrid_name is None:
+        one_letter = library._one_letter.get(residue1.resname,
+                                              residue1.resname[0])
+        hybrid_name = (one_letter + "2" + mut_resname.upper())[:4]
     residue1.resnA, residue1.resnB = residue1.resname, mut_resname
     residue1.set_resname(hybrid_name)
 
@@ -295,8 +307,44 @@ def _build_target_residue(target, ff, rtp, term, residue1,
             attach_bonds_from_rtp(residue2, ff)
         return residue2
 
-    # default: parameters + embedded geometry from the RTP entry
-    return TargetResidue.from_rtp(target, ff).residue
+    # default: parameters + embedded geometry from the RTP entry.  When the
+    # residue sits at a terminus, build the target in its terminal-patched form
+    # too -- otherwise the WT (terminal) morphs to an internal target and the
+    # terminus charge (e.g. the N-terminal +1) is lost in state B.
+    return TargetResidue.from_rtp(target, ff, term=term).residue
+
+
+# ── hybrid accumulation (single per-force-field nsaa.rtp / nsaa.mtp) ───────────
+
+def _accumulate_hybrid(ffpath, hybrid_name, rtp_text, mtp_text, bCharmm):
+    """Upsert an engine-built hybrid into the force field's nsaa.{rtp,mtp}.
+
+    All generative hybrids -- point mutations, PTMs, cross-link endpoints and
+    terminal-deletion neighbours alike -- accumulate into single per-force-field
+    files (mirroring the mutres.rtp/mutres.mtp convention) rather than scattering
+    one file per hybrid.  pdb2gmx globs ``*.rtp`` in the FF dir and gen_hybrid_top
+    reads multi-entry MTPs, so a single file serves both.  Re-building a hybrid
+    replaces its entry.
+    """
+    rtp_header, rtp_entry = _split_rtp_header(rtp_text, hybrid_name)
+    _upsert_entry(os.path.join(ffpath, "nsaa.rtp"), hybrid_name, rtp_entry,
+                  header=rtp_header)
+    _upsert_entry(os.path.join(ffpath, "nsaa.mtp"), hybrid_name, mtp_text)
+    if bCharmm:
+        # generic atom-renaming spec (constant content) -- write once
+        arn = os.path.join(ffpath, "nsaa.arn")
+        if not os.path.isfile(arn):
+            list2file([_ARN_CONTENT], arn)
+    fn_restypes = pmx_data_file("mutff/residuetypes.dat")
+    existing = _get_residue_types(fn_restypes)
+    if hybrid_name not in existing:
+        # residuetypes.dat may lack a trailing newline; GROMACS rejects a
+        # merged line, so ensure the previous entry is terminated first.
+        need_nl = (os.path.isfile(fn_restypes)
+                   and os.path.getsize(fn_restypes) > 0
+                   and open(fn_restypes, "rb").read()[-1:] != b"\n")
+        with open(fn_restypes, "a" if os.path.isfile(fn_restypes) else "w") as f:
+            f.write(("\n" if need_nl else "") + f"{hybrid_name:<6} Protein\n")
 
 
 # ── model-level mutate ────────────────────────────────────────────────────────
@@ -387,33 +435,112 @@ def mutate(model, mut_resid: int, target: str, ff: str,
         residue1, residue2, ff, target, term=term, write_ff_types=write_files)
 
     if write_files:
-        # Accumulate all engine-built hybrids into single per-force-field files
-        # (nsaa.rtp / nsaa.mtp), mirroring the mutres.rtp/mutres.mtp convention,
-        # instead of scattering one file per hybrid.  pdb2gmx globs *.rtp in the
-        # FF dir, and gen_hybrid_top reads multi-entry MTPs -- so a single file
-        # works for both.  Re-mutating a hybrid replaces its entry.
-        rtp_header, rtp_entry = _split_rtp_header(rtp_text, hybrid_name)
-        _upsert_entry(os.path.join(ffpath, "nsaa.rtp"), hybrid_name, rtp_entry,
-                      header=rtp_header)
-        _upsert_entry(os.path.join(ffpath, "nsaa.mtp"), hybrid_name, mtp_text)
-        if bCharmm:
-            # generic atom-renaming spec (constant content) -- write once
-            arn = os.path.join(ffpath, "nsaa.arn")
-            if not os.path.isfile(arn):
-                list2file([_ARN_CONTENT], arn)
-        fn_restypes = pmx_data_file("mutff/residuetypes.dat")
-        existing = _get_residue_types(fn_restypes)
-        if hybrid_name not in existing:
-            # residuetypes.dat may lack a trailing newline; GROMACS rejects a
-            # merged line, so ensure the previous entry is terminated first.
-            need_nl = (os.path.isfile(fn_restypes)
-                       and os.path.getsize(fn_restypes) > 0
-                       and open(fn_restypes, "rb").read()[-1:] != b"\n")
-            with open(fn_restypes, "a" if os.path.isfile(fn_restypes) else "w") as f:
-                f.write(("\n" if need_nl else "") + f"{hybrid_name:<6} Protein\n")
+        _accumulate_hybrid(ffpath, hybrid_name, rtp_text, mtp_text, bCharmm)
 
     if verbose:
         print(f"log_> covalent.mutate: hybrid {hybrid_name} "
               f"({residue1.resnA} -> {target}); "
               f"MTP -> {os.path.join(ffpath, 'nsaa.mtp')}")
     return hybrid_name
+
+
+# ── terminal deletion (a residue morph through the same core) ──────────────────
+
+def _term_del_code(resname: str) -> str:
+    """One-letter code for the deletion-neighbour hybrid name (``V`` -> ``VdeC``).
+
+    Uses ``library._ext_one_letter`` -- the canonical map that already
+    disambiguates the isosteric residue-name collisions (HSD->H, HSE->X,
+    HSP->Z, CYM->CM), and from which ``library._term_deletion_residues`` (the
+    recognised XdeC/XdeN protein-residue set) is derived -- so a generated name
+    is guaranteed to be recognised and never collides across variants.
+    """
+    return library._ext_one_letter.get(resname,
+                                        library._one_letter.get(resname,
+                                                                resname[0]))
+
+
+def delete_terminal(model, del_resid: int, ff: str,
+                    del_chain: Optional[str] = None, inplace: bool = False,
+                    write_files: bool = True, verbose: bool = False):
+    """Alchemically delete a terminal residue, composed from the core engine.
+
+    A terminal deletion is two residue morphs plus a boundary decouple:
+
+    * the **neighbour** (n-1 for a C-terminal deletion, n+1 for an N-terminal)
+      morphs from an internal residue to a terminus -- an ordinary
+      ``build_hybrid_residue`` graph map of ``internal -> terminal`` (the
+      terminal state built by ``TargetResidue.from_rtp(..., term=...)``), so it
+      grows the terminus cap atom (``OT2`` / extra amide H's) as an appearing
+      dummy and retypes the backbone.  Emitted as the ``XdeC``/``XdeN`` hybrid.
+    * the **target** residue becomes all-dummy in state B (done at gen_hybrid_top,
+      which also decouples the boundary dihedrals).
+
+    This replaces the bespoke ``alchemy.apply_terminal_deletion`` +
+    ``scripts.generate_term_deletion``: the neighbour hybrid is now generated on
+    the fly into ``nsaa.{rtp,mtp}`` like every other engine hybrid, rather than
+    pre-built per force field.
+    """
+    rtp, ffpath = _load_rtp(ff)
+    bCharmm = "charmm" in ff
+
+    m = model if inplace else deepcopy(model)
+    if m.unity == "nm":
+        m.nm2a()
+
+    del_res = m.fetch_residue(idx=del_resid, chain=del_chain)
+    chain = del_res.chain
+    residues = chain.residues
+    idx = residues.index(del_res)
+
+    is_c = del_res == chain.cterminus()
+    is_n = del_res == chain.nterminus()
+    if not (is_c or is_n):
+        raise ValueError(
+            "Terminal deletion requested but residue %s (%s) is not at a "
+            "terminus" % (del_res.id, del_res.resname))
+    if is_c:
+        if idx == 0:
+            raise ValueError("Cannot delete C-terminal residue: it is the only "
+                             "residue in the chain")
+        neighbor, term, suffix = residues[idx - 1], "C", "deC"
+    else:
+        if idx >= len(residues) - 1:
+            raise ValueError("Cannot delete N-terminal residue: it is the only "
+                             "residue in the chain")
+        neighbor, term, suffix = residues[idx + 1], "N", "deN"
+
+    # parameterize + bond the neighbour as an internal residue (state A)
+    _assign_rtp_entries(neighbor, rtp, None)
+    if not any(getattr(a, "bonds", None) for a in neighbor.atoms):
+        attach_bonds_from_rtp(neighbor, ff)
+
+    # state B: the same residue in its terminal-patched form (embedded geometry,
+    # superposed onto the neighbour's real coords -- the cap dummy rides along)
+    residue2 = TargetResidue.from_rtp(neighbor.resname, ff, term=term).residue
+
+    hybrid_name = _term_del_code(neighbor.resname) + suffix
+    rtp_text, mtp_text, hn = build_hybrid_residue(
+        neighbor, residue2, ff, neighbor.resname, term=None, term_b=term,
+        hybrid_name=hybrid_name, write_ff_types=write_files)
+
+    # The deleted residue is a WT -> all-dummy morph: every atom disappears in
+    # state B.  gen_hybrid_top applies that dummification structurally, but the
+    # backbone DUM_ types it introduces (e.g. DUM_NH1, never needed by an
+    # ordinary sidechain mutation) must be registered in the force field.  Build
+    # the all-dummy hybrid through the engine so _make_bstate_dummies +
+    # _write_atp_fnb register exactly those types -- the same mechanism every
+    # engine hybrid uses.
+    if write_files:
+        _assign_rtp_entries(del_res, rtp, term)
+        _make_bstate_dummies(del_res)
+        _write_atp_fnb("atomtypes.atp", "ffnonbonded.itp", del_res, ffpath)
+
+    if write_files:
+        _accumulate_hybrid(ffpath, hn, rtp_text, mtp_text, bCharmm)
+
+    if verbose:
+        print(f"log_> covalent.delete_terminal: {term}-terminal deletion of "
+              f"residue {del_res.id} ({del_res.resname}); neighbour "
+              f"{neighbor.id} -> hybrid {hn}")
+    return m if not inplace else hn

@@ -186,13 +186,45 @@ Terminal deletion forms **no** new bond, so it has no exclusion issue and folds
 into the core most directly (target → all-dummy, neighbour → cap dummies, plus a
 `decouple` morph over boundary dihedrals).
 
+**Implemented (`covalent.delete_terminal`).** A terminal deletion is now two
+residue morphs composed from the engine, with *no* bespoke machinery:
+
+* the **neighbour** morph (internal → terminus) is an ordinary
+  `build_hybrid_residue` graph map of `internal → terminal`, where the terminal
+  state is `TargetResidue.from_rtp(resname, term=…)` (the same
+  `nsaa._rtp_terminal` patch the NSAA path uses).  It grows the terminus cap
+  (`OT2` / extra amide H's) as an appearing dummy and retypes the backbone,
+  emitted as the `XdeC`/`XdeN` hybrid into `nsaa.{rtp,mtp}` like any other
+  mutation.  `build_hybrid_residue` gained `term_b`/`hybrid_name` so state A and
+  state B can carry different terminal patches under a chosen name.
+* the **target** morph (WT → all-dummy) is built through the same engine so
+  `_make_bstate_dummies` + `_write_atp_fnb` register the backbone `DUM_` types
+  (e.g. `DUM_NH1`) an ordinary sidechain mutation never introduces.
+  gen_hybrid_top applies the structural dummification and the boundary
+  `decouple` (via `apply_bond_morph`).
+
+This retired `scripts/generate_term_deletion.py` (the hand-authored per-force-
+field `XdeC`/`XdeN` generator) and `alchemy.apply_terminal_deletion` + its
+dummy-coordinate builders.  Charge bookkeeping was corrected so a wholly-
+dummified residue no longer aborts `Topology.write`: `get_hybrid_qA/qB` iterate
+*perturbed* residues (aligning `target_qB` with `write_atoms`), and the integer-
+charge correction skips a residue with no real atom to hold the residual.
+
+*Known limitation:* the split (`gentop --split`) legs still carry the neighbour
+backbone CMAP across the deleted `+N`, which the all-state-B `qon` leg rejects
+(`Unknown cmap torsion … DUM`).  The shipped example uses the dual-state
+topology (no `--split`), which is CMAP-clean; decoupling the boundary CMAP for
+the split legs is the remaining terminal-deletion item.
+
 ## Roadmap
 
 1. `[ inter_bonds ]` MTP section: format + parser + writer.
 2. `gen_hybrid_top` consumer applying `apply_bond_morph`; retire the three
    bespoke `alchemy.py` functions (additive → validate byte-equivalence →
    remove).
-3. Terminal deletion through the core (no exclusions).
+3. ~~Terminal deletion through the core (no exclusions).~~ ✅ done
+   (`covalent.delete_terminal`); remaining: boundary-CMAP decouple for the
+   `--split` legs.
 4. `decouple`-generated split residues for bond-forming (disulfide/NOS);
    validate the generated hybrids reproduce the shipped split-atom prebuilts,
    then generate rather than ship them.

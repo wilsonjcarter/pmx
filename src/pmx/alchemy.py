@@ -98,12 +98,17 @@ def mutate(m, mut_resid, mut_resname, ff, mut_chain=None,
     # get the correct mtp file
     mtp_file = get_mtp_file(residue, ff)
 
-    # Terminal residue deletion
+    # Terminal residue deletion -- a residue morph through the generative core:
+    # the neighbour morphs internal->terminus (an ordinary build_hybrid_residue
+    # graph map, emitted into nsaa.{rtp,mtp}), the target is dummified at
+    # gen_hybrid_top.  No pre-built XdeC/XdeN library, no bespoke structure prep.
     if mut_resname.upper() == 'DEL':
         if residue.moltype != 'protein':
             raise RuntimeError("Terminal deletion is only supported for "
                                "protein residues")
-        apply_terminal_deletion(m=m2, residue=residue, ff=ff, verbose=verbose)
+        from .covalent import delete_terminal
+        delete_terminal(m2, del_resid=mut_resid, ff=ff, del_chain=mut_chain,
+                        inplace=True, verbose=verbose)
     # Mutation if Protein
     elif residue.moltype == 'protein':
         # PTM aliases (P1/P2, me1/2/3), a direct PTM/NSAA target name, or an
@@ -112,11 +117,19 @@ def mutate(m, mut_resid, mut_resname, ff, mut_chain=None,
         # mtp}.  Standard mutations, protonation changes and cross-links (CD/CN/
         # KN) keep the pre-built library path.
         from .covalent import ptm
+        # A residue at a terminus also goes through the generative engine: it
+        # patches both states with the terminus (from_rtp(term=...)) and maps by
+        # graph, whereas the pre-built internal X2Y hybrids assume the internal
+        # backbone (HN, O) and fail on the terminal H1/H2/H3 / OT1/OT2.
+        chain = residue.chain
+        is_terminal = (residue == chain.cterminus()
+                       or residue == chain.nterminus())
         # Detection funnel: a PTM alias, an --itp fragment, a target not shipped
-        # as a pre-built 20x20 hybrid, or an explicit --generative override all
-        # go through the generative engine; otherwise use the shipped hybrid.
+        # as a pre-built 20x20 hybrid, a terminal residue, or an explicit
+        # --generative override all go through the generative engine; otherwise
+        # use the shipped hybrid.
         target = ptm.target_for(residue.resname, mut_resname)
-        if target is None and (itp is not None or generative
+        if target is None and (itp is not None or generative or is_terminal
                                or not _is_classic_mutation(mut_resname)):
             target = mut_resname
         if target is not None:
@@ -187,148 +200,6 @@ def apply_aa_mutation(m, residue, new_aa_name, mtp_file, refB=None,
     if verbose is True:
         print('log_> Inserted hybrid residue %s at position %s (chain %s)' %
               (hybrid_res.resname, str(hybrid_res.id), hybrid_res.chain_id))
-
-
-def _build_dummy_ot2_coords(residue):
-    """Place a dummy OT2 in the sp2 plane of the carboxylate, symmetric to O."""
-    C = np.array(residue['C'].x)
-    O = np.array(residue['O'].x)
-    CA = np.array(residue['CA'].x)
-    ca_c = C - CA
-    ca_c = ca_c / np.linalg.norm(ca_c)
-    c_o = O - C
-    proj = np.dot(c_o, ca_c) * ca_c
-    perp = c_o - proj
-    return list(C + proj - perp)
-
-
-def _build_dummy_nh3_coords(residue, n_protons=2):
-    """Build coordinates for dummy NH3+ protons on the N atom."""
-    import math
-    N = np.array(residue['N'].x)
-    CA = np.array(residue['CA'].x)
-    n_ca = CA - N
-    n_ca = n_ca / np.linalg.norm(n_ca)
-    bond_len = 1.02  # Angstrom
-
-    has_hn = residue.has_atom('HN') or residue.has_atom('H')
-    if has_hn:
-        try:
-            H = np.array(residue['HN'].x)
-        except Exception:
-            H = np.array(residue['H'].x)
-        n_h = H - N
-        n_h = n_h / np.linalg.norm(n_h)
-        rot120 = Rotation(N, N - n_ca)
-        rot240 = Rotation(N, N - n_ca)
-        h1_pos = N + n_h * bond_len
-        h2_pos = rot120.apply(list(h1_pos), 120.0)
-        h3_pos = rot240.apply(list(h1_pos), 240.0)
-        return [h2_pos, h3_pos]
-    else:
-        CD = np.array(residue['CD'].x)
-        n_cd = CD - N
-        n_cd = n_cd / np.linalg.norm(n_cd)
-        base = (n_ca + n_cd)
-        base = base / np.linalg.norm(base)
-        perp = np.cross(n_ca, n_cd)
-        perp = perp / np.linalg.norm(perp)
-        tet_angle = math.radians(109.5 / 2)
-        h1_dir = -base * math.cos(tet_angle) + perp * math.sin(tet_angle)
-        h2_dir = -base * math.cos(tet_angle) - perp * math.sin(tet_angle)
-        return [list(N + h1_dir * bond_len), list(N + h2_dir * bond_len)]
-
-
-def apply_terminal_deletion(m, residue, ff, verbose=False):
-    """Prepare structure for terminal residue deletion via alchemical FEP.
-
-    Modifies the neighbor residue (n-1 for C-terminal, n+1 for N-terminal)
-    by adding dummy atoms and renaming to the hybrid residue name. The
-    terminal residue itself is left unchanged; it will be fully dummified
-    later by gen_hybrid_top.
-    """
-    chain = residue.chain
-    chain_residues = chain.residues
-
-    res_idx = None
-    for i, r in enumerate(chain_residues):
-        if r == residue:
-            res_idx = i
-            break
-    if res_idx is None:
-        raise RuntimeError("Could not find residue in its chain")
-
-    is_cterm = (residue == chain.cterminus())
-    is_nterm = (residue == chain.nterminus())
-
-    if not is_cterm and not is_nterm:
-        raise RuntimeError("Terminal deletion requested but residue %d (%s) "
-                           "is not at a terminus" % (residue.id, residue.resname))
-
-    if is_cterm:
-        if res_idx == 0:
-            raise RuntimeError("Cannot delete C-terminal residue: it is the "
-                               "only residue in the chain")
-        neighbor = chain_residues[res_idx - 1]
-        neighbor_key = _convert_aa_name(neighbor.resname)
-        hybrid_name = neighbor_key + 'deC'
-
-        if verbose:
-            print('log_> C-terminal deletion: residue %d (%s)' %
-                  (residue.id, residue.resname))
-            print('log_> Neighbor residue %d (%s) -> %s' %
-                  (neighbor.id, neighbor.resname, hybrid_name))
-
-        dot2 = Atom(name='DOT2')
-        dot2.x = _build_dummy_ot2_coords(neighbor)
-        dot2.resname = hybrid_name
-        dot2.chain_id = neighbor.chain_id
-        dot2.occ = 1.0
-        dot2.bfac = 0.0
-        neighbor.append(dot2)
-
-        for atom in neighbor.atoms:
-            atom.resname = hybrid_name
-        neighbor.resname = hybrid_name
-
-        if verbose:
-            print('log_> Added dummy OT2 atom to residue %d, renamed to %s' %
-                  (neighbor.id, hybrid_name))
-
-    elif is_nterm:
-        if res_idx >= len(chain_residues) - 1:
-            raise RuntimeError("Cannot delete N-terminal residue: it is the "
-                               "only residue in the chain")
-        neighbor = chain_residues[res_idx + 1]
-        neighbor_key = _convert_aa_name(neighbor.resname)
-        hybrid_name = neighbor_key + 'deN'
-
-        if verbose:
-            print('log_> N-terminal deletion: residue %d (%s)' %
-                  (residue.id, residue.resname))
-            print('log_> Neighbor residue %d (%s) -> %s' %
-                  (neighbor.id, neighbor.resname, hybrid_name))
-
-        is_pro = (neighbor.resname == 'PRO')
-        dummy_coords = _build_dummy_nh3_coords(neighbor, n_protons=2)
-        dummy_names = ['DHN1', 'DHN2'] if is_pro else ['DH2', 'DH3']
-
-        for dname, dcoords in zip(dummy_names, dummy_coords):
-            datom = Atom(name=dname)
-            datom.x = dcoords
-            datom.resname = hybrid_name
-            datom.chain_id = neighbor.chain_id
-            datom.occ = 1.0
-            datom.bfac = 0.0
-            neighbor.append(datom)
-
-        for atom in neighbor.atoms:
-            atom.resname = hybrid_name
-        neighbor.resname = hybrid_name
-
-        if verbose:
-            print('log_> Added dummy protons to residue %d, renamed to %s' %
-                  (neighbor.id, hybrid_name))
 
 
 def apply_nuc_mutation(m, residue, new_nuc_name, mtp_file, verbose=False):
@@ -578,6 +449,17 @@ def gen_hybrid_top(topol, recursive=True, verbose=False, scaleDih=1.0,
                                     extra_mtp_files=extra_mtp_files,
                                     supplement_bonded_files=supplement_bonded_files)
             pmx_itps.append(pmx_itp)
+
+    # A --bond declaration is applied by whichever molecule owns both endpoints
+    # (see _apply_inter_bonds); flag any that no molecule/chain resolved (a typo
+    # or a wrong resid/chain), which per-molecule skipping would otherwise hide.
+    unresolved = [eb for eb in (inter_bonds or []) if not eb.get('_applied')]
+    if unresolved:
+        raise RuntimeError(
+            "gentop --bond: no molecule/chain contains both atoms of: "
+            + "; ".join("%s:%s-%s:%s" % (eb['resid_a'], eb['atom_a'],
+                                         eb['resid_b'], eb['atom_b'])
+                        for eb in unresolved))
 
     return pmx_top, pmx_itps
 
@@ -1226,10 +1108,21 @@ def _apply_inter_bonds(topol, rlist, explicit_bonds, verbose=False):
     for eb in explicit_bonds:
         a = _find_topol_atom(rlist, eb['resid_a'], eb.get('chain_a'), eb['atom_a'])
         b = _find_topol_atom(rlist, eb['resid_b'], eb.get('chain_b'), eb['atom_b'])
+        if a is None and b is None:
+            # Neither endpoint is in this molecule -- the bond belongs to another
+            # chain (e.g. the protein in a doublebox; this rlist is the reference
+            # peptide).  process_topol runs per-molecule, so skip here; the bond
+            # is applied when the molecule that owns both atoms is processed.  A
+            # bond never resolved by ANY molecule is caught by gen_hybrid_top's
+            # post-processing unresolved-bond check (eb['_applied']).
+            continue
         if a is None or b is None:
             raise RuntimeError(
-                "gentop --bond: could not resolve %s:%s or %s:%s in the topology"
+                "gentop --bond: could not resolve %s:%s or %s:%s in the topology "
+                "(one endpoint found, the other not -- an inter-residue bond must "
+                "lie within a single molecule/chain)"
                 % (eb['resid_a'], eb['atom_a'], eb['resid_b'], eb['atom_b']))
+        eb['_applied'] = True
         key = frozenset((a.id, b.id))
         if key in applied:
             continue

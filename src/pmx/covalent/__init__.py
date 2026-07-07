@@ -20,7 +20,7 @@ additively and will progressively host those pieces without changing behaviour.
 
 from .target import TargetResidue
 from .mapping import map_residues, ResidueMapping, attach_bonds_from_rtp
-from .mutate import mutate, build_hybrid_residue
+from .mutate import mutate, build_hybrid_residue, delete_terminal
 from .edit import (InterResidueBondMorph, Interaction,
                    apply_bond_morph, induced_bond_morph)
 from .crosslink import (walk_reacting_atoms, build_split_residue, decouple,
@@ -29,6 +29,7 @@ from . import ptm
 
 __all__ = ["TargetResidue", "map_residues", "ResidueMapping",
            "attach_bonds_from_rtp", "mutate", "build_hybrid_residue",
+           "delete_terminal",
            "InterResidueBondMorph", "Interaction",
            "apply_bond_morph", "induced_bond_morph",
            # cross-link (dual-topology) API

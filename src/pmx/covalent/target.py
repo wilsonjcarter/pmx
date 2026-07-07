@@ -161,6 +161,34 @@ def _rtp_atoms_bonds(resname: str, ff: str):
     return ffpath, resolved, atom_rows, intra_bonds
 
 
+def _terminal_patch(atom_rows, intra_bonds, term: str):
+    """Apply the force field's terminal patch to RTP ``atom_rows``/``bonds``.
+
+    Reuses :func:`pmx.nsaa._rtp_terminal` (the same patch the NSAA emit path
+    uses) so a terminal residue is built from one definition, then returns the
+    patched ``(atom_rows, intra_bonds)`` for embedding.  Only the atom and bond
+    lists are needed here (elements + connectivity); the terminal impropers are
+    resolved later, from the RTP, by :func:`build_hybrid_residue`.
+    """
+    from ..nsaa import _rtp_terminal
+    entr = {
+        "atoms": [list(r) for r in atom_rows],
+        "bonds": [list(b) for b in intra_bonds],
+        "diheds": [], "improps": [], "cmap": [],
+    }
+    entr = _rtp_terminal(entr, term)
+    seen, bonds = set(), []
+    for a1, a2 in entr["bonds"]:
+        if a1.startswith(("+", "-")) or a2.startswith(("+", "-")):
+            continue
+        key = frozenset((a1, a2))
+        if key in seen:
+            continue
+        seen.add(key)
+        bonds.append((a1, a2))
+    return entr["atoms"], bonds
+
+
 def _embed_coords(elements: List[str],
                   bonds: List[Tuple[int, int]],
                   seed: int = 0xC0DE) -> List[List[float]]:
@@ -249,6 +277,7 @@ class TargetResidue:
 
     @classmethod
     def from_rtp(cls, resname: str, ff: str, seed: int = 0xC0DE,
+                 term: Optional[str] = None,
                  verbose: bool = False) -> "TargetResidue":
         """Build a 3-D target residue from an RTP entry alone.
 
@@ -265,6 +294,11 @@ class TargetResidue:
             Force-field name (resolved via ``GMXLIB``/``get_ff_path``).
         seed : int
             RDKit embedding random seed (deterministic geometry).
+        term : {'N', 'C'}, optional
+            Build the residue in its terminal-patched form (adds the terminus
+            atoms and retypes/recharges the backbone via the force field's
+            terminal patch).  Used to express a terminal deletion's neighbour as
+            an ordinary internal->terminal residue morph.
         verbose : bool
             Print a short summary of the built residue.
 
@@ -273,6 +307,8 @@ class TargetResidue:
         TargetResidue
         """
         ffpath, resname, atom_rows, intra_bonds = _rtp_atoms_bonds(resname, ff)
+        if term:
+            atom_rows, intra_bonds = _terminal_patch(atom_rows, intra_bonds, term)
         masses = _load_atomtype_masses(ffpath)
 
         # RTPParser returns RTP-native names (the RTP files and the mutres

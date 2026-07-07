@@ -1173,17 +1173,25 @@ class TopolBase:
                         TR('State B has total charge of %g' % round(qB_tot, 5))
                         TR('Applying charge correction to ensure integer charges')
                     latom = _last_perturbed_atom(r)
-                    if verbose is True:
-                        TR('Selecting atom %d-%s (%s) as perturbed atom with highest order'
-                           % (latom.id, latom.name, latom.resname))
-                    newqB = latom.qqB-(qB_tot-target_chargeB)
-                    if verbose is True:
-                        TR('Changing chargeB of atom %s from %g to %g'
-                           % (latom.name, latom.qqB, newqB))
-                    latom.qqB = newqB
-                    qB_tot = sum(map(lambda a: a.qqB, r.atoms))
-                    if verbose is True:
-                        TR('New total charge of B-state is %g' % round(qB_tot, 5))
+                    if latom is None:
+                        # Wholly-dummified residue (terminal deletion target):
+                        # no real atom to carry the residual, B-charge is already
+                        # 0 by construction -- skip the correction.
+                        if verbose is True:
+                            TR('Residue %s is fully dummified; skipping charge '
+                               'correction (B-state charge is 0)' % r.resname)
+                    else:
+                        if verbose is True:
+                            TR('Selecting atom %d-%s (%s) as perturbed atom with highest order'
+                               % (latom.id, latom.name, latom.resname))
+                        newqB = latom.qqB-(qB_tot-target_chargeB)
+                        if verbose is True:
+                            TR('Changing chargeB of atom %s from %g to %g'
+                               % (latom.name, latom.qqB, newqB))
+                        latom.qqB = newqB
+                        qB_tot = sum(map(lambda a: a.qqB, r.atoms))
+                        if verbose is True:
+                            TR('New total charge of B-state is %g' % round(qB_tot, 5))
                 else:
                     if verbose is True:
                         TR('No corrections applied to ensure integer charges')
@@ -1622,13 +1630,20 @@ class TopolBase:
         return round(qB, 3)
 
     def get_hybrid_qA(self):
-        """Returns the charge of state A for hybrid residues only.
+        """Returns the charge of state A for perturbed residues only.
+
+        Iterates the same residues (in the same order) that
+        :meth:`write_atoms` pops ``target_qB`` for -- i.e. residues with
+        morphing atoms -- so the target-charge list aligns positionally.  This
+        is a superset of ``is_hybrid()`` residues: it also covers the
+        name-not-``X2Y`` cases such as a terminal deletion's ``XdeC``/``XdeN``
+        neighbour and its fully-dummified target residue.
         """
         qA = []
         rlist = []
-        # identify hybrid residues
+        # identify perturbed residues (see write_atoms' _is_perturbed_residue)
         for res in self.residues:
-            if res.is_hybrid():
+            if _is_perturbed_residue(res):
                 rlist.append(res)
         # add all atom q of hybrid residues
         for r in rlist:
@@ -1639,13 +1654,16 @@ class TopolBase:
         return qA
 
     def get_hybrid_qB(self):
-        """Returns the charge of state B for hybrid residues only.
+        """Returns the charge of state B for perturbed residues only.
+
+        Mirrors :meth:`get_hybrid_qA`: iterates residues with morphing atoms so
+        the ``target_qB`` list aligns with :meth:`write_atoms`.
         """
         qB = []
         rlist = []
-        # identify hybrid residues
+        # identify perturbed residues
         for res in self.residues:
-            if res.is_hybrid():
+            if _is_perturbed_residue(res):
                 rlist.append(res)
         # add all atom q of hybrid residues
         for r in rlist:
@@ -2265,9 +2283,10 @@ def _last_perturbed_atom(r):
         if _atoms_morphe([atom]) and atom.name not in ['N', 'CA', 'C', 'O', 'H']:
             if not atom.atomtype.startswith('DUM') and not atom.atomtypeB.startswith('DUM'):
                 last_atom = atom
-    if last_atom is None:
-        print('Error: Could not find a perturbed atom to put rest charges on !', file=sys.stderr)
-        sys.exit(1)
+    # A wholly-dummified residue (e.g. a terminal-deletion target, every atom
+    # disappearing) has no real atom to carry a residual charge.  Its B-state
+    # charge is 0 by construction, so there is nothing to correct -- return None
+    # and let the caller skip the correction rather than abort the whole run.
     return last_atom
 
 

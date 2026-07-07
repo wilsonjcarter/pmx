@@ -34,6 +34,26 @@ def _morphes(mtp_text):
     return out
 
 
+def _atom_charges(mtp_text):
+    """Parse the [ atoms ] section into (chargeA, chargeB) per atom."""
+    out, inseg = [], False
+    for line in mtp_text.splitlines():
+        s = line.split(";")[0].strip()
+        if s.startswith("[ atoms"):
+            inseg = True
+            continue
+        if inseg and s.startswith("["):
+            break
+        f = s.split()
+        # name typeA chargeA cgnr massA typeB chargeB massB
+        if inseg and len(f) >= 7:
+            try:
+                out.append((float(f[2]), float(f[6])))
+            except ValueError:
+                pass
+    return out
+
+
 @pytest.fixture(scope="module")
 def hybrid():
     set_gmxlib()
@@ -74,37 +94,110 @@ def test_hydroxyl_h_disappears(hybrid):
     assert any("HG" in m[0] for m in gone), "hydroxyl H should disappear"
 
 
+def _tripeptide_model(resname):
+    """A 3-residue chain of *resname* so residue 2 is internal (not a terminus)."""
+    from copy import deepcopy
+    from pmx.model import Model
+    base = TargetResidue.from_rtp(resname, FF).residue
+    atoms, aid = [], 1
+    for ri in (1, 2, 3):
+        for a in base.atoms:
+            b = deepcopy(a)
+            b.id = aid
+            b.resnr = ri
+            b.chain_id = "A"
+            b.x = [a.x[0] + ri * 5.0, a.x[1], a.x[2]]
+            atoms.append(b)
+            aid += 1
+    return Model(atoms=atoms, renumber_residues=False)
+
+
 def test_mutate_from_structure_matches_rtp_path(tmp_path):
     """structure= (geometry from a PDB) yields the same hybrid as the default
-    RTP path -- only coordinates differ."""
+    RTP path -- only coordinates differ.  Uses an internal residue (residue 2 of
+    a tripeptide) so no terminal patch is involved."""
     from pmx.gmx import set_gmxlib
-    from pmx.model import Model
     from pmx.covalent import TargetResidue, mutate
     set_gmxlib()
-    ser = str(tmp_path / "ser.pdb")
     sep = str(tmp_path / "sep.pdb")
-    TargetResidue.from_rtp("SER", FF).write(ser)      # protonated WT
     TargetResidue.from_rtp("SEP", FF).write(sep)      # target geometry
 
-    m_def = Model(ser)
-    n_def = mutate(m_def, 1, "SEP", FF, inplace=True, write_files=False)
-    m_str = Model(ser)
-    n_str = mutate(m_str, 1, "SEP", FF, structure=sep,
+    m_def = _tripeptide_model("SER")
+    n_def = mutate(m_def, 2, "SEP", FF, inplace=True, write_files=False)
+    m_str = _tripeptide_model("SER")
+    n_str = mutate(m_str, 2, "SEP", FF, structure=sep,
                    inplace=True, write_files=False)
 
     assert n_def == n_str == "S2SE"
-    assert sorted(a.name for a in m_def.residues[0].atoms) == \
-        sorted(a.name for a in m_str.residues[0].atoms)
+    assert sorted(a.name for a in m_def.residues[1].atoms) == \
+        sorted(a.name for a in m_str.residues[1].atoms)
     # HN common (backbone) and phosphate present as dummies
-    assert any(a.name == "HN" for a in m_str.residues[0].atoms)
-    assert any(a.name == "DP" for a in m_str.residues[0].atoms)
+    assert any(a.name == "HN" for a in m_str.residues[1].atoms)
+    assert any(a.name == "DP" for a in m_str.residues[1].atoms)
 
 
-def test_itp_target_requires_structure():
+def test_terminal_mutation_routes_generative_and_conserves_charge(tmp_path):
+    """A residue at a terminus is mutated through the generative engine with the
+    terminus patched in both states -- a charge-neutral swap stays neutral."""
+    from pmx.gmx import set_gmxlib
+    from pmx.covalent import build_hybrid_residue
+    set_gmxlib()
+    # C-terminal ALA -> SER: both neutral, so state-A and state-B residue
+    # charges must match when both are built in terminal form.
+    r1 = TargetResidue.from_rtp("ALA", FF, term="C").residue
+    r2 = TargetResidue.from_rtp("SER", FF, term="C").residue
+    _, mtp, hn = build_hybrid_residue(r1, r2, FF, "SER", term="C",
+                                      write_ff_types=False)
+    qA = sum(m[0] for m in _atom_charges(mtp))
+    qB = sum(m[1] for m in _atom_charges(mtp))
+    assert round(qA) == round(qB)          # neutral -> neutral at the terminus
+    # the C-terminal carboxylate (OT2) is present, not an internal single O
+    names = [m[0] for m in _morphes(mtp)]
+    assert "OT2" in names or any(n.startswith("OT") for n in names)
+
+
+def test_terminal_neighbour_morph_cterm():
+    # A terminal deletion's neighbour is an internal->terminal residue morph:
+    # build_hybrid_residue(internal, terminal) via the same engine as any
+    # mutation, producing the C-terminus cap (C->CC, O->OT1, appearing OT2).
+    set_gmxlib()
+    r1 = TargetResidue.from_rtp("VAL", FF).residue
+    r2 = TargetResidue.from_rtp("VAL", FF, term="C").residue
+    _, mtp, hn = build_hybrid_residue(r1, r2, FF, "VAL", term=None,
+                                      term_b="C", hybrid_name="VdeC",
+                                      write_ff_types=False)
+    assert hn == "VdeC"
+    morphs = {m[0]: m for m in _morphes(mtp)}   # keyed by state-A atom name
+    # carbonyl C retypes C -> CC; O is renamed OT1 and retyped O -> OC
+    assert morphs["C"][3] == "CC"
+    assert morphs["O"][2] == "OT1" and morphs["O"][3] == "OC"
+    # the second carboxyl oxygen appears from a dummy in state B
+    appearing = [m for m in _morphes(mtp) if m[1].startswith("DUM")]
+    assert any(m[3] == "OC" for m in appearing)
+
+
+def test_terminal_neighbour_morph_nterm_adds_two_protons():
+    set_gmxlib()
+    r1 = TargetResidue.from_rtp("ALA", FF).residue
+    r2 = TargetResidue.from_rtp("ALA", FF, term="N").residue
+    _, mtp, hn = build_hybrid_residue(r1, r2, FF, "ALA", term=None,
+                                      term_b="N", hybrid_name="AdeN",
+                                      write_ff_types=False)
+    assert hn == "AdeN"
+    morphs = {m[0]: m for m in _morphes(mtp)}
+    assert morphs["N"][3] == "NH3"          # amide N -> charged N-terminus
+    # two amide protons appear from dummies (H2, H3)
+    appearing = [m for m in _morphes(mtp) if m[1].startswith("DUM")]
+    assert len(appearing) == 2
+
+
+def test_itp_target_missing_file_raises():
+    # An ITP target no longer requires a structure (from_itp RDKit-embeds the
+    # geometry), but a missing ITP file must still surface clearly.
     from pmx.covalent.mutate import _build_target_residue
-    with pytest.raises(ValueError):
+    with pytest.raises((FileNotFoundError, OSError)):
         _build_target_residue("SEP", FF, {}, None, None,
-                              structure=None, itp="frag.itp")
+                              structure=None, itp="does_not_exist.itp")
 
 
 def _write_capped_sep_fragment(tmp_path):
