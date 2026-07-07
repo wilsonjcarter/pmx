@@ -35,7 +35,7 @@
 
 import sys
 from .library import _aliases, pmx_data_file
-from .parser import parseList, kickOutComments, readSection
+from .parser import parseList, kickOutComments, readSection, readSectionAll
 
 
 # Recognised sub-sections inside an RTP residue block.  Any other '[ ... ]'
@@ -628,6 +628,12 @@ class BondedParser:
                 starts.append(i)
         for s in starts:
             lst = readSection(self.lines[s:], '[ dihedraltypes ]', '[')
+            # drop blank lines -- a #include'd supplemental block can leave a
+            # trailing empty line before the next section, which otherwise makes
+            # parseList fall through to the wrong (2-atom) dihedral format.
+            lst = [x for x in lst if x.strip()]
+            if not lst:
+                continue
             try:
                 lst = parseList('ssssiffffff', lst)
             except:
@@ -670,7 +676,15 @@ class NBParser:
     def __parse_atomtypes(self, version):
 
         self.atomtypes = {}
-        lst = readSection(self.lines, '[ atomtypes ]', '[')
+        # read EVERY [ atomtypes ] block (the force field's plus any supplied by
+        # #include'd ligand ITPs), so ligand parameters can be supplied as ITPs
+        # instead of being injected into the force-field files.
+        lst = readSectionAll(self.lines, '[ atomtypes ]', '[')
+        # keep only data rows: an atom-type name starts with a letter or digit
+        # (amber has 2C/3C), so drop blanks and stray banner/decoration lines
+        # (e.g. a ``****`` header from a force-field .itp) that a multi-block read
+        # can otherwise capture.
+        lst = [x for x in lst if x.strip() and x.strip()[0].isalnum()]
         ffnamelower = self.ff.lower()
         if version == 'old':
             if ffnamelower.startswith('amber'):

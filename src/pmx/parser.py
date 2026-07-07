@@ -83,6 +83,28 @@ def readSection(lines, begin, end):
     return ret
 
 
+def readSectionAll(lines, begin, end):
+    """Like :func:`readSection`, but concatenates EVERY ``begin`` block.
+
+    GROMACS accumulates repeated sections (e.g. a ligand ITP contributes a
+    second ``[ atomtypes ]`` block on top of the force field's).  ``readSection``
+    stops at the first block; this collects them all so ``#include``-supplied
+    parameters are seen instead of forcing edits into the force-field files.
+    """
+    ret = []
+    collecting = False
+    for line in lines:
+        if line.strip() == begin:
+            collecting = True
+            continue
+        if collecting:
+            if end in line:
+                collecting = False
+            elif line.strip():
+                ret.append(line)
+    return ret
+
+
 def __parse_error(msg, line):
     s = "pmx_Error_> %s" % msg
     s += "\nTrouble is here -> %s" % line
