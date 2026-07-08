@@ -760,6 +760,19 @@ def _rtp_terminal(entr: dict, term: str) -> dict:
         del_atoms(entr, '+N')
         entr['bonds'].extend([['C', 'OT1'], ['C', 'OT2']])
         entr['improps'].append(['C', 'CA', 'OT2', 'OT1', ''])
+    elif term == 'C_amide':
+        # CHARMM CT2: a C-terminal primary amide (-C(=O)-NH2), neutral -- the
+        # experimental "amidation" that blocks the free carboxylate.  The
+        # carbonyl O stays; a NH2 is grown in place of the second carboxylate O.
+        ren_atom(entr, 'C', atype='CC', q=0.55)
+        ren_atom(entr, 'O', atype='O', q=-0.55)
+        del_atoms(entr, '+N')
+        add_atom(entr, 'NT',  'NH2', -0.62, after='O')
+        add_atom(entr, 'HT1', 'H',   0.30, after='NT')
+        add_atom(entr, 'HT2', 'H',   0.32, after='HT1')
+        entr['bonds'].extend([['C', 'NT'], ['NT', 'HT1'], ['NT', 'HT2']])
+        entr['improps'].extend([['C', 'NT', 'CA', 'O', ''],
+                                ['NT', 'C', 'HT1', 'HT2', '']])
     return entr
 
 

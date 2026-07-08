@@ -544,3 +544,46 @@ def delete_terminal(model, del_resid: int, ff: str,
               f"residue {del_res.id} ({del_res.resname}); neighbour "
               f"{neighbor.id} -> hybrid {hn}")
     return m if not inplace else hn
+
+
+def amidate_cterminus(model, resid: int, ff: str, chain: Optional[str] = None,
+                      inplace: bool = False, write_files: bool = True,
+                      verbose: bool = False):
+    """Alchemically amidate a C-terminus: ``-COO-`` (A) -> ``-C(=O)NH2`` (B).
+
+    The experimental "amidation" that blocks the free C-terminal carboxylate (a
+    C-degron recognition test).  It is charge-changing (-1 -> 0): the second
+    carboxylate oxygen disappears and an amide NH2 appears -- built through the
+    same hybrid-residue engine as a mutation, via the CHARMM CT2 terminal patch
+    (``term_b='C_amide'``).  A *terminal modification*, the addition companion to
+    :func:`delete_terminal`.
+    """
+    rtp, ffpath = _load_rtp(ff)
+    bCharmm = "charmm" in ff
+    m = model if inplace else deepcopy(model)
+    if m.unity == "nm":
+        m.nm2a()
+
+    res = m.fetch_residue(idx=resid, chain=chain)
+    if res != res.chain.cterminus():
+        raise ValueError("amidate_cterminus: residue %s (%s) is not the "
+                         "C-terminus" % (res.id, res.resname))
+    # the residue already carries its carboxylate (OT1/OT2 from pdb2gmx), so it
+    # must be typed with the C-terminal patch -- not the internal RTP, which
+    # would leave OT2 untyped and empty out the hybrid.
+    _assign_rtp_entries(res, rtp, "C")
+    if not any(getattr(a, "bonds", None) for a in res.atoms):
+        attach_bonds_from_rtp(res, ff)
+
+    residue2 = TargetResidue.from_rtp(res.resname, ff, term="C_amide").residue
+    code = library._ext_one_letter.get(res.resname, res.resname[:1])
+    hybrid_name = (code + "am")[:4]
+    rtp_text, mtp_text, hn = build_hybrid_residue(
+        res, residue2, ff, res.resname, term="C", term_b="C_amide",
+        hybrid_name=hybrid_name, write_ff_types=write_files)
+    if write_files:
+        _accumulate_hybrid(ffpath, hn, rtp_text, mtp_text, bCharmm)
+    if verbose:
+        print(f"log_> covalent.amidate_cterminus: {res.id} ({res.resname}) "
+              f"-COO- -> -CONH2  (hybrid {hn})")
+    return m if not inplace else hn
