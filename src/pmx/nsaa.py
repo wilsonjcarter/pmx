@@ -722,19 +722,27 @@ def _rtp_terminal(entr: dict, term: str) -> dict:
     """
     entr = deepcopy(entr)
     if term == 'N':
-        ren_atom(entr, 'N',  atype='NH3', q=-0.30)
-        ren_atom(entr, 'CA', atype='CT1', q=0.21)
-        ren_atom(entr, 'HA', atype='HB1', q=0.10)
-        del_atoms(entr, 'HN')
         del_atoms(entr, '-C')
-        # Proline's ring N is already bonded to CA and CD, so an N-terminus adds
-        # only TWO protons (NH2+), not three -- otherwise the ring N would have
-        # valence 5.  Detect proline by its N-CD ring bond.
+        # Proline needs its own N-terminal patch (CHARMM PRO-NH2+): the ring N is
+        # already bonded to CA and CD, so it becomes NH2+ (TWO protons, not three)
+        # and the ring atoms retype to NP/CP1/CP3.  The generic NH3+ patch would
+        # give the ring N valence 5 and an unparameterised NH3-CP3 bond.  Detect
+        # proline by its N-CD ring bond.
         is_pro = any({'N', 'CD'} == set(b[:2]) for b in entr['bonds'])
-        h_names = ['H2', 'H3'] if is_pro else ['H1', 'H2', 'H3']
+        if is_pro:
+            ren_atom(entr, 'N',  atype='NP',  q=-0.07)
+            ren_atom(entr, 'CA', atype='CP1', q=0.16)
+            ren_atom(entr, 'CD', atype='CP3', q=0.16)
+            h_names, hq = ['H1', 'H2'], 0.24
+        else:
+            ren_atom(entr, 'N',  atype='NH3', q=-0.30)
+            ren_atom(entr, 'CA', atype='CT1', q=0.21)
+            ren_atom(entr, 'HA', atype='HB1', q=0.10)
+            del_atoms(entr, 'HN')
+            h_names, hq = ['H1', 'H2', 'H3'], 0.33
         prev = 'N'
         for h in h_names:
-            add_atom(entr, h, 'HC', 0.33, after=prev)
+            add_atom(entr, h, 'HC', hq, after=prev)
             prev = h
         entr['bonds'].extend([['N', h] for h in h_names])
     elif term == 'C':
