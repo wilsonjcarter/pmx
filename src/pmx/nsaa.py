@@ -729,11 +729,19 @@ def _rtp_terminal(entr: dict, term: str) -> dict:
         # give the ring N valence 5 and an unparameterised NH3-CP3 bond.  Detect
         # proline by its N-CD ring bond.
         is_pro = any({'N', 'CD'} == set(b[:2]) for b in entr['bonds'])
+        is_gly = not any(a[0] == 'CB' for a in entr['atoms'])
         if is_pro:
             ren_atom(entr, 'N',  atype='NP',  q=-0.07)
             ren_atom(entr, 'CA', atype='CP1', q=0.16)
             ren_atom(entr, 'CD', atype='CP3', q=0.16)
             h_names, hq = ['H1', 'H2'], 0.24
+        elif is_gly:
+            # CHARMM GLY-NH3+: glycine CA is CT2 and has HA1/HA2 (no lone 'HA'
+            # to retype), so it needs its own patch, not the generic NH3+ one.
+            ren_atom(entr, 'N',  atype='NH3', q=-0.30)
+            ren_atom(entr, 'CA', atype='CT2', q=0.13)
+            del_atoms(entr, 'HN')
+            h_names, hq = ['H1', 'H2', 'H3'], 0.33
         else:
             ren_atom(entr, 'N',  atype='NH3', q=-0.30)
             ren_atom(entr, 'CA', atype='CT1', q=0.21)
