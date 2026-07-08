@@ -2488,3 +2488,63 @@ def merge_atomtypes(*args):
                         for x in all_atomtypes)]
 
     return unique_atomtypes
+
+
+def fold_moleculetype(host, guest, offset_resnr=True):
+    '''Fold the *guest* moleculetype into *host* so a single ``[ moleculetype ]``
+    holds both molecules.
+
+    This is the assembly step a covalent complex needs: a GROMACS bond cannot
+    span two moleculetypes, so to form a cross-link between a protein and an
+    externally-parameterised ligand (which never passes through ``pdb2gmx``, so
+    ``pdb2gmx -merge`` cannot reach it) the two must live in one moleculetype.
+    After folding, ``gentop --bond`` / :func:`pmx.alchemy._apply_inter_bonds` can
+    form the bond within the single molecule.  (Contrast the ABFE route, which
+    keeps the molecules separate and restrains them via
+    ``[ intermolecular_interactions ]`` -- there is no covalent bond there.)
+
+    *guest*'s atom indices and residue numbers are shifted to continue after
+    *host*.  The bonded terms carry over untouched because pmx stores them as
+    references to ``Atom`` objects, not integer indices -- only the ids they
+    write out change.  Atom types are merged and de-duplicated
+    (:func:`merge_atomtypes`), so the ligand's (e.g. GAFF) types travel with it.
+
+    Parameters
+    ----------
+    host, guest : Topology
+        Single-moleculetype topologies.  *host* is mutated in place and returned;
+        drop *guest* from the master ``[ molecules ]`` list afterwards.
+    offset_resnr : bool
+        Continue *guest*'s residue numbering after *host* (default).  Set False
+        only if the two already use disjoint residue numbers.
+
+    Returns
+    -------
+    Topology
+        *host*, now containing both molecules' atoms and bonded terms.
+    '''
+    na = len(host.atoms)
+    nres = max((a.resnr for a in host.atoms), default=0)
+    for a in guest.atoms:
+        a.id += na
+        if offset_resnr:
+            a.resnr += nres
+    host.atoms.extend(guest.atoms)
+    for sec in ('bonds', 'pairs', 'angles', 'dihedrals', 'cmap'):
+        getattr(host, sec).extend(getattr(guest, sec) or [])
+    host.atomtypes = merge_atomtypes(host.atomtypes or [], guest.atomtypes or [])
+
+    # rebuild the residue grouping from the merged atom list
+    host.residues = []
+    mol = None
+    cur = None
+    for atom in host.atoms:
+        if atom.resnr != cur or mol is None:
+            mol = Molecule()
+            mol.id = atom.resnr
+            mol.resname = atom.resname
+            host.residues.append(mol)
+            cur = atom.resnr
+        mol.atoms.append(atom)
+        atom.molecule = mol
+    return host
