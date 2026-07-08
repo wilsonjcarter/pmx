@@ -727,10 +727,16 @@ def _rtp_terminal(entr: dict, term: str) -> dict:
         ren_atom(entr, 'HA', atype='HB1', q=0.10)
         del_atoms(entr, 'HN')
         del_atoms(entr, '-C')
-        add_atom(entr, 'H1', 'HC', 0.33, after='N')
-        add_atom(entr, 'H2', 'HC', 0.33, after='H1')
-        add_atom(entr, 'H3', 'HC', 0.33, after='H2')
-        entr['bonds'].extend([['N', 'H1'], ['N', 'H2'], ['N', 'H3']])
+        # Proline's ring N is already bonded to CA and CD, so an N-terminus adds
+        # only TWO protons (NH2+), not three -- otherwise the ring N would have
+        # valence 5.  Detect proline by its N-CD ring bond.
+        is_pro = any({'N', 'CD'} == set(b[:2]) for b in entr['bonds'])
+        h_names = ['H2', 'H3'] if is_pro else ['H1', 'H2', 'H3']
+        prev = 'N'
+        for h in h_names:
+            add_atom(entr, h, 'HC', 0.33, after=prev)
+            prev = h
+        entr['bonds'].extend([['N', h] for h in h_names])
     elif term == 'C':
         ren_atom(entr, 'C', atype='CC',  q=0.34)
         ren_atom(entr, 'O', new='OT1', atype='OC', q=-0.67)
