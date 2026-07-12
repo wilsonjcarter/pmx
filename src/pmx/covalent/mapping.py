@@ -1,9 +1,10 @@
 """Topology-first atom mapping for covalent residue mutations.
 
-The classic pmx ligand mapping (``pmx.ligand_alchemy.LigandAtomMapping`` /
-``pmx.nsaa.domapping``) targets *arbitrary* ligand pairs with a 3-D
-maximum-common-substructure search plus distance-based pruning, which makes the
-mapping sensitive to embedding/alignment quality.
+The classic pmx ligand mapping (``pmx.ligand_alchemy.LigandAtomMapping``) targets
+*arbitrary* ligand pairs with a 3-D maximum-common-substructure search plus
+distance-based pruning, which makes the mapping sensitive to embedding/alignment
+quality.  (The former ``pmx.nsaa.domapping`` 3-D residue mapper, once used by
+``mutate_nsaa``, has been retired in favour of the graph mapping below.)
 
 :func:`map_residues` instead maps on the **molecular graph**, so a pair is only
 formed when the two atoms occupy corresponding positions in the connectivity:

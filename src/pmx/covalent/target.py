@@ -2,8 +2,8 @@
 
 A :class:`TargetResidue` wraps a pmx :class:`~pmx.model.Model` holding a single
 residue whose atoms carry names, element symbols, and 3-D coordinates -- the
-minimal geometry that pmx's mapping pipeline (``pmx.nsaa.domapping`` /
-``mutate_nsaa``) needs.  Force-field parameters (atom type, charge, mass) are
+minimal geometry that pmx's graph-MCS mapping pipeline
+(:func:`pmx.covalent.map_residues`) needs.  Force-field parameters (atom type, charge, mass) are
 *not* required here: for an RTP target they are assigned downstream from the
 force-field RTP, exactly as for a user-supplied structure.
 
@@ -19,6 +19,8 @@ from __future__ import annotations
 import os
 from functools import lru_cache
 from typing import Dict, List, Optional, Tuple
+
+import numpy as np
 
 from ..atom import Atom
 from ..model import Model
@@ -161,7 +163,8 @@ def _rtp_atoms_bonds(resname: str, ff: str):
     return ffpath, resolved, atom_rows, intra_bonds
 
 
-def _terminal_patch(atom_rows, intra_bonds, term: str):
+def _terminal_patch(atom_rows, intra_bonds, term: str, ff: str = None,
+                    resname: str = None):
     """Apply the force field's terminal patch to RTP ``atom_rows``/``bonds``.
 
     Reuses :func:`pmx.nsaa._rtp_terminal` (the same patch the NSAA emit path
@@ -176,7 +179,7 @@ def _terminal_patch(atom_rows, intra_bonds, term: str):
         "bonds": [list(b) for b in intra_bonds],
         "diheds": [], "improps": [], "cmap": [],
     }
-    entr = _rtp_terminal(entr, term)
+    entr = _rtp_terminal(entr, term, ff=ff, resname=resname)
     seen, bonds = set(), []
     for a1, a2 in entr["bonds"]:
         if a1.startswith(("+", "-")) or a2.startswith(("+", "-")):
@@ -308,7 +311,8 @@ class TargetResidue:
         """
         ffpath, resname, atom_rows, intra_bonds = _rtp_atoms_bonds(resname, ff)
         if term:
-            atom_rows, intra_bonds = _terminal_patch(atom_rows, intra_bonds, term)
+            atom_rows, intra_bonds = _terminal_patch(atom_rows, intra_bonds, term,
+                                                     ff=ff, resname=resname)
         masses = _load_atomtype_masses(ffpath)
 
         # RTPParser returns RTP-native names (the RTP files and the mutres
@@ -437,3 +441,43 @@ class TargetResidue:
     def write(self, path: str) -> None:
         """Write the target residue to a PDB/GRO file."""
         self.model.write(path)
+
+
+def complete_target_from_structure(supplied, resname, ff, term=None):
+    """Complete a target residue read from a structure against the force-field RTP.
+
+    If *supplied* is MISSING atoms the RTP defines (e.g. a heavy-atom-only crystal
+    template with no hydrogens), rebuild the full atom set (+ hydrogens, + types)
+    from the RTP via :meth:`TargetResidue.from_rtp` and overlay only the supplied
+    HEAVY-atom coordinates (Kabsch fit: matched heavy atoms snapped to the supplied
+    positions exactly, the rest follow the fit and are refined downstream by
+    RDKit/pdb2gmx). Structures already containing every RTP atom, and residues absent
+    from the RTP, are returned unchanged.
+
+    This is the single home for the "structure = heavy-atom geometry, RTP = identity/
+    types/hydrogens" rule, shared by the covalent and nsaa mutation orchestrators.
+    """
+    try:
+        full = TargetResidue.from_rtp(resname, ff, term=term).residue
+    except Exception:
+        return supplied
+    sup = {a.name: a for a in supplied.atoms}
+    if {a.name for a in full.atoms} <= set(sup):
+        return supplied                                       # already complete
+    is_heavy = lambda a: not a.name[:1].startswith(("H", "D"))
+    common = [a for a in full.atoms if a.name in sup and is_heavy(a)]
+    if len(common) < 3:
+        return supplied
+    P = np.array([list(a.x) for a in common])
+    Q = np.array([list(sup[a.name].x) for a in common])
+    Pc, Qc = P.mean(0), Q.mean(0)
+    U, S, Vt = np.linalg.svd((P - Pc).T @ (Q - Qc))
+    d = np.sign(np.linalg.det(Vt.T @ U.T))
+    R = Vt.T @ np.diag([1.0, 1.0, d]) @ U.T
+    for a in full.atoms:
+        if a.name in sup:
+            a.x = list(sup[a.name].x)
+        else:
+            a.x = list(R @ (np.array(list(a.x)) - Pc) + Qc)
+    full.set_resname(resname)
+    return full

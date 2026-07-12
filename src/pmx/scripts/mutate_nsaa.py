@@ -152,8 +152,10 @@ def parse_options():
         default=None,
         help=(
             "GROMACS ITP fragment file for the NSAA, parameterized with a\n"
-            "CH3 cap at the CA position.  Required when --nsapdb is provided\n"
-            "and the residue is not in the pmx built-in library."
+            "CH3 cap at the CA position (for a residue not in the FF RTP).\n"
+            "Geometry is embedded from the ITP bond graph, so --nsapdb is\n"
+            "optional (supply it only to override the embedded geometry).\n"
+            "Delegates to the covalent engine, same as `pmx mutate --itp`."
         ),
     )
     parser.add_argument(
@@ -163,8 +165,10 @@ def parse_options():
         type=str,
         default=None,
         help=(
-            "PDB or GRO file containing the NSAA structure.  If omitted, the\n"
-            "NSAA is taken from the pmx built-in library (standard residues only)."
+            "PDB or GRO file containing the NSAA structure.  Optional: with\n"
+            "--itp it overrides the embedded geometry; without --itp it is the\n"
+            "geometry source (else the NSAA is taken from the pmx built-in\n"
+            "library, standard residues only)."
         ),
     )
     parser.add_argument(
@@ -277,8 +281,10 @@ def main(args):
     print('')
     print('log_> Hybrid structure written to: %s' % args.outfile)
     print('log_> Force-field files updated in: %s' % get_ff_path(ff))
-    print('log_> MTP file written to working directory (pass to '
-          'generate_hybrid_topology via --extra_mtp).')
+    # All front ends now delegate to the covalent engine, which accumulates the
+    # hybrid into the FF's nsaa.{rtp,mtp}; pmx gentop auto-discovers it.
+    print('log_> Hybrid written to the force field\'s nsaa.mtp; '
+          'pmx gentop reads it automatically (no --extra_mtp).')
     print('')
 
 

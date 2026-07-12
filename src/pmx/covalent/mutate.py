@@ -34,7 +34,7 @@ from ..utils import get_ff_path, list2file
 from ..library import pmx_data_file
 
 from .mapping import map_residues, attach_bonds_from_rtp, _element_of
-from .target import TargetResidue
+from .target import TargetResidue, complete_target_from_structure
 
 # Reuse the battle-tested emit + ITP-fragment helpers from nsaa (import, do not
 # modify).
@@ -213,10 +213,12 @@ def build_hybrid_residue(residue1, residue2, ff: str, mut_resname: str,
     _, badic = _make_transition_dics(atom_pairs, residue1)
     _update_bond_lists(residue1, badic)
 
-    entr1 = _rtp_terminal(rtp[residue1.resname], term) if term \
+    entr1 = _rtp_terminal(rtp[residue1.resname], term, ff=ff,
+                          resname=residue1.resname) if term \
         else rtp[residue1.resname]
     if residue2.resname in rtp:
-        entr2 = _rtp_terminal(rtp[residue2.resname], term_b) if term_b \
+        entr2 = _rtp_terminal(rtp[residue2.resname], term_b, ff=ff,
+                              resname=residue2.resname) if term_b \
             else rtp[residue2.resname]
     else:
         entr2 = {"atoms": [], "bonds": [], "diheds": [], "improps": [], "cmap": []}
@@ -264,8 +266,8 @@ def _build_target_residue(target, ff, rtp, term, residue1,
     """Build the (parameterized, bonded) target residue from the chosen front end.
 
     Precedence: ``itp`` (arbitrary parameterized fragment) > ``structure``
-    (geometry override, parameters from the RTP) > RTP name (default:
-    parameters + RDKit-embedded geometry from the force-field RTP entry).
+    (geometry override, parameters from the RTP) > RTP name (default: parameters +
+    RDKit-embedded geometry from the force-field RTP entry).
     """
     if itp is not None:
         # NSAA capped-fragment workflow: parameters from the ITP; geometry from
@@ -302,6 +304,12 @@ def _build_target_residue(target, ff, rtp, term, residue1,
         model2.read(structure)
         residue2 = model2.residues[0]
         residue2.set_resname(target)
+        # If the structure is MISSING atoms that the RTP defines (e.g. a
+        # heavy-atom-only crystal template with no hydrogens), complete the atom
+        # set from the RTP and overlay only the supplied heavy-atom coordinates.
+        # Complete structures are left untouched, so every other structure=
+        # workflow is unchanged.
+        residue2 = complete_target_from_structure(residue2, target, ff, term)
         _assign_rtp_entries(residue2, rtp, term)
         if not any(getattr(a, "bonds", None) for a in residue2.atoms):
             attach_bonds_from_rtp(residue2, ff)
@@ -392,6 +400,15 @@ def mutate(model, mut_resid: int, target: str, ff: str,
     Accumulates the hybrid into the force field's ``nsaa.rtp``/``nsaa.mtp`` and
     returns the hybrid residue name.
     """
+    # Accept the classic one-letter residue shorthand for the target and resolve
+    # it to the 3-letter RTP name the generative engine needs.  The classic
+    # library path resolves these itself (via _convert_aa_name); the generative
+    # path did not, so a one-letter target at a terminus / PTM / NSAA -- e.g.
+    # `pmx mutate --script '1 V'` on an N-terminal residue -- failed with
+    # "Residue 'V' not found in the RTP".
+    if len(target) == 1:
+        target = library._aacids_dic.get(target.upper(), target)
+
     rtp, ffpath = _load_rtp(ff)
     bCharmm = "charmm" in ff
 

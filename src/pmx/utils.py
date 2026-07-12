@@ -246,8 +246,8 @@ def get_mtp_file(residue, ff):
     elif residue.moltype == 'protein':
         mtp_file = os.path.join(ffpath, 'mutres.mtp')
     else:
-        raise(ValueError, 'Cannot undertand mutation type needed '
-                          'from the input strcture provided')
+        raise ValueError('Cannot understand mutation type needed '
+                         'from the input structure provided')
     return mtp_file
 
 

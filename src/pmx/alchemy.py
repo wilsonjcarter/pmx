@@ -744,14 +744,44 @@ def _set_conformation(old_res, new_res, rotdic):
             pass  # keep MTP/bb_super position if source atom not found
 
 
+def _proline_ring_state(r, topol):
+    """Return which state ('A'/'B') has a proline ring at residue *r*, else None.
+
+    Proline is identified by its ring-closure bond N-Cdelta (the side chain closes
+    a 5-membered ring back onto the backbone N) -- unique to proline, so detection
+    is independent of the hybrid *name*.  This fires for the classic hybrid ('X2P'),
+    the generative hybrid ('X2PR'), and terminal proline alike, and -- unlike the
+    old ``'P' in resname and len==3`` gate -- never mis-fires on phospho hybrids
+    (``S2P1`` etc.).  'A' = real proline ring in state A; 'B' = appearing (dummy)
+    proline ring in state B.
+    """
+    byname = {}
+    for a in r.atoms:
+        byname.setdefault(a.name, a)
+    n = byname.get('N')
+    if n is None:
+        return None
+
+    def ring_closed(cd_name):
+        cd = byname.get(cd_name)
+        if cd is None:
+            return False
+        for b in topol.bonds:
+            if {b[0].id, b[1].id} == {n.id, cd.id}:
+                return True
+        return False
+
+    if ring_closed('CD'):    # real proline ring present in state A
+        return 'A'
+    if ring_closed('DCD'):   # appearing (dummy) proline ring in state B
+        return 'B'
+    return None
+
+
 def _proline_dihedral_decouplings(topol, rlist, rdic):
     for r in rlist:
-        if 'P' in r.resname and len(r.resname) == 3:
-            # identify in which state proline sits
-            prolineState = 'A'
-            if '2P' in r.resname:
-                prolineState = 'B'
-
+        prolineState = _proline_ring_state(r, topol)
+        if prolineState is not None:
             # find the atoms for which the bond needs to be broken
             prolineCDatom = ''
             prolineCBatom = ''
@@ -850,12 +880,8 @@ def _proline_dihedral_decouplings(topol, rlist, rdic):
 
 def _proline_decouplings(topol, rlist, rdic):
     for r in rlist:
-        if 'P' in r.resname and len(r.resname) == 3:
-            # identify in which state proline sits
-            prolineState = 'A'
-            if '2P' in r.resname:
-                prolineState = 'B'
-
+        prolineState = _proline_ring_state(r, topol)
+        if prolineState is not None:
             # find the atoms for which the bond needs to be broken
             prolineCDatom = ''
             prolineCGatom = ''
@@ -2029,12 +2055,24 @@ def _get_hybrid_residues(m, ff, version='new', verbose=False,
                                   verbose=verbose)
         rdic[res.resname] = mtp
         hybrid_res = mtp[0]
-        atom_names = list(map(lambda a: a.name, hybrid_res.atoms))
-        atoms = res.fetchm(atom_names)
-        for i, atom in enumerate(hybrid_res.atoms):
-            atoms[i].atomtypeB = atom.atomtypeB
-            atoms[i].qB = atom.qB
-            atoms[i].mB = atom.mB
+        # Match each mtp atom to the structure atom BY NAME.  fetchm() silently
+        # skips names it cannot find, which used to misalign a positional index
+        # (atoms[i]) and raise an opaque IndexError.  Matching by name instead
+        # gives a clear, actionable error when a required atom is genuinely absent
+        # (e.g. the hybrid was built from a template missing that atom).
+        by_name = {a.name: a for a in res.atoms}
+        for atom in hybrid_res.atoms:
+            target = by_name.get(atom.name)
+            if target is None:
+                raise mtpError(
+                    "hybrid residue %s%s: atom '%s' listed in the mtp is missing "
+                    "from the structure topology. The hybrid was likely built from "
+                    "a template that lacks this atom (e.g. a crystal template with "
+                    "no hydrogens). Rebuild the target residue with a complete-atom "
+                    "template." % (res.resname, res.id, atom.name))
+            target.atomtypeB = atom.atomtypeB
+            target.qB = atom.qB
+            target.mB = atom.mB
     return rlist, rdic
 
 
