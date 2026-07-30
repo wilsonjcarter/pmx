@@ -257,7 +257,7 @@ def get_nuc_hybrid_resname(residue, new_nuc_name):
 
 def gen_hybrid_top(topol, recursive=True, verbose=False, scaleDih=1.0,
                    extra_mtp_files=None, supplement_bonded_files=None,
-                   inter_bonds=None):
+                   inter_bonds=None, decouple_dummies=False):
     """Fills the bstate of a topology file containing pmx hybrid residues. This
     can be either a top or itp file. If the file contains other itp files via
     include statements, the function can iterate through them if the recursive
@@ -288,6 +288,13 @@ def gen_hybrid_top(topol, recursive=True, verbose=False, scaleDih=1.0,
 
             pmxtop, itps = gen_hybrid_top(top, extra_mtp_files=["A2SEP.mtp"])
 
+    decouple_dummies : bool, optional
+        Opt-in Boresch dummy-atom decoupling corrections (default False).  When
+        True, removes factorization-breaking bonded terms at physical/dummy
+        junctions that the default "naive" symmetric dummy treatment leaves in
+        place (see :func:`_decouple_dummies`).  Off by default so existing
+        behaviour is byte-identical.
+
     Returns
     -------
     top, itps : obj, list of obj
@@ -302,7 +309,8 @@ def gen_hybrid_top(topol, recursive=True, verbose=False, scaleDih=1.0,
 
     # main function that returns the Topology with filled B states
     def process_topol(topol, ff, ffbonded_file, verbose=False, scaleDih=1.0,
-                      extra_mtp_files=None, supplement_bonded_files=None):
+                      extra_mtp_files=None, supplement_bonded_files=None,
+                      decouple_dummies=False):
         pmxtop = deepcopy(topol)
         # create model with residue list
         m = Model(atoms=pmxtop.atoms, renumber_residues=False)
@@ -417,6 +425,12 @@ def gen_hybrid_top(topol, recursive=True, verbose=False, scaleDih=1.0,
         # unified apply_bond_morph(mode='decouple').
         _terminal_deletion_decouplings(pmxtop, rlist, verbose=verbose)
         _apply_inter_bonds(pmxtop, rlist, inter_bonds, verbose=verbose)
+
+        # Opt-in Boresch dummy-atom decoupling (off by default).  Removes
+        # factorization-breaking bonded terms at physical/dummy junctions that
+        # the default "naive" symmetric treatment leaves in place.
+        if decouple_dummies:
+            _decouple_dummies(pmxtop, verbose=verbose)
         return pmxtop
 
     # -------------
@@ -428,7 +442,8 @@ def gen_hybrid_top(topol, recursive=True, verbose=False, scaleDih=1.0,
     pmx_top = process_topol(topol=topol, ff=ff, ffbonded_file=ffbonded_file,
                             verbose=verbose, scaleDih=scaleDih,
                             extra_mtp_files=extra_mtp_files,
-                            supplement_bonded_files=supplement_bonded_files)
+                            supplement_bonded_files=supplement_bonded_files,
+                            decouple_dummies=decouple_dummies)
 
     # ------------------------------------
     # itps too if asked for and if present
@@ -447,7 +462,8 @@ def gen_hybrid_top(topol, recursive=True, verbose=False, scaleDih=1.0,
                                     ffbonded_file=ffbonded_file,
                                     verbose=verbose,
                                     extra_mtp_files=extra_mtp_files,
-                                    supplement_bonded_files=supplement_bonded_files)
+                                    supplement_bonded_files=supplement_bonded_files,
+                                    decouple_dummies=decouple_dummies)
             pmx_itps.append(pmx_itp)
 
     # A --bond declaration is applied by whichever molecule owns both endpoints
@@ -762,19 +778,31 @@ def _proline_ring_state(r, topol):
     if n is None:
         return None
 
-    def ring_closed(cd_name):
+    def ring_cd(cd_name):
         cd = byname.get(cd_name)
         if cd is None:
-            return False
+            return None
         for b in topol.bonds:
             if {b[0].id, b[1].id} == {n.id, cd.id}:
-                return True
-        return False
+                return cd
+        return None
 
-    if ring_closed('CD'):    # real proline ring present in state A
-        return 'A'
-    if ring_closed('DCD'):   # appearing (dummy) proline ring in state B
-        return 'B'
+    def _morphs(atom):
+        # The ring decoupling (break CD-CG + ring angles/dihedrals in one state) is only
+        # valid when the ring APPEARS or DISAPPEARS -- i.e. its atoms are dummy in exactly
+        # one state.  A Pro->Pro morph (N-terminal-proline terminal patch, XdeN deletion
+        # neighbour) keeps the ring REAL in BOTH states; decoupling it there spuriously
+        # opens an intact ring and destabilises the switch.  So require a real<->dummy morph.
+        ta = (getattr(atom, 'atomtype', '') or '')
+        tb = (getattr(atom, 'atomtypeB', '') or ta)
+        return ta.upper().startswith('DUM') != tb.upper().startswith('DUM')
+
+    cd = ring_cd('CD')       # real proline ring present in state A
+    if cd is not None:
+        return 'A' if _morphs(cd) else None
+    dcd = ring_cd('DCD')     # appearing (dummy) proline ring in state B
+    if dcd is not None:
+        return 'B' if _morphs(dcd) else None
     return None
 
 
@@ -967,6 +995,280 @@ def _proline_decouplings(topol, rlist, rdic):
                             dih[5] = [func, dih[6][1], 0.0]
                         else:
                             dih[5] = [func, dih[6][1], 0.0, dih[6][-1]]
+
+
+def _dummy_in_state(atom, state):
+    """True if *atom* is a dummy (DUM_ atomtype) in end state 'A' or 'B'.
+
+    Mirrors :func:`_check_case`: state A reads ``atomtype``, state B reads
+    ``atomtypeB`` (falling back to ``atomtype`` when it is unset).
+    """
+    if state == 'A':
+        t = atom.atomtype
+    else:
+        t = atom.atomtypeB if atom.atomtypeB is not None else atom.atomtype
+    return t is not None and t.startswith('DUM')
+
+
+def _decouple_dummies(topol, verbose=False):
+    """Boresch dummy-atom decoupling corrections (opt-in: ``gentop --decouple-dummies``).
+
+    pmx's default ("naive") dummy treatment keeps *every* bonded term of an
+    appearing/disappearing atom in BOTH the physical and the dummy end state.
+    Some of those terms couple a physical degree of freedom to a dummy one at
+    the physical/dummy junction, which breaks the factorization of the dummy
+    contribution to the partition function -- the condition that makes the dummy
+    free energy a state-independent constant that cancels in a thermodynamic
+    cycle (Fleck, Wieder, Boresch, *J. Chem. Theory Comput.* 2021, 17, 4403).
+    This pass removes the offending coupling terms *in the state where the atom
+    is a dummy*, keeping enough of the real bonded terms that no under-restraint
+    ("flapping") is introduced (validated by gas-phase MD; see the sub-functions).
+
+    Off by default; wired through :func:`gen_hybrid_top` and the
+    ``gentop --decouple-dummies`` flag.  Two corrections are applied:
+
+    * **Case #4** -- Urey-Bradley junction terms (:func:`_dc_urey_bradley`).
+    * **Cases #2/#3** -- redundant terminal-junction dihedrals
+      (:func:`_dc_terminal_dihedrals`).
+
+    All modifications are per-state and touch only the state where the atom is a
+    dummy; the physical end state is left byte-identical.
+    """
+    n_ub = _dc_urey_bradley(topol, verbose=verbose)
+    n_del, n_anchor = _dc_terminal_dihedrals(topol, verbose=verbose)
+    if verbose:
+        print('log_> decouple-dummies: %d UB removed, %d redundant junction '
+              'dihedrals deleted, %d anchor dihedral(s) kept'
+              % (n_ub, n_del, n_anchor))
+    return n_ub, n_del, n_anchor
+
+
+def _dc_urey_bradley(topol, verbose=False):
+    """Case #4 -- delete Urey-Bradley junction terms (CHARMM func-5 angles).
+
+    A Urey-Bradley term is a harmonic term in the 1-3 distance of a bond angle,
+    i.e. an effective virtual bond between the two *outer* atoms of the angle.
+    Boresch: "the additional Urey-Bradley term of a bond angle needs to be
+    deleted whenever the angle is made up from two physical and one dummy atom"
+    (p. 4406); the paper deletes these even in its "naive" baseline.  A
+    2-physical/1-dummy angle necessarily has the dummy as an *outer* atom (the
+    central atom is physical), so its UB 1-3 pair straddles the junction.  We
+    zero the UB sub-term (S0, kUB) in the offending state while keeping the
+    harmonic angle (theta0, ktheta) -- the harmonic angle remains as the anchor,
+    so no flapping is introduced (case #4 needs no re-anchoring).
+
+    Note on aliasing: for a junction angle (physical in one state, dummy in the
+    other) :func:`_find_angle_entries` stores the *same* list object in both the
+    A-slot ``ang[4]`` and B-slot ``ang[5]``.  We therefore **reassign** the
+    dummy-state slot with a fresh list rather than mutating it in place, so the
+    physical state's parameters are left untouched.
+    """
+    n_ub = 0
+    for ang in topol.angles:
+        if len(ang) < 6:           # no B-state params filled -> nothing to do
+            continue
+        if ang[3] != 5:            # only CHARMM Urey-Bradley (func-5) angles
+            continue
+        a1, a2, a3 = ang[0], ang[1], ang[2]
+        for state, slot in (('A', 4), ('B', 5)):
+            params = ang[slot]
+            if not isinstance(params, list) or len(params) < 5:
+                continue
+            d1 = _dummy_in_state(a1, state)
+            d2 = _dummy_in_state(a2, state)
+            d3 = _dummy_in_state(a3, state)
+            # Case #4: exactly one dummy, on an OUTER position (central atom
+            # physical) -> 2 physical + 1 dummy, UB 1-3 pair straddles junction.
+            if (not d2) and (d1 != d3):
+                if params[3] != 0.0 or params[4] != 0.0:
+                    # reassign (do not mutate: A/B slots may be the same object)
+                    ang[slot] = [params[0], params[1], params[2], 0.0, 0.0]
+                    n_ub += 1
+                    if verbose:
+                        print('log_> decouple-dummies: removed UB (state %s) '
+                              '%s-%s-%s' % (state, a1.name, a2.name, a3.name))
+    return n_ub
+
+
+def _dc_connected_components(idset, adj):
+    """Connected components of the atom-ids in *idset* under adjacency *adj*."""
+    seen = set()
+    comps = []
+    for s in idset:
+        if s in seen:
+            continue
+        comp = set()
+        stack = [s]
+        while stack:
+            x = stack.pop()
+            if x in comp:
+                continue
+            comp.add(x)
+            seen.add(x)
+            stack.extend(y for y in adj.get(x, ()) if y in idset and y not in comp)
+        comps.append(comp)
+    return comps
+
+
+def _dc_terminal_dihedrals(topol, verbose=False):
+    """Cases #2/#3 -- prune redundant dihedrals at *terminal* dummy junctions.
+
+    A *terminal junction* is a dummy group (a connected set of dummy atoms in a
+    given end state) attached to the physical system through exactly ONE physical
+    bridge atom, with no atom of the group bonded to a second physical atom (no
+    ring back into the physical system).  For such junctions Boresch (p. 4409)
+    shows one can keep *all bond angle terms* -- only the dihedrals are redundant.
+    pmx's naive treatment keeps every junction dihedral in both states, giving
+    the single-/dual-anchored redundant-dihedral constraints (cases #2/#3) that
+    break factorization.
+
+    Rule (p. 4409): keep the dihedrals reaching into the dummy group from ONE
+    physical anchor atom; delete (zero, in the dummy state) every other junction
+    dihedral into the group.  The kept anchor dihedrals are left *unchanged* --
+    their real periodic terms already anchor the group's rotation with a
+    torsional profile identical to the physical atom's, so the group's pose is
+    well defined (no flapping) and the physical subsystem is untouched.
+
+    Boresch (Table 3 fn b) additionally *replaces* the kept dihedral with a stiff
+    single-minimum term to guarantee no flapping.  We deliberately do NOT do that
+    here: the gentop stage has no coordinates, so a hard anchor can only be placed
+    at a fixed phase, and empirically (anchor force-constant sweep in scratchpad/)
+    a phase that does not match the built geometry couples the physical bridge to
+    the dummy and displaces the physical heavy atoms by tens of pm -- a larger
+    error than the redundancy it removes.  Keeping the real dihedral avoids that
+    while still deleting the factorization-breaking redundant terms.
+
+    Only strictly terminal, single-branch junctions are handled here; dual/triple/
+    ring junctions (more than one physical bridge, a group atom bonded to two
+    physical atoms, or a bridge carrying a second dummy group) are left as-is
+    (they need the fuller Boresch section-2.3 treatment and are over-anchored but
+    flapping-free under the naive scheme).
+    """
+    # bond adjacency over atom ids
+    adj = {}
+    for b in topol.bonds:
+        adj.setdefault(b[0].id, set()).add(b[1].id)
+        adj.setdefault(b[1].id, set()).add(b[0].id)
+    id2atom = {a.id: a for a in topol.atoms}
+
+    n_del = 0
+    n_anchor = 0
+    for state, slot in (('A', 5), ('B', 6)):
+        dumids = set(a.id for a in topol.atoms if _dummy_in_state(a, state))
+        if not dumids:
+            continue
+        for group in _dc_connected_components(dumids, adj):
+            # physical bridge atom(s): physical atoms bonded to the group
+            bridges = set()
+            for did in group:
+                for nb in adj.get(did, ()):
+                    if nb not in group and not _dummy_in_state(id2atom[nb], state):
+                        bridges.add(nb)
+            # terminal junction only: exactly one physical bridge, no ring back
+            if len(bridges) != 1:
+                continue
+            ring = any(
+                len([nb for nb in adj.get(did, ())
+                     if nb not in group and not _dummy_in_state(id2atom[nb], state)]) > 1
+                for did in group)
+            if ring:
+                continue
+            # single dummy branch only: the bridge must not carry a second dummy
+            # group (that is a two-branch dual junction -- needs the fuller
+            # section-2.3 inter-group treatment, out of scope here).
+            X = next(iter(bridges))
+            if any(nb not in group for nb in adj.get(X, ())
+                   if _dummy_in_state(id2atom[nb], state)):
+                continue
+
+            # junction dihedrals reaching into this group in this state
+            jdih = []
+            for d in topol.dihedrals:
+                if len(d) < 7:
+                    continue
+                params = d[slot]
+                if not isinstance(params, list):   # 'NULL' / fake dihedral
+                    continue
+                ids = [d[0].id, d[1].id, d[2].id, d[3].id]
+                in_grp = [i for i in ids if i in group]
+                phys = [i for i in ids if not _dummy_in_state(id2atom[i], state)]
+                if in_grp and phys:                # spans the junction
+                    jdih.append(d)
+            if not jdih:
+                continue
+
+            # physical "anchor" candidates: the physical END atom (position 0 or
+            # 3) of each junction dihedral -- the atom farthest from the dummy.
+            def phys_end(d):
+                ids = [d[0].id, d[1].id, d[2].id, d[3].id]
+                if ids[0] not in group and not _dummy_in_state(id2atom[ids[0]], state):
+                    if ids[3] in group or _dummy_in_state(id2atom[ids[3]], state):
+                        return ids[0]
+                if ids[3] not in group and not _dummy_in_state(id2atom[ids[3]], state):
+                    if ids[0] in group or _dummy_in_state(id2atom[ids[0]], state):
+                        return ids[3]
+                # both ends physical (dummy in the middle) -> use the heavier end
+                return None
+
+            # choose the anchor: prefer a heavy (non-H) physical atom that anchors
+            # the most junction dihedrals; deterministic tie-break by atom id.
+            from collections import Counter
+            counts = Counter()
+            for d in jdih:
+                e = phys_end(d)
+                if e is not None:
+                    counts[e] += 1
+            if not counts:
+                continue
+
+            def anchor_key(aid):
+                a = id2atom[aid]
+                heavy = 0 if (a.atomtype or '').upper().startswith('H') \
+                    or (a.name or '').upper().startswith('H') else 1
+                return (heavy, counts[aid], -aid)   # heavy > frequent > low-id
+            anchor = max(counts, key=anchor_key)
+
+            # Keep the dihedrals reaching into the group from the ONE anchor atom
+            # *unchanged* (their real, geometry-consistent periodic terms already
+            # anchor the group's rotation without coupling it to a second physical
+            # atom); delete every other junction dihedral in the dummy state.
+            #
+            # We deliberately do NOT replace the kept dihedral with an artificial
+            # stiff single-minimum term.  Empirically (anchor force-constant sweep,
+            # scratchpad/), a hard anchor at a phase that does not match the built
+            # geometry -- which is unavoidable here, since the gentop stage has no
+            # coordinates -- couples the physical bridge to the dummy and displaces
+            # the physical heavy atoms by tens of pm (worse than the redundancy it
+            # removes).  Keeping the real dihedral leaves the group's torsional
+            # profile identical to the physical atom's, which is well-defined (no
+            # flapping) and does not perturb the physical subsystem.
+            anchor_tuples = set()
+            for d in jdih:
+                func = d[4]
+                tup = (d[0].id, d[1].id, d[2].id, d[3].id)
+                if phys_end(d) == anchor and func in (1, 4, 9):
+                    anchor_tuples.add(tup)                       # keep as-is
+                    continue
+                d[slot] = _dc_zero_dih(func, d[slot])
+                n_del += 1
+                if verbose:
+                    print('log_> decouple-dummies: deleted junction dihedral '
+                          '(state %s) %s-%s-%s-%s' % (state, d[0].name,
+                          d[1].name, d[2].name, d[3].name))
+            n_anchor += len(anchor_tuples)
+    return n_del, n_anchor
+
+
+def _dc_zero_dih(func, params):
+    """Return a zeroed dihedral parameter list for *func* (deletes the term)."""
+    if func == 3:                                  # Ryckaert-Bellemans
+        return [func, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+    if func == 2:                                  # improper (harmonic)
+        phi = params[1] if isinstance(params, list) and len(params) > 1 else 0.0
+        return [func, phi, 0.0]
+    phi = params[1] if isinstance(params, list) and len(params) > 1 else 0.0
+    mult = params[-1] if isinstance(params, list) and len(params) > 3 else 1
+    return [func, phi, 0.0, mult]                  # proper: zero the force constant
 
 
 def extract_atoms(residue):

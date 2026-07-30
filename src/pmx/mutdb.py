@@ -37,6 +37,7 @@ from .model import Model
 from .atom import Atom
 from .molecule import Molecule
 from .parser import readSection, kickOutComments, parseList
+from .utils import mtpError
 
 
 def read_mutpdb(filename='mutations_oplsaa.pdb'):
@@ -80,6 +81,15 @@ def read_new_mtp_entry(entry, filename='mutres.mtp'):
     ml = readSection(res, '[ morphes ]', '[')
     for i, line in enumerate(ml):
         entr = line.split()
+        if len(entr) < 5:
+            raise mtpError(
+                "mtp entry '%s' in %s has an incomplete [ morphes ] line "
+                "(missing the B-state atom type): %r. This happens when the "
+                "hybrid was built from a target-residue template that lacks "
+                "hydrogens (e.g. a raw crystal template). Supply a complete-atom "
+                "template (heavy atoms + hydrogens); the crystal geometry can be "
+                "preserved by superposing a full library template onto the crystal "
+                "heavy atoms." % (entry, filename, line.strip()))
         n0 = entr[0]
         t0 = entr[1]
         n1 = entr[3]
@@ -109,9 +119,14 @@ def read_new_mtp_entry(entry, filename='mutres.mtp'):
 
     coords = readSection(res, '[ coords ]', '[')
     coords = parseList('fff', coords)
+    # The [ coords ] section is used only for structure placement, not for the
+    # hybrid topology (gentop reads atomtypeB/qB/mB).  Tolerate an incomplete
+    # section (e.g. a hybrid built from a template lacking hydrogens, or a short
+    # peptide) instead of raising an opaque IndexError.
     for i, atom in enumerate(mol.atoms):
-        atom.x = coords[i]
-        atom.unity = 'A'
+        if i < len(coords):
+            atom.x = coords[i]
+            atom.unity = 'A'
     il = readSection(res, '[ impropers ]', '[')
     imps = []
     for line in il:
@@ -194,9 +209,12 @@ def read_mtp_entry(entry, filename='ffamber99sb.mtp', version='old'):
 
     coords = readSection(res, '[ coords ]', '[')
     coords = parseList('fff', coords)
+    # tolerate an incomplete [ coords ] section (see read_new_mtp_entry) -- coords
+    # are for structure placement, not the hybrid topology.
     for i, atom in enumerate(mol.atoms):
-        atom.x = coords[i]
-        atom.unity = 'nm'
+        if i < len(coords):
+            atom.x = coords[i]
+            atom.unity = 'nm'
     bonds = []
     bl = readSection(res, '[ bonds ]', '[')
     for line in bl:

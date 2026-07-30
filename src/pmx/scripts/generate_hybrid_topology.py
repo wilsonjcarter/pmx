@@ -129,6 +129,20 @@ mutate, and after having passed that mutated structure through pdb2gmx.
                         'cross-boundary AMBER<->GAFF bonded terms and ITP-internal '
                         'GAFF terms needed when filling B states for NSAA hybrids.')
 
+    parser.add_argument('--decouple-dummies',
+                        dest='decouple_dummies',
+                        default=False,
+                        action='store_true',
+                        help='Opt-in Boresch dummy-atom decoupling corrections. '
+                        'Removes factorization-breaking bonded terms at '
+                        'physical/dummy junctions that the default "naive" '
+                        'symmetric dummy treatment leaves in place (Fleck, '
+                        'Wieder, Boresch, JCTC 2021, 17, 4403).  Deletes '
+                        'Urey-Bradley (CHARMM func-5) terms on 2-physical/'
+                        '1-dummy angles, and prunes redundant dihedrals at '
+                        'terminal dummy junctions (keeping one physical anchor). '
+                        'Off by default (does not change existing behaviour).')
+
     parser.add_argument('--bond',
                         dest='bond',
                         action='append',
@@ -209,7 +223,8 @@ def main(args):
                                      verbose=True, scaleDih=scaleDih,
                                      extra_mtp_files=args.extra_mtp,
                                      supplement_bonded_files=args.supplement_bonded,
-                                     inter_bonds=inter_bonds)
+                                     inter_bonds=inter_bonds,
+                                     decouple_dummies=args.decouple_dummies)
 
     # get the base path for the .itp file output
     basepath = os.path.abspath(outfile).rsplit('/',1)[0]

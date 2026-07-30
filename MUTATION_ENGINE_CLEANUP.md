@@ -343,6 +343,81 @@ Remaining follow-ups: (a) amber-non-q `N<res>`/`C<res>` resolver; (b) amber term
 (parameterize the harness FF per case); (c) the hardcoded CHARMM fallback + its is_pro/is_gly
 special cases are now superseded for tdb FFs — can be trimmed once amber-non-q is covered.
 
+## Phase 6 — Boresch dummy-atom decoupling (`gentop --decouple-dummies`)  *(2026-07-12)*
+**Why:** the Boresch audit (JCTC 2021, 17, 4403; paper `~/Downloads/dummy-atoms-...pdf`)
+showed pmx's default "naive" dummy treatment keeps *every* bonded term of an
+appearing/disappearing atom in BOTH end states, symmetrically. Some of those couple a
+physical DOF to a dummy one at the junction and **break the factorization** that makes the
+dummy free energy a state-independent constant (a systematic ΔG bias, common to classic and
+generative). Flapping (#6–9) is ABSENT (pmx over-anchors). Correction is opt-in, off by
+default, and must keep golden 0-drift when off.
+
+**Design:** a new gentop-stage pass `alchemy._decouple_dummies(topol)`, gated behind
+`gen_hybrid_top(..., decouple_dummies=)` → CLI `pmx gentop --decouple-dummies`. Runs after
+the proline/terminal decouplings in `process_topol`. Off by default → golden byte-identical.
+
+- **[x] Case #4 — Urey-Bradley terms (DONE, verified 2026-07-12).** CHARMM func-5 angles
+  carry a UB (1-3 harmonic) term = a virtual bond between the two *outer* angle atoms.
+  Boresch p.4406/4417: delete the UB "whenever the angle is made up from two physical and
+  one dummy atom" (even the paper's *naive* baseline does this). A 2-phys/1-dummy angle has
+  the dummy as an OUTER atom, so its UB 1-3 pair straddles the junction. Fix: zero the UB
+  sub-term (S0,kUB) in the dummy state, KEEP the harmonic angle (theta0,ktheta) → no flapping
+  introduced, no re-anchoring needed. **Aliasing gotcha:** `_find_angle_entries` stores the
+  SAME list object in the A-slot `ang[4]` and B-slot `ang[5]` for a junction angle, so the
+  pass *reassigns* the dummy-state slot with a fresh list (never mutates in place) — the
+  physical state keeps its real UB, the dummy state loses it (correct asymmetry).
+  Verified empirically (`scratchpad/verify_decouple.py`): on ala2val/asp2lys/leu2phe/
+  ile2val/asp2aspp the ONLY lines that change are func-5 angle UB columns (`non-func5 = 0`),
+  zeroed in exactly the dummy state; grompp-clean at both λ endpoints. Golden 0-drift (flag
+  off), 130 tests. Note: 1-phys/2-dummy angle UBs (dummy central OR two outer dummies) are
+  left per the paper's strict rule — they belong to the anchoring-count cleanup, not the
+  crisp UB rule.
+- **[x] Case #2/#3 — redundant terminal-junction dihedrals (DONE + validated 2026-07-13,
+  `_dc_terminal_dihedrals`).** Scope (user-chosen): *strictly terminal, single-branch*
+  junctions only — a dummy group bonded to the physical system through exactly ONE physical
+  bridge atom, no ring back to physical, bridge carrying no second dummy group. Dual/triple/
+  ring/shared-bridge are GUARDED OUT (ala2val/val2ala's two CB-methyls → 0 dihedral changes,
+  UB only). Boresch p.4409 keeps *all angles* at a terminal junction; only dihedrals are
+  redundant (ala2val: 23 junction dihedrals per methyl group; ile2val: 6 for the lone HV).
+  Algorithm: pick one physical anchor atom (physical dihedral end-atom anchoring the most
+  junction dihedrals; heavy-atom & low-id tie-break), KEEP its dihedrals unchanged, delete
+  (zero, dummy state only, multiplicity preserved) every other junction dihedral into the
+  group.
+  **KEY EMPIRICAL LESSON — the paper's stiff re-anchor is WRONG for the coordinate-free
+  gentop stage.** First cut followed Boresch literally (replace kept dihedral with a stiff
+  mult-1 term, k=100 kcal/mol, Table 3 fn b). Two problems, both caught by validation:
+  (a) GROMACS forbids perturbing a proper-dihedral *multiplicity* between states A/B
+  (`multiplicity can not be perturbed 1!=3`); (b) even after working around (a) by appending
+  a separate mult-1 entry, an anchor-fc sweep (`scratchpad/`) showed the stiff anchor at a
+  FIXED phase (can't match the absent geometry) COUPLES the physical bridge to the dummy and
+  displaces physical HEAVY atoms up to 244 pm (leu2phe) / 46 pm (ile2val) — worse than the
+  redundancy removed. Deletions ALONE: <1–5 pm. **Fix: keep the anchor atom's REAL dihedral
+  untouched** (its periodic minima already match the built geometry; the dummy's torsion
+  profile then equals the physical atom's), no artificial stiff term. Validated: physical
+  heavy-atom RMSD (naive vs corrected, vacuum min at dummy endpoint) 0.35–3.0 pm (ile2val
+  0.75, leu2phe 3.0, ala2pro 0.35, asp2lys 1.6); gas-phase flapping MD
+  (`scratchpad/flapping_check.py`, 100 ps) — pruned+kept-real group localizes as well as the
+  over-anchored naive (unimodal, antipodal excursions ≤ naive) for single-H, methyl, and
+  PHE-ring groups; grompp-clean both λ endpoints; golden 0-drift (flag off); 130 tests.
+  NOT done: dual/triple/ring junctions (guarded out; need the fuller Boresch §2.3 pass).
+- **[x] Factorization spot check for case #4 (DONE 2026-07-12, `scratchpad/factorization_check.py`).**
+  Structural form of the paper's check #1: at the endpoint where the group is a dummy,
+  vacuum-minimize with the naive vs corrected topology and measure the PHYSICAL-atom
+  displacement (the clean factorization-break signal; total Epot is contaminated by the
+  nonbonded-inert dummy group's own bonded relaxation, so it is NOT reported as the bias).
+  Marginal effect of the UB removal on physical geometry (tight-converged):
+  | case (endpoint) | phys-atom RMSD | max displacement |
+  |---|---|---|
+  | ILE→VAL, δ-methyl dummy (B) | 0.66 pm | 1.7 pm |
+  | ALA→PRO, ring appears (A) | 0.49 pm | 2.2 pm |
+  | ASP→LYS, NZ amine + carboxylate (A) | ~2.0 pm | ~7.5 pm |
+  Conclusion: **case #4 in isolation is a small, real correction** — pmx over-anchors, and
+  the retained harmonic angle stays as the anchor, so removing the UB shifts the physical
+  minimum only sub-few-pm. Largest for stiff heteroatom junctions (Asp carboxylate kUB up to
+  1.76e5, Lys amine); negligible for a plain methyl/ring. The theoretical value is restoring
+  *exact* factorization (a systematic bias, small per-junction, additive over many junctions);
+  the bulk of the remaining factorization break is in the un-pruned redundant dihedrals (#2/#3).
+
 ## Guardrails
 - **Behavior-preserving only.** Golden fixtures + 129 tests gate every commit; if any
   byte changes, stop and explain before proceeding.
