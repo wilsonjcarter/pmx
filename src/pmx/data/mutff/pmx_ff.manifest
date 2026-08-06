@@ -24,6 +24,9 @@
 #             `parent` is the file it is expected to live in (informational --
 #             the check is that it resolves, not where from, since a residue may
 #             legitimately move between the base RTP and a topic file).
+#   charge    residue whose net charge must equal `parent` (to 1e-4).  Guards the
+#             ECC scaling: charges are a silent failure mode -- a wrong one still
+#             builds, still runs, and only shows up as a bad free energy.
 #   hdb       residue that must have a hydrogen-build entry in some *.hdb.
 #   file      file that must exist in the force-field directory.
 #   include   file that must exist AND be #include'd by `parent`.
@@ -152,3 +155,49 @@ amber99sb-star-ildnp-q-ecc-mut  residue YP2   aminoacids.rtp
 # phosaa.r2tp in particular looks authoritative -- it carries live-looking,
 # correctly-scaled SP1/SP2/TP1/TP2/YP1/YP2 blocks -- while the entries actually
 # in use come from aminoacids.rtp.  Do not edit a .r2tp expecting an effect.
+
+# ── ECC charge scaling (charmm36m-ecc-mut) ───────────────────────────────────
+# `kind = charge` pins a residue's net charge; the value column is the expected
+# net.  charmm36m-ecc-mut scaled its canonical charged residues (x0.75 on every
+# side-chain atom, backbone untouched) but NOT its PTMs, so SEP/TPO/PTR/MLY/M3L
+# and the phosaa-named SP1..YP2 all still carried full formal charge.  Any ECC
+# phospho or methyl calculation was mixing scaled protein charges with an
+# unscaled modification -- TPO at -2.0 being the worst case.
+#
+# Scaled 2026-08-06 using the scheme derived from LYS/ASP (every non-backbone
+# atom x0.75, original recorded as a trailing "; qold=" comment).  CHARMM's
+# backbone sums to zero, so the net becomes 0.75 x the formal charge, matching
+# Amber's phosaa set.  These lines are the regression guard.
+charmm36m-ecc-mut  charge  SEP   -0.75
+charmm36m-ecc-mut  charge  TPO   -1.50
+charmm36m-ecc-mut  charge  PTR   -0.75
+charmm36m-ecc-mut  charge  SP1   -0.75
+charmm36m-ecc-mut  charge  SP2   -1.50
+charmm36m-ecc-mut  charge  TP1   -0.75
+charmm36m-ecc-mut  charge  TP2   -1.50
+charmm36m-ecc-mut  charge  YP1   -0.75
+charmm36m-ecc-mut  charge  YP2   -1.50
+charmm36m-ecc-mut  charge  MLY   +0.75
+charmm36m-ecc-mut  charge  M3L   +0.75
+charmm36m-ecc-mut  charge  MLYS  +0.75
+# canonical residues, pinned so the two sets cannot drift apart
+charmm36m-ecc-mut  charge  LYS   +0.75
+charmm36m-ecc-mut  charge  ARG   +0.75
+charmm36m-ecc-mut  charge  ASP   -0.75
+charmm36m-ecc-mut  charge  GLU   -0.75
+charmm36m-ecc-mut  charge  HSP   +0.75
+charmm36m-ecc-mut  charge  CYM   -0.75
+charmm36m-ecc-mut  charge  TYM   -0.75
+# NOS endpoints: NOT scaled, deliberately.  CN0/KN0 carry no formal charge --
+# they are a bound state whose pair sums to zero (-0.154 / +0.154), so there is
+# no ionic group to scale.  Pinned so nobody "fixes" them later.
+charmm36m-mut      charge  CN0   -0.154
+charmm36m-mut      charge  KN0   +0.154
+charmm36m-mut      charge  KS0   +0.286
+
+# ── UNRESOLVED: D-amino acids are still unscaled ─────────────────────────────
+# DASP DGLU DLYS DARG DHSP carry full formal charge in charmm36m-ecc-mut while
+# their L counterparts are scaled.  Same class of inconsistency as the PTMs
+# above, but out of scope for the PTM work and not deliberately reviewed -- left
+# for a decision rather than silently changed.  Not pinned here, because pinning
+# the current (wrong-looking) values would entrench them.

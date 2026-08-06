@@ -76,6 +76,28 @@ def _check_all():
                     "%s: residue %s MISSING (expected in %s; searched %s)"
                     % (ff, value, parent or "?", searched))
 
+        elif kind == "charge":
+            # `parent` holds the expected net charge.  Guards the ECC scaling:
+            # charmm36m-ecc-mut shipped SEP/TPO/PTR/MLY/M3L at full formal charge
+            # while its canonical residues were scaled, so any ECC phospho or
+            # methyl calculation mixed scaled protein charges with an unscaled
+            # modification.  Scaled 2026-08-06; this stops it drifting back.
+            try:
+                if ff not in rtp_cache:
+                    rtp_cache[ff] = load_ff_rtp(ff)
+                rtp = rtp_cache[ff]
+            except Exception as e:                      # pragma: no cover
+                fails.append("%s: could not load RTP database (%s)" % (ff, e))
+                continue
+            if value not in rtp:
+                fails.append("%s: residue %s MISSING (charge check)" % (ff, value))
+                continue
+            q = sum(float(a[2]) for a in rtp[value]["atoms"])
+            want = float(parent)
+            if abs(q - want) > 1e-4:
+                fails.append("%s: %s net charge %+.4f, expected %+.4f"
+                             % (ff, value, q, want))
+
         elif kind == "hdb":
             found = False
             for name in sorted(os.listdir(_ffdir(ff))):
