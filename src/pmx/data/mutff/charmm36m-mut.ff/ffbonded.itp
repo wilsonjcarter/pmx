@@ -15067,3 +15067,6 @@ CT3      HS   2     0.233942
      HN3        X        X      CN4     2     0.000000   167.360000
      HN3        X        X      CN3     2     0.000000   125.520000
       CC        X        X     CTD1     2     0.000000   803.328000
+
+; ---- pmx: NOS/SONOS/sulfenic bonded parameters (topic file, see nos_bonded.itp)
+#include "nos_bonded.itp"

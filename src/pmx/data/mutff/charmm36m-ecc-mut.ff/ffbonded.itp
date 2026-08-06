@@ -15067,3 +15067,81 @@ CT3      HS   2     0.233942
      HN3        X        X      CN4     2     0.000000   167.360000
      HN3        X        X      CN3     2     0.000000   125.520000
       CC        X        X     CTD1     2     0.000000   803.328000
+
+  ; --- TYM CB-CG junction (CT2-CG2R61), mirrored from CHARMM Tyr CA (no dummies) ---
+  [ bondtypes ]
+    CG2R61  CT2      1 0.14900000 192464.00
+  [ angletypes ]
+    CT1     CT2     CG2R61   5 107.500000 433.462400 0.00000000 0.00
+    CG2R61  CT2     HA2      5 107.500000 412.542400 0.00000000 0.00
+    CT2     CG2R61  CG2R61   5 122.300000 383.254400 0.00000000 0.00
+  [ dihedraltypes ]
+    CG2R61  CT2     CT1     HB1      9 0.000000 0.836800 3
+    CG2R61  CT2     CT1     C        9 180.000000 5.355520 1
+    CG2R61  CT2     CT1     C        9 180.000000 3.932960 2
+    CG2R61  CT2     CT1     C        9 180.000000 6.568880 3
+    CG2R61  CT2     CT1     NH1      9 180.000000 2.175680 1
+    CG2R61  CT2     CT1     NH1      9 180.000000 2.594080 2
+    CG2R61  CT2     CT1     NH1      9 0.000000 6.610720 3
+    CG2R61  CG2R61  CT2     HA2      9 0.000000 0.000000 6
+    CG2R61  CG2R61  CT2     CT1      9 0.000000 4.476880 1
+    CG2R61  CG2R61  CT2     CT1      9 180.000000 1.004160 2
+    CG2R61  CG2R61  CT2     CT1      9 180.000000 0.711280 3
+    HGR61   CG2R61  CG2R61  CT2      9 180.000000 17.572800 2
+    CG2R61  CG2R61  CG2R61  CT2      9 180.000000 12.970400 2
+
+    
+; --- NOS bonds
+ [ bondtypes ]
+ ; i      j   func    b0(nm)      kb(kJ/mol/nm^2)
+   NG311  OG301  1    0.14740      203677.12
+
+ [ angletypes ]
+ ; i      j      k    func   th0(deg)   kth(kJ/mol/rad^2)
+   CG321  NG311  OG301  5    103.800      578.229   0.00000   0.00
+   OG301  NG311  HGP1   5    102.290      485.344   0.00000   0.00
+   NG311  OG301  SG301  5    109.260      673.624   0.00000   0.00
+
+ [ dihedraltypes ]
+ ; i      j      k      l   func  phase(deg)  kphi(kJ/mol)  mult
+   CG321  CG321  NG311  OG301  9       0.00      1.5230   1
+   CG321  CG321  NG311  OG301  9       0.00      0.3515   2
+   CG321  CG321  NG311  OG301  9       0.00     16.9996   3
+   CG321  CG321  NG311  OG301  9       0.00      1.4811   4
+   CG321  NG311  OG301  SG301  9       0.00      7.6651   3
+   CG321  NG311  OG301  SG301  9       0.00      0.4351   6
+   HGA2   CG321  NG311  OG301  9     180.00      5.5898   3
+   HGP1   NG311  OG301  SG301  9     180.00      4.9790   3
+   HGP1   NG311  OG301  SG301  9       0.00      5.0124   1
+   NG311  OG301  SG301  CG321  9     180.00      0.0335   1
+   NG311  OG301  SG301  CG321  9       0.00      8.5228   2
+   NG311  OG301  SG301  CG321  9       0.00      3.7572   3
+   NG311  OG301  SG301  CG321  9     180.00      0.4644   6
+
+; ---- restored 2026-08-05 from the bundle snapshot ff/charmm36m-mut.ff/ffbonded.itp.
+; ---- Heteroatom bridge terms for CSO (sulfenic) and the NOS bridge, lost from the
+; ---- core mutff tree.  Only the entries ECC did not already carry are added here;
+; ---- the NG311-OG301 bond and the NOS angle/dihedral blocks are already present
+; ---- above, and re-adding them makes grompp reject a "second block of parameters".
+ [ bondtypes ]
+   OG301  SG301  1   0.16857    196673.10  ; S-O NOS bridge (SG2-OD2)
+   OG311  SG301  1   0.17016    212195.74  ; S-O sulfenic (SG1-OD)
+   OG311  HGP1   1   0.09600    456056.00  ; O-H sulfenic (OD-HD)
+   NG311  HGP1   1   0.10210    369865.60  ; N-H amine (NZ-HZ)
+
+ [ angletypes ]
+   SG301  OG311  HGP1   5   105.26    288.863  0.2191 334.64 ; S-O-H sulfenic (SG1-OD-HD)
+   CT1    CG321  SG301  5   112.50    485.344  0.00000   0.00 ; CA-CB-SG  (from the working Jul-13 CSO topology, CT1-CT2-S)
+   CG321  SG301  OG311  5    99.37    582.580  0.00000   0.00 ; CB-SG-OD  (from the working Jul-13 CSO topology, CT2-S-OG311)
+
+#include "cgenff_link.itp"
+
+ [ dihedraltypes ]
+ ; CSO sulfenic torsions, recovered verbatim from the working Jul-13 topology
+ ; (CNOS/fe_calcs/1e8i/sulfenic/pmxtop.top), re-expressed for the CGenFF typing
+ ; the current merged.rtp gives CSO (CB=CG321, SG=SG301, OD=OG311, HD=HGP1).
+   CT1    CG321  SG301  OG311  9   180.00    3.0476   1 ; CA-CB-SG-OD
+   CT1    CG321  SG301  OG311  9     0.00    1.3724   3 ; CA-CB-SG-OD
+   HGA2   CG321  SG301  OG311  9     0.00    1.7272   3 ; HB-CB-SG-OD
+   CG321  SG301  OG311  HGP1   9     0.00    1.6723   1 ; CB-SG-OD-HD
+   CG321  SG301  OG311  HGP1   9     0.00   11.9173   2 ; CB-SG-OD-HD

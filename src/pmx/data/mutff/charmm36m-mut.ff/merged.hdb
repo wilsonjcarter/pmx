@@ -450,3 +450,6 @@ ASPM       3
 1       1       HN      N       CA      -C
 3       4       HB      CB1     CA      C
 2       6       HB      CB2     CA      CG
+NME		2
+1	1	HN	N	-C	CH3
+3	4	HH3 CH3 N	-C

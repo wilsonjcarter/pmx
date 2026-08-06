@@ -1,0 +1,115 @@
+; nos_bonded.itp -- bonded parameters for the NOS / SONOS / sulfenic chemistry,
+; charmm36m-mut.  Included once from the end of ffbonded.itp.
+;
+; RESTORED 2026-08-06.  These were appended directly to the vendored ffbonded.itp
+; and were lost when that file went back to its upstream state; the only surviving
+; copy was the bundle snapshot ~/Desktop/pmx_covalent_showcases/ff/.  Kept in a
+; topic file so a revert or regeneration of ffbonded.itp cannot take them again.
+;
+; The first block is verbatim from the bundle.  The trailing block is additional:
+; the bundle's terms assume CSO typed with the protein types CT2/HA2, but the
+; vendored merged.rtp types CSO with the CGenFF types CG321/HGA2.  Rather than
+; re-type the vendored residue (which the loader would not let a topic file
+; override anyway), the CGenFF-typed equivalents are supplied here, recovered
+; from the working 2026-07-13 topology
+; ~/projects/2026_cnos/CNOS/fe_calcs/1e8i/sulfenic/pmxtop.top.
+
+ [ bondtypes ]
+ ; i      j   func    b0(nm)      kb(kJ/mol/nm^2)
+   NG311  OG301  1    0.14740      203677.12
+   OG301  SG301  1    0.16857      196673.10
+   OG311  SG301  1    0.17016      212195.74
+
+ [ angletypes ]
+ ; i      j      k    func   th0(deg)   kth(kJ/mol/rad^2)
+   CG321  NG311  OG301  5    103.800      578.229   0.00000   0.00
+   OG301  NG311  HGP1   5    102.290      485.344   0.00000   0.00
+   NG311  OG301  SG301  5    109.260      673.624   0.00000   0.00
+
+ [ dihedraltypes ]
+ ; i      j      k      l   func  phase(deg)  kphi(kJ/mol)  mult
+   CG321  CG321  NG311  OG301  9       0.00      1.5230   1
+   CG321  CG321  NG311  OG301  9       0.00      0.3515   2
+   CG321  CG321  NG311  OG301  9       0.00     16.9996   3
+   CG321  CG321  NG311  OG301  9       0.00      1.4811   4
+   CG321  NG311  OG301  SG301  9       0.00      7.6651   3
+   CG321  NG311  OG301  SG301  9       0.00      0.4351   6
+   HGA2   CG321  NG311  OG301  9     180.00      5.5898   3
+   HGP1   NG311  OG301  SG301  9     180.00      4.9790   3
+   HGP1   NG311  OG301  SG301  9       0.00      5.0124   1
+   NG311  OG301  SG301  CG321  9     180.00      0.0335   1
+   NG311  OG301  SG301  CG321  9       0.00      8.5228   2
+   NG311  OG301  SG301  CG321  9       0.00      3.7572   3
+   NG311  OG301  SG301  CG321  9     180.00      0.4644   6
+
+ [ bondtypes ]
+ ;  i      j   func   b0(nm)     kb
+   CT2    NG311  1   0.14740    220078.40  ; CG321-NG311 (CE-NZ)
+   CT2    SG301  1   0.18160    179075.20  ; CG321-SG301 (CB-SG)
+
+ [ angletypes ]
+ ;  i      j      k   func  th0      kth        ub0   kub     ; atoms / src
+   CT2    NG311  OG301  5   103.80    578.229  0.0   0.0     ; CE-NZ-OD  OPTIMISED Jun15
+   CT2    CT2    NG311  5   110.00    365.682  0.0   0.0     ; CD-CE-NZ  <-CG321CG321NG311
+   HA2    CT2    NG311  5   109.50    271.123  0.2130 418.40 ; HE-CE-NZ  <-NG311CG321HGA2 (w/UB)
+   CT2    NG311  HGP1   5   111.00    384.928  0.0   0.0     ; CE-NZ-HZ  <-CG321NG311HGP1
+   CT1    CT2    SG301  5   112.50    485.344  0.0   0.0     ; CA-CB-SG  <-CHARMM S-CT2-CT1
+   HA2    CT2    SG301  5   111.00    317.984  0.0   0.0     ; HB-CB-SG  <-SG301CG321HGA2
+   CT2    SG301  OG311  5    99.37    582.580  0.0   0.0     ; CB-SG-OD sulfenic <-CG321SG301OG311
+   CT2    SG301  OG301  5   101.70    431.036  0.0   0.0     ; CB-SG-OD nos <-CG321SG301OG301
+
+ [ dihedraltypes ]
+ ;  i      j      k      l   func  phase    kphi     mult ; atoms / src
+   CT2    CT2    NG311  OG301  9     0.0    1.5230  1 ; CD-CE-NZ-OD r13
+   CT2    CT2    NG311  OG301  9     0.0    0.3515  2 ; CD-CE-NZ-OD r13
+   CT2    CT2    NG311  OG301  9     0.0   16.9996  3 ; CD-CE-NZ-OD r13
+   CT2    CT2    NG311  OG301  9     0.0    1.4811  4 ; CD-CE-NZ-OD r13
+   CT2    NG311  OG301  SG301  9     0.0    7.6651  3 ; CE-NZ-OD-SG r13
+   CT2    NG311  OG301  SG301  9     0.0    0.4351  6 ; CE-NZ-OD-SG r13
+   HA2    CT2    NG311  OG301  9   180.0    5.5898  3 ; HE-CE-NZ-OD r13
+   NG311  OG301  SG301  CT2    9   180.0    0.0335  1 ; NZ-OD-SG-CB r13
+   NG311  OG301  SG301  CT2    9     0.0    8.5228  2 ; NZ-OD-SG-CB r13
+   NG311  OG301  SG301  CT2    9     0.0    3.7572  3 ; NZ-OD-SG-CB r13
+   NG311  OG301  SG301  CT2    9   180.0    0.4644  6 ; NZ-OD-SG-CB r13
+   CT1    CT2    SG301  OG311  9   180.0    3.0476  1 ; CA-CB-SG-OD(sulf) <-cgenff
+   CT1    CT2    SG301  OG311  9     0.0    1.3724  3 ; CA-CB-SG-OD(sulf) <-cgenff
+   HA2    CT2    SG301  OG311  9     0.0    1.7272  3 ; HB-CB-SG-OD(sulf) <-cgenff
+   HGP1   OG311  SG301  CT2    9     0.0    1.6723  1 ; HD-OD-SG-CB(sulf) <-cgenff
+   HGP1   OG311  SG301  CT2    9     0.0   11.9173  2 ; HD-OD-SG-CB(sulf) <-cgenff
+
+ ; --- intra-residue torsions to the bridge heteroatoms (were missing) ---
+   CT2    CT2    NG311  HGP1   9     0.0    0.4184  3 ; CD-CE-NZ-HZ  <-cgenff CG321CG321NG311HGP1
+   HA2    CT2    NG311  HGP1   9     0.0    0.2092  3 ; HE-CE-NZ-HZ  <-cgenff HGA2CG321NG311HGP1
+   CT1    CT2    SG301  OG301  9   180.0    3.0476  1 ; CA-CB-SG-OD(nos) <-sulfenic OG311 analogy
+   CT1    CT2    SG301  OG301  9     0.0    1.3724  3 ; CA-CB-SG-OD(nos) <-sulfenic OG311 analogy
+   HA2    CT2    SG301  OG301  9     0.0    1.7272  3 ; HB-CB-SG-OD(nos) <-sulfenic OG311 analogy
+
+ ; Pure-aliphatic side-chain torsions (C-C-C-N etc.) resolve from existing
+ ; CT2 parameters; run grompp to catch any residual missing term.
+
+ ; --- heteroatom-only bridge bonds/angles (option-independent; were missing) ---
+ [ bondtypes ]
+   SG301  OG311  1   0.17016    212195.74  ; S-O sulfenic (SG1-OD)
+   SG301  OG301  1   0.16857    196673.10  ; S-O NOS bridge (SG2-OD2)
+   OG311  HGP1   1   0.09600    456056.00  ; O-H sulfenic (OD-HD)
+   NG311  HGP1   1   0.10210    369865.60  ; N-H amine (NZ-HZ)  cgenff 442.0/1.021
+ [ angletypes ]
+   SG301  OG311  HGP1   5   105.26    288.863  0.2191 334.64 ; S-O-H sulfenic (SG1-OD-HD)
+
+
+
+
+; ---- CGenFF-typed CSO equivalents (CB=CG321, SG=SG301, OD=OG311, HD=HGP1) ----
+ [ angletypes ]
+   CT1    CG321  SG301  5   112.50    485.344  0.00000   0.00 ; CA-CB-SG  (as CT1-CT2-S)
+   CG321  SG301  OG311  5    99.37    582.580  0.00000   0.00 ; CB-SG-OD  (as CT2-S-OG311)
+
+ [ dihedraltypes ]
+   CT1    CG321  SG301  OG311  9   180.00    3.0476   1 ; CA-CB-SG-OD
+   CT1    CG321  SG301  OG311  9     0.00    1.3724   3 ; CA-CB-SG-OD
+   HGA2   CG321  SG301  OG311  9     0.00    1.7272   3 ; HB-CB-SG-OD
+   CG321  SG301  OG311  HGP1   9     0.00    1.6723   1 ; CB-SG-OD-HD
+   CG321  SG301  OG311  HGP1   9     0.00   11.9173   2 ; CB-SG-OD-HD
+
+; protein <-> CGenFF link terms (CT1-CG321 etc); present but never included before
+#include "cgenff_link.itp"

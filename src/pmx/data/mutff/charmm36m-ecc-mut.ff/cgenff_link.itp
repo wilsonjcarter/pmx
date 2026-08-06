@@ -1,0 +1,88 @@
+; ============================================================================
+; cgenff_link.itp   --  missing bonded parameters for the acyl-lysine hybrids
+;
+;   PART 1  CHARMM<->CGenFF backbone junction (CA=CT1 to CB=CG321)   [analogy]
+;   PART 2  CGenFF sidechain-internal terms                          [legacy]
+;
+; PART 2 values are Carter's validated legacy params (HIB/SLY/BLY/FLY work).
+; Terms NOT in the legacy set are marked  [analogy]  and were filled from the
+; nearest ffbonded.itp entry -- these are the crotonyl (KCR) conjugated terms,
+; one propionyl (PLY) term, and all of PART 1. Sanity-check the [analogy] lines
+; if KCR/PLY endpoints matter quantitatively.
+;
+; USAGE: add at the END of  charmm36m-mut.ff/ffbonded.itp :
+;     #include "cgenff_link.itp"
+; ============================================================================
+
+
+; ========================= PART 1 : backbone junction =======================
+; Only through-bond crossing CHARMM(backbone)/CGenFF(sidechain) = CA-CB = CT1-CG321.
+; Not present in the legacy set; required by the current charmm36m-mut typing.  [analogy]
+
+[ bondtypes ]
+; i     j      func   b0(nm)       kb
+  CT1   CG321   1     0.15380000   186188.00      ; <- CT1-CT2
+
+[ angletypes ]
+; i     j      k      func  th0        cth          ub0          cub
+  NH1   CT1    CG321   5    113.500000 585.760000   0.00000000   0.00       ; <- NH1-CT1-CT2
+  C     CT1    CG321   5    108.000000 435.136000   0.00000000   0.00       ; <- C-CT1-CT2
+  HB1   CT1    CG321   5    111.000000 292.880000   0.00000000   0.00       ; <- HB1-CT1-CT2
+  CT1   CG321  CG321   5    113.500000 488.272800   0.25610000   9338.69    ; <- CG311-CG321-CG321
+  CT1   CG321  HGA2    5    110.100000 279.742240   0.21790000   18853.10   ; <- CG311-CG321-HGA2
+
+[ dihedraltypes ]
+; i     j      k      l      func  phi0       cp           mult
+  X     CT1    CG321  X      9     0.000000   0.836800     3                ; <- X-CT1-CT2-X
+  CT1   CG321  CG321  CG321  9     0.000000   2.092000     3                ; <- CG311-CG321-CG321-CG321
+  CT1   CG321  CG321  CG321  9   180.000000   2.092000     6                ; <- CG311-CG321-CG321-CG321
+  CT1   CG321  CG321  HGA2   9     0.000000   0.815880     3                ; <- CG311-CG321-CG321-HGA2
+  CG321 CT1    NH1    C      9     0.000000   7.531200     1                ; <- CT2-CT1-NH1-C
+  CG321 CT1    NH1    H      9     0.000000   0.000000     1                ; <- CT2-CT1-NH1-H
+  CG321 CT1    C      O      9     0.000000   5.857600     1                ; <- CT2-CT1-C-O
+  CG321 CT1    C      NH1    9     0.000000   0.000000     1                ; <- CT2-CT1-C-NH1
+
+
+; ============ PART 2 : CGenFF sidechain-internal terms (legacy) ==============
+
+[ bondtypes ]
+;      i        j  func           b0           kb
+   CG2O1    CG301     1   0.14900000    209200.00
+
+[ angletypes ]
+;      i        j        k  func       theta0       ktheta          ub0          kub
+   NG2S1    CG2O1    CG301     5   116.500000   669.440002   0.00000000         0.00
+   OG2D1    CG2O1    CG301     5   121.000000   669.440002   0.00000000         0.00
+   CG2O1    CG301    CG331     5   108.000000   435.135986   0.00000000         0.00
+   CG2O1    CG301    OG311     5   111.000000   937.216003   0.00000000         0.00
+
+[ dihedraltypes ]
+;      i        j        k        l  func         phi0         kphi  mult
+   CG321    NG2S1    CG2O1    CG301     9     0.000000     6.694400     1
+   CG321    NG2S1    CG2O1    CG301     9   180.000000    10.460000     2
+    HGP1    NG2S1    CG2O1    CG301     9   180.000000    10.460000     2
+   NG2S1    CG2O1    CG301    CG331     9     0.000000     0.000000     1
+   NG2S1    CG2O1    CG301    OG311     9     0.000000    10.752880     1
+   NG2S1    CG2O1    CG301    OG311     9     0.000000     1.924640     3
+   OG2D1    CG2O1    CG301    CG331     9     0.000000     5.857600     1
+   OG2D1    CG2O1    CG301    OG311     9   180.000000     7.029120     2
+   CG2O1    CG301    CG331     HGA3     9     0.000000     0.836800     3
+   CG2O1    CG301    OG311     HGP1     9     0.000000     1.464400     1
+   CG2O1    CG301    OG311     HGP1     9     0.000000     1.548080     2
+   CG2O1    CG301    OG311     HGP1     9   180.000000     0.041840     3
+   CG321    NG2S1    CG2O1    HGR52     9     0.000000     6.443360     1
+   CG321    NG2S1    CG2O1    HGR52     9   180.000000    12.217280     2
+   CG2O1    CG321    CG321    CG331     9     0.000000     0.794960     3
+   CG2O1    CG321    CG321    CG2O3     9     0.000000     0.836800     3
+; -- crotonyl (KCR) + propionyl (PLY): not in legacy set                    [analogy]
+   CG2O1   CG2DC1   CG2DC1     HGA4     9   180.000000    21.756800     2   ; <- *-CG2DC1-CG2DC1-HGA4 (C=C)
+   CG321    NG2S1    CG2O1   CG2DC1     9     0.000000     6.694400     1   ; <- CG321-NG2S1-CG2O1-CG321
+   CG321    NG2S1    CG2O1   CG2DC1     9   180.000000    10.460000     2
+   NG2S1    CG2O1    CG321    CG331     9     0.000000     0.000000     1   ; <- NG2S1-CG2O1-CG321-CG321 (PLY)
+
+[ dihedraltypes ]
+; 'improper' dihedrals (func 2)
+;      i        j        k        l  func         phi0         kphi
+   CG2O1    CG301    NG2S1    OG2D1     2     0.000000  1004.159973
+   NG2S1        X        X     HGP1     2     0.000000   167.360000   ; wildcard for lysinemods
+   OG2D2        X        X    CG2O3     2     0.000000   803.328000   ; wildcard for lysinemods

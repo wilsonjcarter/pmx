@@ -61840,3 +61840,24 @@ C5  C4  C6  C5M
   [ cmap ]
 	   -C     N    CA     C    +N
 
+
+[ NME ] ; terminal residue, provided by Mark Abraham
+      		; renamed by Justin Lemkul to avoid clash with N-methylacetamide
+       [ atoms ]
+      	   N	   NH1	   -0.470  1
+      	   HN	   H	   0.310   1
+      	   CH3	   CT3	   -0.110  1
+      	   HH31    HA3	   0.090   1
+      	   HH32    HA3	   0.090   1
+      	   HH33    HA3	   0.090   1
+       [ bonds ]
+      	   -C	   N
+      	   N	   HN
+      	   N	   CH3
+      	   CH3	   HH31
+      	   CH3	   HH32
+      	   CH3	   HH33
+       [ impropers ]
+      	   N	   -C	   CH3	   HN
+      	   -C	   CH3	   N	   -O
+
