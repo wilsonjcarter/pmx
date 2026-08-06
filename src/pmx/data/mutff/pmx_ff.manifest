@@ -1,0 +1,154 @@
+# pmx_ff.manifest -- what pmx adds to, or must preserve in, each bundled force field.
+#
+# WHY THIS EXISTS
+# ---------------
+# Every residue and parameter pmx introduced used to live inside a *vendored*
+# file (merged.rtp, aminoacids.rtp, ffbonded.itp), indistinguishable from
+# upstream content.  On 2026-07-15 a revert of merged.rtp silently took the
+# CN0/KN0/KS0 NOS endpoints, 7 acyl-lysines and NME with it; nothing noticed
+# until 2026-08-05, and recovering them cost a day of archaeology through build
+# artifacts.  Nothing in the tree could answer "which residues did we add, and
+# are they all still here?".
+#
+# This file answers that question, and tests/test_ff_manifest.py enforces it.
+# A revert or regeneration that drops an entry now fails a test instead of
+# surfacing weeks later as a confusing build error.
+#
+# FORMAT
+# ------
+#   <force-field>  <kind>  <value>  [parent]
+#
+# Blank lines and #-comments ignored.  Kinds:
+#
+#   residue   RTP entry that must resolve through ffparser.load_ff_rtp.
+#             `parent` is the file it is expected to live in (informational --
+#             the check is that it resolves, not where from, since a residue may
+#             legitimately move between the base RTP and a topic file).
+#   hdb       residue that must have a hydrogen-build entry in some *.hdb.
+#   file      file that must exist in the force-field directory.
+#   include   file that must exist AND be #include'd by `parent`.
+#   restype   residue that must be classified in the tree-level residuetypes.dat
+#             (force-field column is '-').  A per-force-field residuetypes.dat
+#             REPLACES this file rather than merging with it, so introducing one
+#             silently declassifies everything it omits -- that is exactly what a
+#             12-byte stub containing only "6FL Protein" did to charmm36m-mut.
+#
+# ADDING TO THIS FILE
+# -------------------
+# If you hand-add a residue or parameter block to a force field, add a line here
+# in the same commit.  If it is upstream content being restored, add it too --
+# the point is to detect loss, not only to record authorship.
+
+# ── charmm36m-mut ────────────────────────────────────────────────────────────
+# NOS / SONOS bound-state endpoints.  Ours: present in no upstream, reconstructed
+# 2026-08-06 from the state-B columns of topologies that ran.  These are what
+# `pmx mutate --react` resolves; a hybrid library cannot supply them.
+charmm36m-mut       residue   CN0            nos.rtp
+charmm36m-mut       residue   KN0            nos.rtp
+charmm36m-mut       residue   KS0            nos.rtp
+charmm36m-mut       include   nos_bonded.itp ffbonded.itp
+charmm36m-mut       file      cgenff_link.itp
+
+# Acyl-lysines.  Upstream content that had been lost locally; restored to a topic
+# file 2026-08-06.  The histone-reader showcase depends on these.
+charmm36m-mut       residue   ALY            acyl.rtp
+charmm36m-mut       residue   BLY            acyl.rtp
+charmm36m-mut       residue   FLY            acyl.rtp
+charmm36m-mut       residue   HIB            acyl.rtp
+charmm36m-mut       residue   KCR            acyl.rtp
+charmm36m-mut       residue   PLY            acyl.rtp
+charmm36m-mut       residue   SLY            acyl.rtp
+
+# NME.  Upstream content, lost and restored.  It must live in merged.rtp: from a
+# topic file pdb2gmx resolves the entry but then dies at atom-sorting with
+# "Atom H in residue NME was not found in rtp entry NME with 6 atoms".  Needed by
+# the GACE reference arm (ACE-ALA-X-ALA-NME).
+charmm36m-mut       residue   NME            merged.rtp
+charmm36m-mut       hdb       NME            merged.hdb
+
+# ── charmm36m-ecc-mut ────────────────────────────────────────────────────────
+# Protein<->CGenFF link terms + the sulfenic/NOS bonded block.  CSO is a hybrid
+# residue (CA=CT1 protein, CB=CG321 CGenFF), so it needs both.
+charmm36m-ecc-mut   file      cgenff_link.itp
+charmm36m-ecc-mut   include   cgenff_link.itp ffbonded.itp
+charmm36m-ecc-mut   residue   GACE           merged.rtp
+charmm36m-ecc-mut   residue   TYM            merged.rtp
+charmm36m-ecc-mut   residue   NME            merged.rtp
+
+# ── amber -q-ecc variants ────────────────────────────────────────────────────
+# GACE is the GSH reference cap; ALY the acetyl-lysine.  Both turn out to be
+# UPSTREAM content, not ours -- an earlier draft assumed otherwise because they
+# sit indented mid-file in aminoacids.rtp (ALY at ~line 544), which reads like a
+# hand-insertion.  Declared here anyway: the GSH reference work depends on GACE,
+# so its disappearance must fail a test regardless of who authored it.
+amber14sb-q-ecc-mut         residue GACE  aminoacids.rtp
+amber14sb-q-ecc-mut         residue ALY   aminoacids.rtp
+amber19sb-q-ecc-mut         residue GACE  aminoacids.rtp
+amber19sb-q-ecc-mut         residue ALY   aminoacids.rtp
+amber99sb-star-ildnp-q-ecc-mut residue GACE aminoacids.rtp
+amber99sb-star-ildnp-q-ecc-mut residue ALY  aminoacids.rtp
+
+# ── disulfide endpoints ──────────────────────────────────────────────────────
+# CHARMM ships CYS2, Amber ships CYX; covalent/target.py maps between them.  A
+# recipe naming either endpoint must resolve on every one of these.
+charmm36m-mut               residue CYS2  merged.rtp
+charmm36m-ecc-mut           residue CYS2  merged.rtp
+amber14sb-q-mut             residue CYX   aminoacids.rtp
+amber19sb-q-mut             residue CYX   aminoacids.rtp
+amber19sbmut                residue CYX   aminoacids.rtp
+amber99sb-star-ildnp-q-mut  residue CYX   aminoacids.rtp
+
+# ── tree-level residuetypes.dat ──────────────────────────────────────────────
+-  restype  CN0   Protein
+-  restype  KN0   Protein
+-  restype  KS0   Protein
+-  restype  6FL   Protein
+-  restype  NME   Protein
+-  restype  ACE   Protein
+
+# ── TYM (deprotonated tyrosine) ──────────────────────────────────────────────
+# The ONLY residue pmx adds across the entire Amber family, and it is in
+# charmm36m-ecc-mut too.  GACE and ALY, which an earlier draft of
+# FF_LAYOUT_PROPOSAL.md claimed were ours, turned out to be upstream content.
+amber14sb-q-ecc-mut             residue TYM   aminoacids.rtp
+amber14sb-q-mut                 residue TYM   aminoacids.rtp
+amber14sbmut                    residue TYM   aminoacids.rtp
+amber19sb-q-ecc-mut             residue TYM   aminoacids.rtp
+amber19sb-q-mut                 residue TYM   aminoacids.rtp
+amber19sbmut                    residue TYM   aminoacids.rtp
+amber99sb-star-ildn-mut         residue TYM   aminoacids.rtp
+amber99sb-star-ildnp-q-ecc-mut  residue TYM   aminoacids.rtp
+amber99sb-star-ildnp-q-mut      residue TYM   aminoacids.rtp
+charmm36m-ecc-mut               residue TYM   merged.rtp
+
+# ── Amber phospho residues ───────────────────────────────────────────────────
+# Live in the vendored aminoacids.rtp and are correctly ECC-scaled: SP1/TP1/YP1
+# -0.75 and SP2/TP2/YP2 -1.50, i.e. 0.75x per formal charge unit.  Declared here
+# because CHARMM's ECC force field does NOT scale its equivalents (SEP -1,
+# TPO -2, PTR -1) -- Amber is the precedent for fixing that.
+amber14sb-q-ecc-mut             residue SP1   aminoacids.rtp
+amber14sb-q-ecc-mut             residue SP2   aminoacids.rtp
+amber14sb-q-ecc-mut             residue TP1   aminoacids.rtp
+amber14sb-q-ecc-mut             residue TP2   aminoacids.rtp
+amber14sb-q-ecc-mut             residue YP1   aminoacids.rtp
+amber14sb-q-ecc-mut             residue YP2   aminoacids.rtp
+amber19sb-q-ecc-mut             residue SP1   aminoacids.rtp
+amber19sb-q-ecc-mut             residue SP2   aminoacids.rtp
+amber19sb-q-ecc-mut             residue TP1   aminoacids.rtp
+amber19sb-q-ecc-mut             residue TP2   aminoacids.rtp
+amber19sb-q-ecc-mut             residue YP1   aminoacids.rtp
+amber19sb-q-ecc-mut             residue YP2   aminoacids.rtp
+amber99sb-star-ildnp-q-ecc-mut  residue SP1   aminoacids.rtp
+amber99sb-star-ildnp-q-ecc-mut  residue SP2   aminoacids.rtp
+amber99sb-star-ildnp-q-ecc-mut  residue TP1   aminoacids.rtp
+amber99sb-star-ildnp-q-ecc-mut  residue TP2   aminoacids.rtp
+amber99sb-star-ildnp-q-ecc-mut  residue YP1   aminoacids.rtp
+amber99sb-star-ildnp-q-ecc-mut  residue YP2   aminoacids.rtp
+
+# ── DEAD FILES -- do not trust as a source ───────────────────────────────────
+# *.r2tp, *.r3tp and *.m2tp (phosaa.r2tp, phosaa.r3tp, mutres.r2tp, mutres.m2tp,
+# aminoacids.r2tp) are read by NOTHING: not pmx (ffparser globs *.rtp only) and
+# not pdb2gmx (same).  They are upstream files, left in place, but they are dead.
+# phosaa.r2tp in particular looks authoritative -- it carries live-looking,
+# correctly-scaled SP1/SP2/TP1/TP2/YP1/YP2 blocks -- while the entries actually
+# in use come from aminoacids.rtp.  Do not edit a .r2tp expecting an effect.
