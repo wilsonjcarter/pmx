@@ -24,7 +24,7 @@ import numpy as np
 
 from ..atom import Atom
 from ..model import Model
-from ..ffparser import RTPParser
+from ..ffparser import RTPParser, load_ff_rtp
 from ..utils import get_ff_path
 
 try:
@@ -102,15 +102,19 @@ def _element_for_type(atomtype: str, masses: Dict[str, float]) -> str:
 # ── RTP -> RDKit geometry ─────────────────────────────────────────────────────
 
 @lru_cache(maxsize=8)
-def _load_rtp(rtp_file: str) -> RTPParser:
-    """Parse and cache an RTP database (read-only use).
+def _load_rtp(ff: str) -> RTPParser:
+    """Parse and cache a force field's residue database (read-only use).
 
     ``RTPParser`` is slow on large merged CHARMM RTP files (tens of thousands of
     lines), and a single session may build several targets from the same force
     field; caching the parse keeps repeated ``from_rtp`` calls cheap.  Callers
     must treat the returned parser as read-only.
+
+    Delegates to :func:`pmx.ffparser.load_ff_rtp`, so residues split out of the
+    vendored file into a topic RTP (``nos.rtp``, ``caps.rtp``, ...) resolve here
+    exactly as they already do for pdb2gmx.
     """
-    return RTPParser(rtp_file)
+    return load_ff_rtp(ff)
 
 
 # Residue-name synonyms so a generic/target name resolves to the force field's
@@ -123,7 +127,10 @@ _RESNAME_SYNONYMS = {
     "HID":  ["HID", "HSD"], "HIE": ["HIE", "HSE"], "HIP": ["HIP", "HSP"],
     "HSD":  ["HSD", "HID"], "HSE": ["HSE", "HIE"], "HSP": ["HSP", "HIP"],
     "LYN":  ["LYN", "LSN"], "ASH": ["ASH", "ASPP"], "GLH": ["GLH", "GLUP"],
-    "CYX":  ["CYX", "CYS2"], "CYM": ["CYM"],
+    # Both directions: CHARMM ships the disulfide-bonded cysteine as CYS2, Amber
+    # as CYX.  Recipes name one endpoint, so without the reverse mapping a
+    # disulfide targeting CYS2 is unresolvable on every Amber force field.
+    "CYX":  ["CYX", "CYS2"], "CYS2": ["CYS2", "CYX"], "CYM": ["CYM"],
 }
 
 
@@ -145,14 +152,12 @@ def _rtp_atoms_bonds(resname: str, ff: str):
     inter-residue ``+``/``-`` bonds dropped.
     """
     ffpath = get_ff_path(ff)
-    rtp_file = os.path.join(ffpath, "merged.rtp")
-    if not os.path.isfile(rtp_file):
-        rtp_file = os.path.join(ffpath, "aminoacids.rtp")
-    rtp = _load_rtp(rtp_file)
+    rtp = _load_rtp(ff)
     resolved = _resolve_resname(resname, rtp)
     if resolved is None:
+        searched = ", ".join(os.path.basename(s) for s in rtp.sources)
         raise KeyError(
-            f"Residue '{resname}' not found in {rtp_file}. "
+            f"Residue '{resname}' not found in {ffpath} (searched: {searched}). "
             "Provide a structure/ITP target, or add the RTP entry.")
     entry = rtp[resolved]
     atom_rows = entry["atoms"]

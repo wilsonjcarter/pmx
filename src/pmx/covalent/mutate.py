@@ -29,7 +29,7 @@ import numpy as np
 
 from .. import library
 from ..model import Model
-from ..ffparser import RTPParser
+from ..ffparser import RTPParser, load_ff_rtp
 from ..utils import get_ff_path, list2file
 from ..library import pmx_data_file
 
@@ -87,11 +87,8 @@ def _superpose_target(residue1, residue2, pairs) -> None:
 # ── force-field helpers ───────────────────────────────────────────────────────
 
 def _load_rtp(ff: str):
-    ffpath = get_ff_path(ff)
-    rtp_file = os.path.join(ffpath, "merged.rtp")
-    if not os.path.isfile(rtp_file):
-        rtp_file = os.path.join(ffpath, "aminoacids.rtp")
-    return RTPParser(rtp_file), ffpath
+    # base RTP + any topic RTPs (nos.rtp, caps.rtp, ...); see ffparser.load_ff_rtp
+    return load_ff_rtp(ff), get_ff_path(ff)
 
 
 def _inter_residue_bonds(rtp, resname, term):
@@ -156,7 +153,8 @@ def build_hybrid_residue(residue1, residue2, ff: str, mut_resname: str,
                          term: Optional[str] = None,
                          term_b: Optional[str] = "__same__",
                          hybrid_name: Optional[str] = None,
-                         write_ff_types: bool = True) -> Tuple[str, str, str]:
+                         write_ff_types: bool = True,
+                         reverse: bool = False) -> Tuple[str, str, str]:
     """Build a hybrid residue from two parameterized residues via graph mapping.
 
     Both residues must already carry atom types/charges/masses and bond
@@ -228,6 +226,14 @@ def build_hybrid_residue(residue1, residue2, ff: str, mut_resname: str,
     im1 = _improps_as_atoms(entr1["improps"], residue1, residue2)
     im2 = _improps_as_atoms(entr2["improps"], residue1, residue2, use_b=True)
 
+    # reverse the alchemical direction: the target becomes state A and the WT
+    # state B, so the emitted hybrid morphs product -> reactant.  Swapping the
+    # A/B improper & dihedral lists flips which state each interaction belongs to
+    # (the per-atom A/B fields are swapped just below, before emit).
+    if reverse:
+        dih1, dih2 = dih2, dih1
+        im1, im2 = im2, im1
+
     cmap = rtp[residue1.resname].get("cmap", []) if bCharmm else []
     dihi_list = _generate_dihedral_entries(dih1, dih2, residue1, atom_pairs)
     ii_list = _generate_improp_entries(im1, im2, residue1)
@@ -235,11 +241,38 @@ def build_hybrid_residue(residue1, residue2, ff: str, mut_resname: str,
     bond_neigh = _inter_residue_bonds(rtp, residue1.resnA if hasattr(
         residue1, "resnA") else residue1.resname, term)
 
+    if reverse:
+        # swap each atom's A and B state (types, charges, masses, names).  After
+        # this residue1 carries the product as state A; _make_rtp/_make_mtp and
+        # the model.write() of the mutant structure both read these swapped
+        # fields, so the emitted hybrid and the output coordinates are consistent.
+        for a in residue1.atoms:
+            a.atomtype, a.atomtypeB = a.atomtypeB, a.atomtype
+            a.q, a.qB = a.qB, a.q
+            a.m, a.mB = a.mB, a.m
+            a.name, a.nameB = a.nameB, a.name
+            a.type, a.typeB = a.typeB, a.type
+            # A WT-only atom (removed in the forward morph) carries the sentinel
+            # name '<name>.gone' as its B-state name; after the swap that lands
+            # in state A, which is not a valid structure-atom name.  Give it a
+            # clean D-prefixed dummy name (pmx's added-atom convention), keeping
+            # RTP and written coordinates consistent so pdb2gmx sorts it.
+            if a.name.endswith('.gone'):
+                a.name = ('D' + a.name[:-len('.gone')])[:4]
+
     if hybrid_name is None:
         one_letter = library._one_letter.get(residue1.resname,
                                               residue1.resname[0])
-        hybrid_name = (one_letter + "2" + mut_resname.upper())[:4]
-    residue1.resnA, residue1.resnB = residue1.resname, mut_resname
+        if reverse:
+            # distinct name (e.g. SP2S) so the reverse hybrid never collides with
+            # its forward counterpart (S2SP) in the shared nsaa.rtp/nsaa.mtp.
+            hybrid_name = (mut_resname.upper() + "2" + one_letter)[:4]
+        else:
+            hybrid_name = (one_letter + "2" + mut_resname.upper())[:4]
+    if reverse:
+        residue1.resnA, residue1.resnB = mut_resname, residue1.resname
+    else:
+        residue1.resnA, residue1.resnB = residue1.resname, mut_resname
     residue1.set_resname(hybrid_name)
 
     rtp_text = "".join(_make_rtp(residue1, ii_list, dihi_list,
@@ -378,7 +411,8 @@ def mutate(model, mut_resid: int, target: str, ff: str,
            structure: Optional[str] = None, itp: Optional[str] = None,
            refB: Optional[str] = None,
            mut_chain: Optional[str] = None, inplace: bool = False,
-           write_files: bool = True, verbose: bool = False):
+           write_files: bool = True, verbose: bool = False,
+           reverse: bool = False):
     """Mutate ``mut_resid`` in *model* to *target*, via one of three front ends.
 
     Parameters
@@ -449,14 +483,16 @@ def mutate(model, mut_resid: int, target: str, ff: str,
         _apply_ref_geometry(residue2, refB, mut_resid, mut_chain)
 
     rtp_text, mtp_text, hybrid_name = build_hybrid_residue(
-        residue1, residue2, ff, target, term=term, write_ff_types=write_files)
+        residue1, residue2, ff, target, term=term, write_ff_types=write_files,
+        reverse=reverse)
 
     if write_files:
         _accumulate_hybrid(ffpath, hybrid_name, rtp_text, mtp_text, bCharmm)
 
     if verbose:
         print(f"log_> covalent.mutate: hybrid {hybrid_name} "
-              f"({residue1.resnA} -> {target}); "
+              f"({residue1.resnA} -> {residue1.resnB}"
+              f"{', reverse' if reverse else ''}); "
               f"MTP -> {os.path.join(ffpath, 'nsaa.mtp')}")
     return hybrid_name
 

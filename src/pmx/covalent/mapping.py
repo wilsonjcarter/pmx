@@ -124,15 +124,13 @@ def attach_bonds_from_rtp(residue, ff: str) -> None:
     the graph mapper needs.  Intra-residue bonds only; ``+``/``-`` inter-residue
     bonds are skipped.  No-op for atoms already bonded.
     """
-    from ..ffparser import RTPParser
+    from ..ffparser import load_ff_rtp
     from ..utils import get_ff_path
     ffpath = get_ff_path(ff)
-    rtp_file = os.path.join(ffpath, "merged.rtp")
-    if not os.path.isfile(rtp_file):
-        rtp_file = os.path.join(ffpath, "aminoacids.rtp")
-    rtp = RTPParser(rtp_file)
+    rtp = load_ff_rtp(ff)      # base RTP + any topic RTPs
     if residue.resname not in rtp:
-        raise KeyError(f"{residue.resname} not in {rtp_file}")
+        searched = ", ".join(os.path.basename(s) for s in rtp.sources)
+        raise KeyError(f"{residue.resname} not in {ffpath} (searched: {searched})")
     by_name = {}
     for a in residue.atoms:
         by_name[a.name] = a

@@ -1421,7 +1421,7 @@ def sanitize_itp(
         'gaff_type': str}}``
     """
     from collections import deque, defaultdict as _dd
-    from .ffparser import RTPParser
+    from .ffparser import RTPParser, load_ff_rtp
 
     if out_itp is None:
         base, ext = os.path.splitext(itp_file)
@@ -1463,10 +1463,7 @@ def sanitize_itp(
     # ── 3. BFS through base-RTP sidechain from CA ────────────────────────────
     BACKBONE = {'N', 'HN', 'H', 'CA', 'HA', 'C', 'O', 'OC1', 'OC2'}
     ffpath   = get_ff_path(ff)
-    rtp_path = os.path.join(ffpath, 'merged.rtp')
-    if not os.path.isfile(rtp_path):
-        rtp_path = os.path.join(ffpath, 'aminoacids.rtp')
-    rtp_entry     = RTPParser(rtp_path)[base_resname]
+    rtp_entry     = load_ff_rtp(ff)[base_resname]
     rtp_atoms_dict = {a[0]: {'type': a[1]} for a in rtp_entry['atoms']}
     rtp_adj: Dict[str, set] = _dd(set)
     for bond in rtp_entry['bonds']:
@@ -1678,7 +1675,7 @@ def prepare_nsaa_ff(
     out_rtp, out_supplement : str, str
         Paths to the written files.
     """
-    from .ffparser import RTPParser
+    from .ffparser import RTPParser, load_ff_rtp
 
     ffpath = get_ff_path(ff)
     bCharmm = 'charmm' in ff.lower()
@@ -1689,10 +1686,7 @@ def prepare_nsaa_ff(
         out_supplement = f'./{new_resname}_bonded.itp'
 
     # ── 1. Base amino acid RTP ───────────────────────────────────────────────
-    rtp_path = os.path.join(ffpath, 'merged.rtp')
-    if not os.path.isfile(rtp_path):
-        rtp_path = os.path.join(ffpath, 'aminoacids.rtp')
-    rtp_parser  = RTPParser(rtp_path)
+    rtp_parser  = load_ff_rtp(ff)
     base_entry  = rtp_parser[base_resname]
     base_atoms  = base_entry['atoms']   # [[name, type, charge, cgnr], ...]
     base_bonds  = base_entry['bonds']

@@ -33,6 +33,7 @@
 """docs to be added
 """
 
+import os
 import sys
 from .library import _aliases, pmx_data_file
 from .parser import parseList, kickOutComments, readSection, readSectionAll
@@ -396,6 +397,84 @@ class RTPParser:
                  d[2] == name2 and d[3] == name1):
                 return d
         return None
+
+
+# ── force-field RTP discovery ────────────────────────────────────────────────
+#
+# GROMACS pdb2gmx globs every ``*.rtp`` in a force-field directory.  pmx used to
+# read exactly one file (``merged.rtp``, falling back to ``aminoacids.rtp``),
+# hardcoded in five places.  That meant a residue split out of the vendored file
+# into a topic file (``nos.rtp``, ``caps.rtp``, ...) was visible to pdb2gmx and
+# invisible to the generative engine -- which is how ``CYS2`` ends up
+# unresolvable on the Amber force fields even though ``disulfide.rtp`` ships
+# there.  ``load_ff_rtp`` brings pmx in line with pdb2gmx.
+
+#: Files whose entries are alchemical HYBRIDS (state A -> state B), not target
+#: residues.  Excluded from the residue database: pmx generates hybrids on the
+#: fly into ``nsaa.rtp`` now, and ``mutres*.rtp`` is kept for the legacy path
+#: only.  A topic file holding *endpoint* residues must not be named like one of
+#: these, nor match the ``?2??.rtp`` single-hybrid pattern.
+_HYBRID_RTP_FILES = ('mutres.rtp', 'mutres_dna.rtp', 'mutres_term.rtp',
+                     'nsaa.rtp', 'disulfide.rtp')
+
+
+def _is_hybrid_rtp(basename):
+    """True for hybrid libraries and single-hybrid files (``S2P1.rtp``)."""
+    if basename in _HYBRID_RTP_FILES:
+        return True
+    stem = basename[:-len('.rtp')]
+    return len(stem) == 4 and stem[1] == '2'
+
+
+def base_rtp_path(ffpath):
+    """Path to the force field's base residue database."""
+    p = os.path.join(ffpath, 'merged.rtp')
+    return p if os.path.isfile(p) else os.path.join(ffpath, 'aminoacids.rtp')
+
+
+def load_ff_rtp(ff, resolve_aliases=False):
+    """Load a force field's *target-residue* database.
+
+    Parses the base RTP and merges every additional non-hybrid ``*.rtp`` in the
+    force-field directory.  The base file wins on a name clash; clashes are
+    recorded on the returned parser as ``.conflicts`` rather than raising, so a
+    force field that has not been split yet behaves exactly as before.
+
+    Parameters
+    ----------
+    ff : str
+        Force-field name, resolved via ``GMXLIB``/``get_ff_path``.
+    resolve_aliases : bool
+        Passed through to :class:`RTPParser`.
+
+    Returns
+    -------
+    RTPParser
+        With two extra attributes: ``sources`` (files merged, base first) and
+        ``conflicts`` (``[(resname, file)]`` shadowed by the base file).
+    """
+    from .utils import get_ff_path      # local import: utils imports ffparser
+
+    ffpath = get_ff_path(ff)
+    base = base_rtp_path(ffpath)
+    rtp = RTPParser(base, resolve_aliases=resolve_aliases)
+    rtp.sources = [base]
+    rtp.conflicts = []
+
+    for name in sorted(os.listdir(ffpath)):
+        if not name.endswith('.rtp') or _is_hybrid_rtp(name):
+            continue
+        path = os.path.join(ffpath, name)
+        if os.path.samefile(path, base):
+            continue
+        extra = RTPParser(path, resolve_aliases=resolve_aliases)
+        for resname in extra.keys:
+            if resname in rtp:
+                rtp.conflicts.append((resname, path))
+                continue
+            rtp.add_entry(resname, extra[resname])
+        rtp.sources.append(path)
+    return rtp
 
 
 class BondedParser:
