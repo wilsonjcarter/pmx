@@ -17,7 +17,6 @@ class PmxCli:
 
     Available commands are:
         mutate        Mutate protein or DNA/RNA
-        mutate_nsaa   Mutate to non-standard amino acid (NSAA/PTM)
         gentop        Fill hybrid topology with B states
         analyse       Estimate free energy from Gromacs xvg files
 
@@ -47,10 +46,6 @@ class PmxCli:
     def mutate(self):
         from . import mutate
         mutate.entry_point()
-
-    def mutate_nsaa(self):
-        from . import mutate_nsaa
-        mutate_nsaa.entry_point()
 
     def gentop(self):
         from . import generate_hybrid_topology
@@ -89,7 +84,7 @@ def check_unknown_cmd(unknowns):
     '''Checks unknown command line arguments are raises a warning if unexpected
     commands are found.
     '''
-    expected = ['pmx', 'analyse', 'mutate', 'mutate_nsaa', 'doublebox',
+    expected = ['pmx', 'analyse', 'mutate', 'doublebox',
                 'gentop', 'gmxlib', 'genlib', 'abfe', 'atomMapping',
                 'ligandHybrid']
 

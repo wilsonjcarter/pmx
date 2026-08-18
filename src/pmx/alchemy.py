@@ -75,14 +75,8 @@ def mutate(m, mut_resid, mut_resname, ff, mut_chain=None,
     # get the correct mtp file
     mtp_file = get_mtp_file(residue, ff)
 
-    # Terminal residue deletion
-    if mut_resname.upper() == 'DEL':
-        if residue.moltype != 'protein':
-            raise RuntimeError("Terminal deletion is only supported for "
-                               "protein residues")
-        apply_terminal_deletion(m=m2, residue=residue, ff=ff, verbose=verbose)
     # Mutation if Protein
-    elif residue.moltype == 'protein':
+    if residue.moltype == 'protein':
         new_aa_name = _convert_aa_name(mut_resname)
         apply_aa_mutation(m=m2, residue=residue, new_aa_name=new_aa_name,
                           mtp_file=mtp_file, refB=refB, verbose=verbose)
@@ -147,148 +141,6 @@ def apply_aa_mutation(m, residue, new_aa_name, mtp_file, refB=None,
               (hybrid_res.resname, str(hybrid_res.id), hybrid_res.chain_id))
 
 
-def _build_dummy_ot2_coords(residue):
-    """Place a dummy OT2 in the sp2 plane of the carboxylate, symmetric to O."""
-    C = np.array(residue['C'].x)
-    O = np.array(residue['O'].x)
-    CA = np.array(residue['CA'].x)
-    ca_c = C - CA
-    ca_c = ca_c / np.linalg.norm(ca_c)
-    c_o = O - C
-    proj = np.dot(c_o, ca_c) * ca_c
-    perp = c_o - proj
-    return list(C + proj - perp)
-
-
-def _build_dummy_nh3_coords(residue, n_protons=2):
-    """Build coordinates for dummy NH3+ protons on the N atom."""
-    import math
-    N = np.array(residue['N'].x)
-    CA = np.array(residue['CA'].x)
-    n_ca = CA - N
-    n_ca = n_ca / np.linalg.norm(n_ca)
-    bond_len = 1.02  # Angstrom
-
-    has_hn = residue.has_atom('HN') or residue.has_atom('H')
-    if has_hn:
-        try:
-            H = np.array(residue['HN'].x)
-        except Exception:
-            H = np.array(residue['H'].x)
-        n_h = H - N
-        n_h = n_h / np.linalg.norm(n_h)
-        rot120 = Rotation(N, N - n_ca)
-        rot240 = Rotation(N, N - n_ca)
-        h1_pos = N + n_h * bond_len
-        h2_pos = rot120.apply(list(h1_pos), 120.0)
-        h3_pos = rot240.apply(list(h1_pos), 240.0)
-        return [h2_pos, h3_pos]
-    else:
-        CD = np.array(residue['CD'].x)
-        n_cd = CD - N
-        n_cd = n_cd / np.linalg.norm(n_cd)
-        base = (n_ca + n_cd)
-        base = base / np.linalg.norm(base)
-        perp = np.cross(n_ca, n_cd)
-        perp = perp / np.linalg.norm(perp)
-        tet_angle = math.radians(109.5 / 2)
-        h1_dir = -base * math.cos(tet_angle) + perp * math.sin(tet_angle)
-        h2_dir = -base * math.cos(tet_angle) - perp * math.sin(tet_angle)
-        return [list(N + h1_dir * bond_len), list(N + h2_dir * bond_len)]
-
-
-def apply_terminal_deletion(m, residue, ff, verbose=False):
-    """Prepare structure for terminal residue deletion via alchemical FEP.
-
-    Modifies the neighbor residue (n-1 for C-terminal, n+1 for N-terminal)
-    by adding dummy atoms and renaming to the hybrid residue name. The
-    terminal residue itself is left unchanged; it will be fully dummified
-    later by gen_hybrid_top.
-    """
-    chain = residue.chain
-    chain_residues = chain.residues
-
-    res_idx = None
-    for i, r in enumerate(chain_residues):
-        if r == residue:
-            res_idx = i
-            break
-    if res_idx is None:
-        raise RuntimeError("Could not find residue in its chain")
-
-    is_cterm = (residue == chain.cterminus())
-    is_nterm = (residue == chain.nterminus())
-
-    if not is_cterm and not is_nterm:
-        raise RuntimeError("Terminal deletion requested but residue %d (%s) "
-                           "is not at a terminus" % (residue.id, residue.resname))
-
-    if is_cterm:
-        if res_idx == 0:
-            raise RuntimeError("Cannot delete C-terminal residue: it is the "
-                               "only residue in the chain")
-        neighbor = chain_residues[res_idx - 1]
-        neighbor_key = _convert_aa_name(neighbor.resname)
-        hybrid_name = neighbor_key + 'deC'
-
-        if verbose:
-            print('log_> C-terminal deletion: residue %d (%s)' %
-                  (residue.id, residue.resname))
-            print('log_> Neighbor residue %d (%s) -> %s' %
-                  (neighbor.id, neighbor.resname, hybrid_name))
-
-        dot2 = Atom(name='DOT2')
-        dot2.x = _build_dummy_ot2_coords(neighbor)
-        dot2.resname = hybrid_name
-        dot2.chain_id = neighbor.chain_id
-        dot2.occ = 1.0
-        dot2.bfac = 0.0
-        neighbor.append(dot2)
-
-        for atom in neighbor.atoms:
-            atom.resname = hybrid_name
-        neighbor.resname = hybrid_name
-
-        if verbose:
-            print('log_> Added dummy OT2 atom to residue %d, renamed to %s' %
-                  (neighbor.id, hybrid_name))
-
-    elif is_nterm:
-        if res_idx >= len(chain_residues) - 1:
-            raise RuntimeError("Cannot delete N-terminal residue: it is the "
-                               "only residue in the chain")
-        neighbor = chain_residues[res_idx + 1]
-        neighbor_key = _convert_aa_name(neighbor.resname)
-        hybrid_name = neighbor_key + 'deN'
-
-        if verbose:
-            print('log_> N-terminal deletion: residue %d (%s)' %
-                  (residue.id, residue.resname))
-            print('log_> Neighbor residue %d (%s) -> %s' %
-                  (neighbor.id, neighbor.resname, hybrid_name))
-
-        is_pro = (neighbor.resname == 'PRO')
-        dummy_coords = _build_dummy_nh3_coords(neighbor, n_protons=2)
-        dummy_names = ['DHN1', 'DHN2'] if is_pro else ['DH2', 'DH3']
-
-        for dname, dcoords in zip(dummy_names, dummy_coords):
-            datom = Atom(name=dname)
-            datom.x = dcoords
-            datom.resname = hybrid_name
-            datom.chain_id = neighbor.chain_id
-            datom.occ = 1.0
-            datom.bfac = 0.0
-            neighbor.append(datom)
-
-        for atom in neighbor.atoms:
-            atom.resname = hybrid_name
-        neighbor.resname = hybrid_name
-
-        if verbose:
-            print('log_> Added dummy protons to residue %d, renamed to %s' %
-                  (neighbor.id, hybrid_name))
-
-
 def apply_nuc_mutation(m, residue, new_nuc_name, mtp_file, verbose=False):
 
     hybrid_residue_name, resname1, resname2 = get_nuc_hybrid_resname(residue, new_nuc_name)
@@ -343,7 +195,7 @@ def get_nuc_hybrid_resname(residue, new_nuc_name):
 
 
 def gen_hybrid_top(topol, recursive=True, verbose=False, scaleDih=1.0,
-                   extra_mtp_files=None, supplement_bonded_files=None):
+                   extra_mtp_files=None):
     """Fills the bstate of a topology file containing pmx hybrid residues. This
     can be either a top or itp file. If the file contains other itp files via
     include statements, the function can iterate through them if the recursive
@@ -368,9 +220,7 @@ def gen_hybrid_top(topol, recursive=True, verbose=False, scaleDih=1.0,
     extra_mtp_files : list of str, optional
         Additional MTP files to search for residue parameters, in addition to
         the force-field's built-in MTP database.  These files take precedence
-        over the built-in database.  Pass the ``.mtp`` files generated by
-        :func:`~pmx.nsaa.mutate_nsaa` here so that NSAA hybrid topologies are
-        filled correctly::
+        over the built-in database::
 
             pmxtop, itps = gen_hybrid_top(top, extra_mtp_files=["A2SEP.mtp"])
 
@@ -388,7 +238,7 @@ def gen_hybrid_top(topol, recursive=True, verbose=False, scaleDih=1.0,
 
     # main function that returns the Topology with filled B states
     def process_topol(topol, ff, ffbonded_file, verbose=False, scaleDih=1.0,
-                      extra_mtp_files=None, supplement_bonded_files=None):
+                      extra_mtp_files=None):
         pmxtop = deepcopy(topol)
         # create model with residue list
         m = Model(atoms=pmxtop.atoms, renumber_residues=False)
@@ -406,9 +256,6 @@ def gen_hybrid_top(topol, recursive=True, verbose=False, scaleDih=1.0,
                                            extra_mtp_files=extra_mtp_files)
         # correct b-states
         pmxtop.assign_fftypes()
-        # inject NSAA supplement bonded parameters before B-state lookup
-        if supplement_bonded_files:
-            _inject_supplement_bonded(pmxtop, supplement_bonded_files)
         if verbose is True:
             for r in rlist:
                 print('log_> Hybrid Residue -> %d | %s ' % (r.id, r.resname))
@@ -496,7 +343,6 @@ def gen_hybrid_top(topol, recursive=True, verbose=False, scaleDih=1.0,
         _proline_dihedral_decouplings(pmxtop, rlist, rdic)
 
         _add_disulfide_bonded_terms(pmxtop, rlist, rdic, ff)
-        _terminal_deletion_decouplings(pmxtop, rlist, verbose=verbose)
         return pmxtop
 
     # -------------
@@ -507,8 +353,7 @@ def gen_hybrid_top(topol, recursive=True, verbose=False, scaleDih=1.0,
               % (topol.filename.split('.')[-1], topol.filename))
     pmx_top = process_topol(topol=topol, ff=ff, ffbonded_file=ffbonded_file,
                             verbose=verbose, scaleDih=scaleDih,
-                            extra_mtp_files=extra_mtp_files,
-                            supplement_bonded_files=supplement_bonded_files)
+                            extra_mtp_files=extra_mtp_files)
 
     # ------------------------------------
     # itps too if asked for and if present
@@ -526,8 +371,7 @@ def gen_hybrid_top(topol, recursive=True, verbose=False, scaleDih=1.0,
             pmx_itp = process_topol(topol=topol2, ff=ff,
                                     ffbonded_file=ffbonded_file,
                                     verbose=verbose,
-                                    extra_mtp_files=extra_mtp_files,
-                                    supplement_bonded_files=supplement_bonded_files)
+                                    extra_mtp_files=extra_mtp_files)
             pmx_itps.append(pmx_itp)
 
     return pmx_top, pmx_itps
@@ -1104,54 +948,6 @@ def _add_disulfide_bonded_terms(topol, rlist, rdic, ff):
                          extract_atoms(disulfide_pair[0]),
                          extract_atoms(disulfide_pair[1]),
                          mode='form')
-
-
-def _terminal_deletion_decouplings(topol, rlist, verbose=False):
-    """Zero B-state force constants for dihedrals spanning the deletion boundary.
-
-    In state B the deletion target is fully dummy. Dihedral terms that span
-    the neighbor-deletion boundary are zeroed in state B to remove phantom
-    torsional bias on the real atoms.
-    """
-    for r in rlist:
-        if not (r.resname.endswith('deC') or r.resname.endswith('deN')):
-            continue
-
-        chain_res = r.chain.residues
-        idx = chain_res.index(r)
-
-        if r.resname.endswith('deC') and idx + 1 < len(chain_res):
-            del_res = chain_res[idx + 1]
-        elif r.resname.endswith('deN') and idx - 1 >= 0:
-            del_res = chain_res[idx - 1]
-        else:
-            continue
-
-        neighbor_ids = set(a.id for a in r.atoms)
-        del_ids = set(a.id for a in del_res.atoms)
-
-        if verbose:
-            print('log_> Decoupling cross-residue dihedrals: '
-                  '%s (res %d) -- %s (res %d)'
-                  % (r.resname, r.id, del_res.resname, del_res.id))
-
-        dih_count = 0
-        for dih in topol.dihedrals:
-            ids = {dih[0].id, dih[1].id, dih[2].id, dih[3].id}
-            if ids & neighbor_ids and ids & del_ids:
-                if dih[5] == 'NULL' or dih[6] == 'NULL':
-                    continue
-                func = dih[4]
-                if func == 3:
-                    dih[6] = [func, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
-                elif func == 2:
-                    dih[6] = [func, dih[6][1], 0.0]
-                else:
-                    dih[6] = [func, dih[6][1], 0.0, dih[6][-1]]
-                dih_count += 1
-
-        if verbose:
-            print('log_> Zeroed B-state for %d dihedrals' % dih_count)
 
 
 def _find_bonded_entries(topol, verbose=False):
@@ -1858,80 +1654,6 @@ def _get_hybrid_residue(residue_name, mtp_file='ffamber99sb.mtp',
     return resi, bonds, imps, diheds, rotdic
 
 
-def _inject_supplement_bonded(pmxtop, supplement_bonded_files):
-    """Prepend bonded parameters from supplement ITP files into *pmxtop*.
-
-    Supplement ITP files are written by :func:`~pmx.nsaa.prepare_nsaa_ff`
-    and contain ``[ bondtypes ]``, ``[ angletypes ]``, and
-    ``[ dihedraltypes ]`` sections (plus optionally ``[ atomtypes ]``) for
-    AMBER↔GAFF cross-boundary terms and ITP-internal GAFF bonded parameters.
-
-    Entries are prepended to ``pmxtop.BondedParams.bondtypes`` etc. so they
-    take priority over the built-in force-field database when
-    :func:`_find_bonded_entries`, :func:`_find_angle_entries`, and
-    :func:`_find_predefined_dihedrals` perform their lookups.
-
-    Parameters
-    ----------
-    pmxtop : Topology
-    supplement_bonded_files : list of str
-    """
-    from .nsaa import (_parse_ffbonded_section, _parse_atomtypes_section)
-
-    def _to_typed(entry, n_types):
-        """Convert a _parse_ffbonded_section dict to a BondedParser list."""
-        types  = entry['types']     # list of str, len == n_types
-        funct  = entry['funct']     # int
-        params = entry['params']    # list of str
-        # BondedParser stores entries as mixed lists: [str*n_types, int, float*n]
-        try:
-            float_params = [float(p) for p in params]
-        except ValueError:
-            float_params = params   # leave as-is if non-numeric (shouldn't happen)
-        return types + [funct] + float_params
-
-    for supp_file in supplement_bonded_files:
-        if not os.path.isfile(supp_file):
-            print('log_> WARNING: supplement bonded file not found: %s' % supp_file)
-            continue
-
-        # --- [ atomtypes ] ---
-        try:
-            at_entries = _parse_atomtypes_section(supp_file)
-        except Exception:
-            at_entries = []
-        for e in at_entries:
-            name = e[0]
-            if name not in pmxtop.NBParams.atomtypes:
-                pmxtop.NBParams.atomtypes[name] = {
-                    'bond_type': name,
-                    'mass':  float(e[2]),
-                    'sigma': float(e[5]),
-                    'eps':   float(e[6]),
-                }
-
-        # --- [ bondtypes ] ---
-        bond_entries = _parse_ffbonded_section(supp_file, 'bondtypes', 2)
-        for e in reversed(bond_entries):
-            pmxtop.BondedParams.bondtypes.insert(0, _to_typed(e, 2))
-
-        # --- [ angletypes ] ---
-        angle_entries = _parse_ffbonded_section(supp_file, 'angletypes', 3)
-        for e in reversed(angle_entries):
-            pmxtop.BondedParams.angletypes.insert(0, _to_typed(e, 3))
-
-        # --- [ dihedraltypes ] ---
-        dih_entries = _parse_ffbonded_section(supp_file, 'dihedraltypes', 4)
-        for e in reversed(dih_entries):
-            pmxtop.BondedParams.dihedraltypes.insert(0, _to_typed(e, 4))
-
-        n_b = len(bond_entries)
-        n_a = len(angle_entries)
-        n_d = len(dih_entries)
-        print('log_> Supplement bonded: %d bonds, %d angles, %d dihedrals '
-              'injected from %s' % (n_b, n_a, n_d, supp_file))
-
-
 def _read_mtp_names(filename):
     """Return all top-level residue names defined in an MTP file.
 
@@ -1983,8 +1705,7 @@ def _get_hybrid_residues(m, ff, version='new', verbose=False,
     verbose : bool
     extra_mtp_files : list of str, optional
         Additional MTP files to search for residue parameters.  These take
-        precedence over the force-field's built-in MTP database.  Use this
-        to supply NSAA hybrid MTP files generated by :func:`~pmx.nsaa.mutate_nsaa`.
+        precedence over the force-field's built-in MTP database.
 
     Returns
     -------
