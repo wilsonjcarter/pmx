@@ -44,9 +44,7 @@ Each directory contains a `run.sh` (complete pipeline) and a `README.md`
 | 1 | `01_trpcage_W6F` | Trp Cage (1L2Y) | ΔΔG of W→F substitution | charmm36m-mut | none |
 | 2 | `02_protonation_C2CM` | Thioredoxin (1ERT) | ΔpKa of Cys32 | charmm36m-mut | −1 (**doublebox**) |
 | 3 | `03_disulfide_C2CD` | Thioredoxin (1ERT) | ΔE of disulfide formation | charmm36m-mut | none |
-| 4 | `04_cterm_deletion` | HSP90 MEEVD peptide (1ELR) | ΔΔG of C-terminal truncation | charmm36m-mut | +1 (**doublebox**) |
 | 5 | `05_phosphorylation_pTyr` | Lck SH2 domain (1AOT) | ΔΔG of Tyr phosphorylation (YP1) | charmm36m-mut | −1 (**doublebox**) |
-| 6 | `06_nsaa_denovo` **(WIP)** | Protein with target Ser | ΔΔG of Ser→SEP via custom ITP | charmm36m-mut | none |
 
 ## Prerequisites
 
@@ -79,8 +77,6 @@ Step 5a (`gmx editconf`) defines the box for single-system setups (examples 1, 3
 charge-changing examples (2, 4, 5) use `pmx doublebox` instead, which sets the box vectors
 internally — `editconf` is not needed when using doublebox.
 
-Example 4 adds a one-time `generate_term_deletion` step before step 2.
-Example 6 replaces step 2 with `pmx mutate_nsaa` and adds `prepare_nsaa_ff` before it.
 
 ### Charge-changing mutations (doublebox)
 

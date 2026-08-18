@@ -27,8 +27,6 @@ Complete worked examples with input files and thermodynamic cycle diagrams:
    trpcage
    protonation
    disulfide
-   nterm_deletion
-   phosphorylation
 
 
 Another way to setup the files needed for the calculations is via the
