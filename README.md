@@ -4,8 +4,9 @@
 [![Code coverage](https://codecov.io/gh/deGrootLab/pmx/branch/develop/graph/badge.svg)](https://codecov.io/gh/deGrootLab/pmx)
 
 > **This is a custom fork of [deGrootLab/pmx](https://github.com/deGrootLab/pmx) (`develop` branch) with
-> extended protein mutation support.** It adds hybrid residues and force-field parameters for post-translational
-> modifications and non-standard chemistries not present in the upstream release — see highlights below.
+> extended protein mutation support.** It adds hybrid residues and force-field parameters for covalent and
+> non-standard protein chemistries — notably Cys–Cys disulfide formation and breaking — not present in the
+> upstream release — see highlights below.
 
 <img src="examples/imgs/pmx_overview.png" alt="pmx FEP workflow overview" align="center" width="820"/>
 
@@ -17,39 +18,10 @@ residues, generate perturbed force-field parameters, and compute ΔG via non-equ
 | Feature | Hybrid code | Force field |
 |---------|------------|-------------|
 | Cys–Cys disulfide formation / breaking | C2CD | — |
-| C-terminal residue deletion | *deC | — |
-| N-terminal residue deletion | *deN | — |
-| Post-translational modifications | SP1/SP2/YP1/YP2/TP1/TP2/MLZ/MLY/M3L | — |
 
-All phosphorylation hybrids use the same user-facing target code (`P1` monoanionic, `P2` dianionic);
-pmx automatically picks the correct hybrid based on the source residue:
-
-```bash
-printf "63 P1\n" | pmx mutate -f wt.gro -o mutant.pdb -ff charmm36m-mut  # Tyr → YP1
-printf "42 P1\n" | pmx mutate -f wt.gro -o mutant.pdb -ff charmm36m-mut  # Ser → SP1
-printf "18 P1\n" | pmx mutate -f wt.gro -o mutant.pdb -ff charmm36m-mut  # Thr → TP1
-```
-
-`pmx` should now be able to handle arbitrary PTMs for which an `.rtp` entry is present in the `.ff` folder. A user-supplied `.pdb` of the modified residue is still required in order to position the hybrid atoms.
-
-See [`examples/`](examples/) for six worked end-to-end FEP pipelines.
+See [`examples/`](examples/) for three worked end-to-end FEP pipelines.
 
 More features will be added as they become available.
-
-## Modified force fields
-Over the past several years we've experimented with force field modifications, assessing their effect on free energy calculation accuracy. Two major developments have been the use of modified backbone partial charges in the Amber force field family, and charge-scaling in both the Amber and CHARMM families. Several modified force fields are available (`src/pmx/data/mutff/`) and can be used directly with `pmx` or to run plain molecular dynamics simulations.
-| Force field | Notes |
-|---------|---------|
-| ff19SB-q-mut.ff | modified backbone partial charge; mutres per-residue cmap  |
-| ff14SB-q-mut.ff | modified backbone partial charge  |
-| ff99SB-star-ildnp-q-mut.ff | modified backbone partial charge; proline correction  |
-| charmm36m-ecc-mut.ff | ECC charge-scaling; cysteine vdW correction |
-
-If you use these modified force fields, in addition to the original force field references please consider citing:
-
-- Backbone partial charges for Amber14SB/Amber19SB (and improved free energy calculations): Wilson, C.J., et al. *JCTC* 21(8) 4095–4106 (2025) [link](https://doi.org/10.1021/acs.jctc.5c00031)
-- Backbone partial charges for Amber99SB: Best, R., et al. *Biophys. J* 102, 1462-1467 (2012) [link](https://doi.org/10.1016/j.bpj.2012.02.024)
-- Charge-scaling: I. V., Leontyev, A. A. Stuchebrukhov, *J. Chem. Phys.* 130(8), 085102 (2009) [link](https://doi.org/10.1063/1.3060164)
 
 ## Installation
 
