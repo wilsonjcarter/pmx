@@ -65,7 +65,7 @@ def hybrid():
 
 
 def test_hybrid_name(hybrid):
-    assert hybrid[2] == "S2SE"
+    assert hybrid[2] == "S2SP"  # SEP first+last (was truncated S2SE)
 
 
 def test_hn_is_common_not_dummy(hybrid):
@@ -128,7 +128,7 @@ def test_mutate_from_structure_matches_rtp_path(tmp_path):
     n_str = mutate(m_str, 2, "SEP", FF, structure=sep,
                    inplace=True, write_files=False)
 
-    assert n_def == n_str == "S2SE"
+    assert n_def == n_str == "S2SP"
     assert sorted(a.name for a in m_def.residues[1].atoms) == \
         sorted(a.name for a in m_str.residues[1].atoms)
     # HN common (backbone) and phosphate present as dummies
@@ -249,7 +249,7 @@ def test_mutate_via_itp_fragment(tmp_path):
     name = mutate(m, 1, "SEP", FF, itp=itp, structure=pdb,
                   inplace=True, write_files=False)
     names = [a.name for a in m.residues[0].atoms]
-    assert name == "S2SE"
+    assert name == "S2SP"
     assert "HN" in names                      # WT backbone H mapped through
     assert any(a.name == "DP" for a in m.residues[0].atoms)  # phosphate appears
 

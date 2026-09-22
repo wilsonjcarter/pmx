@@ -410,6 +410,37 @@ _term_deletion_residues = set(
      for sfx in ('deN', 'deC')]
 )
 
+
+def _target_code(target):
+    """Two-char code for a hybrid target residue.
+
+    Uses the target's FIRST and LAST characters so that families sharing a
+    prefix stay distinct once truncated to the 4-char cap GROMACS imposes on a
+    residue name through the .pdb round-trip: MLZ->MZ, MLY->MY, M3L->ML,
+    SP1->S1, SP2->S2, TYM->TM, GACE->GE.  (Plain ``target[:2]`` would collapse
+    MLZ/MLY and every phospho mono/di pair to the same name.)
+    """
+    t = target.upper()
+    return (t[0] + t[-1]) if len(t) >= 2 else (t + t)
+
+
+def hybrid_name(source, target, reverse=False):
+    """Deterministic <=4-char name for a generative hybrid residue.
+
+    *source* is the wild-type residue name (or its one-letter code); *target* is
+    the modified residue name.  Forward names are ``L2<target-code>`` (e.g.
+    LYS->MLZ = ``K2MZ``); reverse names front-load the target (``MLZ2``) so a
+    reverse hybrid never collides with its forward counterpart.  Uniqueness
+    across the shipped PTM/covalent target set is guaranteed by construction;
+    :func:`pmx.covalent.mutate._accumulate_hybrid` guards the residual case.
+    """
+    src = source.upper()
+    letter = _one_letter.get(src, src[:1])
+    tgt = target.upper()
+    if reverse:
+        return (tgt + '2' + letter)[:4]
+    return (letter + '2' + _target_code(tgt))[:4]
+
 _protein_residues_incl_pmx_mut = (
     _protein_residues
     .union(_pmx_mut_residues)

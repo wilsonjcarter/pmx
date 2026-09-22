@@ -21,6 +21,7 @@ Two entry points:
 from __future__ import annotations
 
 import os
+import re
 import warnings
 from copy import deepcopy
 from typing import Optional, Tuple
@@ -261,14 +262,13 @@ def build_hybrid_residue(residue1, residue2, ff: str, mut_resname: str,
                 a.name = ('D' + a.name[:-len('.gone')])[:4]
 
     if hybrid_name is None:
-        one_letter = library._one_letter.get(residue1.resname,
-                                              residue1.resname[0])
-        if reverse:
-            # distinct name (e.g. SP2S) so the reverse hybrid never collides with
-            # its forward counterpart (S2SP) in the shared nsaa.rtp/nsaa.mtp.
-            hybrid_name = (mut_resname.upper() + "2" + one_letter)[:4]
-        else:
-            hybrid_name = (one_letter + "2" + mut_resname.upper())[:4]
+        # Central namer (library.hybrid_name): forward = L2<first+last of target>
+        # so prefix-sharing targets stay distinct under the 4-char cap
+        # (MLZ->K2MZ vs MLY->K2MY vs M3L->K2ML; SP1->S2S1 vs SP2->S2S2).  A
+        # reverse hybrid front-loads the target so it never collides with its
+        # forward counterpart in the shared nsaa.rtp/nsaa.mtp.
+        hybrid_name = library.hybrid_name(residue1.resname, mut_resname,
+                                          reverse=reverse)
     if reverse:
         residue1.resnA, residue1.resnB = mut_resname, residue1.resname
     else:
@@ -357,6 +357,19 @@ def _build_target_residue(target, ff, rtp, term, residue1,
 
 # ── hybrid accumulation (single per-force-field nsaa.rtp / nsaa.mtp) ───────────
 
+def _entry_morph(text, name):
+    """Return the (resnA, resnB) recorded in a ``[ name ] ; A -> B`` header.
+
+    Both _make_rtp/_make_mtp stamp each entry with its source->target morph, so
+    this lets _accumulate_hybrid tell a rebuild of the *same* hybrid (replace)
+    from a *different* morph that hashed to the same 4-char name (collision).
+    Returns None when the name is absent or carries no morph comment.
+    """
+    m = re.search(r'^\[\s*' + re.escape(name) + r'\s*\]\s*;\s*(\S+)\s*->\s*(\S+)',
+                  text, re.MULTILINE)
+    return (m.group(1), m.group(2)) if m else None
+
+
 def _accumulate_hybrid(ffpath, hybrid_name, rtp_text, mtp_text, bCharmm):
     """Upsert an engine-built hybrid into the force field's nsaa.{rtp,mtp}.
 
@@ -367,6 +380,20 @@ def _accumulate_hybrid(ffpath, hybrid_name, rtp_text, mtp_text, bCharmm):
     reads multi-entry MTPs, so a single file serves both.  Re-building a hybrid
     replaces its entry.
     """
+    # Guard the 4-char residue-name cap: refuse to overwrite an existing entry
+    # that belongs to a *different* morph (silent overwrite would corrupt a
+    # system holding both, e.g. a mono- and a di-methyl-Lys).  Rebuilding the
+    # same morph is fine (it replaces its own entry).
+    rtp_path = os.path.join(ffpath, "nsaa.rtp")
+    incoming = _entry_morph(rtp_text, hybrid_name)
+    if incoming and os.path.isfile(rtp_path):
+        existing = _entry_morph(open(rtp_path).read(), hybrid_name)
+        if existing and existing != incoming:
+            raise ValueError(
+                f"hybrid name '{hybrid_name}' already maps "
+                f"{existing[0]}->{existing[1]} in {rtp_path}; refusing to reuse "
+                f"it for {incoming[0]}->{incoming[1]}. Pass an explicit "
+                f"hybrid_name= to disambiguate.")
     rtp_header, rtp_entry = _split_rtp_header(rtp_text, hybrid_name)
     _upsert_entry(os.path.join(ffpath, "nsaa.rtp"), hybrid_name, rtp_entry,
                   header=rtp_header)
