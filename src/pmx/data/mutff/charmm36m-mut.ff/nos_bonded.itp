@@ -7,7 +7,7 @@
 ; topic file so a revert or regeneration of ffbonded.itp cannot take them again.
 ;
 ; The first block is verbatim from the bundle.  The trailing block is additional:
-; the bundle's terms assume CSO typed with the protein types CT2/HA2, but the
+; the bundle terms assume CSO typed with the protein types CT2/HA2, but the
 ; vendored merged.rtp types CSO with the CGenFF types CG321/HGA2.  Rather than
 ; re-type the vendored residue (which the loader would not let a topic file
 ; override anyway), the CGenFF-typed equivalents are supplied here, recovered

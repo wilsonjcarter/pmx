@@ -188,3 +188,24 @@ def test_split_bonds_names_bound_only_bridging_atom():
     assert not any(b[0] not in names or b[1] not in names for b in bonds)
     assert any(set(b) == {"OD2", "SG2"} for b in bonds)   # sulfenyl bond named
     assert any(set(b) == {"OD2", "HD2"} for b in bonds)   # O-H bond not dropped
+
+
+# -- cross-link hybrid naming (regression: LYS must be K2KN, not L2KN) ----------
+
+def test_nos_lys_hybrid_named_k2kn():
+    """Lys NOS endpoint must use the one-letter code K, giving K2KN.
+
+    Regression for the resnA[:1] bug: the resname 'LYS' starts with 'L', so the
+    old code produced 'L2KN' -- unregistered in residuetypes.dat and unrouted by
+    get_mtp_file (both expect K2KN)."""
+    from pmx.covalent import decouple_mutate
+    m = _two_residue_model("LYS")
+    name = decouple_mutate(m, 1, "KN0", FF, react_atom="NZ", write_files=False)
+    assert name == "K2KN", name
+
+
+def test_nos_cys_hybrid_named_c2cn():
+    from pmx.covalent import decouple_mutate
+    m = _two_residue_model("CYS")
+    name = decouple_mutate(m, 1, "CN0", FF, react_atom="SG", write_files=False)
+    assert name == "C2CN", name

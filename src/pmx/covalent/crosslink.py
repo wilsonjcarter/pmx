@@ -19,6 +19,7 @@ from __future__ import annotations
 import os
 from typing import Dict, List, Optional, Tuple
 
+from .. import library
 from ..atom import Atom
 from .mapping import _element_of
 
@@ -416,7 +417,12 @@ def decouple_mutate(model, resid, target, ff, react_atom, chain=None,
     _assign_mass_atp(wt, bound, os.path.join(ffpath, "atomtypes.atp"))
     _superpose_by_name(bound, wt)
     amap, atoms, bonds = decouple(wt, bound, react_atom, boundary_depth)
-    name = f"{resnA[:1]}2{target[:2]}"[:4]
+    # Cross-link endpoint name = <one-letter WT code>2<target[:2]> (C2CD, C2CN,
+    # K2KN, K2KS) -- matches residuetypes.dat, get_mtp_file routing and
+    # library._nos_hybrids.  Use the one-letter CODE, not resnA[:1]: for LYS the
+    # resname's first char is 'L' (-> wrong 'L2KN'), the code is 'K' (-> 'K2KN').
+    letter = library._one_letter.get(resnA, resnA[:1])
+    name = f"{letter}2{target[:2]}"[:4]
 
     if write_files:
         mtp_text = emit_crosslink_mtp(list(atoms), name, resnA, target)
