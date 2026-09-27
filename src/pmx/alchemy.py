@@ -47,7 +47,7 @@ def _is_classic_mutation(mut_resname):
 
 def mutate(m, mut_resid, mut_resname, ff, mut_chain=None,
            refB=None, inplace=False, verbose=False, itp=None, structure=None,
-           generative=False):
+           generative=False, reverse=False, hybrid_name=None):
     """Creates an hybrid structure file.
 
     Parameters
@@ -129,14 +129,16 @@ def mutate(m, mut_resid, mut_resname, ff, mut_chain=None,
         # --generative override all go through the generative engine; otherwise
         # use the shipped hybrid.
         target = ptm.target_for(residue.resname, mut_resname)
-        if target is None and (itp is not None or generative or is_terminal
+        if target is None and (itp is not None or generative or reverse
+                               or is_terminal
                                or not _is_classic_mutation(mut_resname)):
             target = mut_resname
         if target is not None:
             from .covalent import mutate as _generative_mutate
             _generative_mutate(m2, mut_resid=mut_resid, target=target, ff=ff,
                                structure=structure, itp=itp, refB=refB,
-                               mut_chain=mut_chain, inplace=True, verbose=verbose)
+                               mut_chain=mut_chain, inplace=True, verbose=verbose,
+                               reverse=reverse, hybrid_name=hybrid_name)
         else:
             new_aa_name = _convert_aa_name(mut_resname)
             apply_aa_mutation(m=m2, residue=residue, new_aa_name=new_aa_name,

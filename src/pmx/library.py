@@ -424,22 +424,91 @@ def _target_code(target):
     return (t[0] + t[-1]) if len(t) >= 2 else (t + t)
 
 
-def hybrid_name(source, target, reverse=False):
-    """Deterministic <=4-char name for a generative hybrid residue.
+def _canonical_code(resname):
+    """The classic-library code for *resname*, or None if it has none.
+
+    ``_ext_one_letter`` is the canonical map the shipped ``mutres.rtp`` names are
+    built from: one character for the 26 standard/protonation-variant residues
+    (``TYR``->``Y``, ``HSE``->``X``, ``HIP``->``Z``) and two for the ten special
+    cases (``CYM``->``CM``, ``TYM``->``YM``, ``LYSN``->``KN``, ``CYSO``->``CO``,
+    phospho ``SP1``/``TP1``/``YP1``->``P1``, ``SP2``/``TP2``/``YP2``->``P2``).
+    """
+    r = resname.upper()
+    return _ext_one_letter.get(r, _one_letter.get(r))
+
+
+def hybrid_name(source, target, reverse=False, term=None):
+    """Deterministic name for a generative hybrid residue.
 
     *source* is the wild-type residue name (or its one-letter code); *target* is
-    the modified residue name.  Forward names are ``L2<target-code>`` (e.g.
-    LYS->MLZ = ``K2MZ``); reverse names front-load the target (``MLZ2``) so a
-    reverse hybrid never collides with its forward counterpart.  Uniqueness
-    across the shipped PTM/covalent target set is guaranteed by construction;
-    :func:`pmx.covalent.mutate._accumulate_hybrid` guards the residual case.
+    the modified residue name.
+
+    **Internal residue** -- forward names are ``L2<target-code>`` where the code
+    is :func:`_target_code` (first+last character), e.g. LYS->MLZ = ``K2MZ``;
+    reverse names front-load the target (``MLZ2``) so a reverse hybrid never
+    collides with its forward counterpart.  Uniqueness holds across the shipped
+    PTM/covalent target set, which is what that code was designed for.
+
+    **Terminal residue** (*term* is ``'N'`` or ``'C'``) -- a terminal hybrid is a
+    DIFFERENT residue from the internal one of the same morph: its backbone
+    carries ``H1/H2/H3`` or ``OT1/OT2``.  So it gets its own name, the classic
+    library spelling plus a lowercase terminus letter::
+
+        LEU->TYR at the N-terminus   L2Yn
+        LEU->THR at the C-terminus   L2Tc
+        LEU->CYM at the N-terminus   L2CMn      (5 chars: CYM's code is 'CM')
+
+    This never shadows the library's internal ``L2Y``/``L2T``, and it is
+    collision-free across the canonical set because the target reverts to its
+    one-letter code -- unlike :func:`_target_code`, under which THR and TYR both
+    give ``TR`` (``L2TR``).  The marker is **lowercase** deliberately: that slot
+    is where a second code character lives (``L2CM``, ``L2YM``, ``L2KN``), so an
+    uppercase ``L2YN`` would be indistinguishable from "LEU -> some two-letter
+    code".  A non-canonical target (a PTM/NSAA with no library code) keeps the
+    ``_target_code`` spelling and just takes the marker.
+
+    The terminus letter is always the FINAL character, matching the terminal
+    *deletion* hybrids ``XdeN``/``XdeC``; there it is uppercase because the
+    preceding ``de`` is lowercase and cannot be misread.
     """
     src = source.upper()
     letter = _one_letter.get(src, src[:1])
     tgt = target.upper()
+    if term:
+        mark = 'n' if term.upper().startswith('N') else 'c'
+        s_code = _canonical_code(src) or letter
+        t_code = _canonical_code(tgt)
+        if t_code is None:                     # PTM/NSAA target: keep _target_code
+            base = (s_code + '2' + _target_code(tgt))[:4]
+        else:
+            base = s_code + '2' + t_code
+        if reverse:
+            base = (tgt + '2' + s_code)[:4]
+        name = base + mark
+        if len(name) > 4:
+            # A residue name longer than 4 characters CANNOT round-trip through a
+            # PDB: it overflows resName (cols 18-21) into chainID and garbles
+            # resSeq --  'ATOM  144  OT2 C2CMcX   9' parses as resName='C2CM',
+            # chainID='c', resSeq='X'.  (The RTP itself tolerates 5, which is why
+            # the shipped CMdeC/CMdeN exist, but the structure file does not.)
+            # This happens only when a side has a two-character library code:
+            # CYM=CM, TYM=YM, LYSN=KN, CYSO=CO, phospho P1/P2.  Refuse rather
+            # than emit a corrupt structure.
+            raise ValueError(
+                f"terminal mutation {source}->{target} would need the hybrid name "
+                f"'{name}', which is {len(name)} characters and cannot round-trip "
+                f"through a PDB (resName is 4 wide; it would overwrite chainID and "
+                f"resSeq).  A terminal residue needs its own name, and there is no "
+                f"free character here because '{s_code}'/'{t_code or _target_code(tgt)}' "
+                f"is a two-character library code.  Terminal mutations involving "
+                f"CYM/TYM/LYSN/CYSO/SP1/SP2/TP1/TP2/YP1/YP2 are not supported; do "
+                f"the mutation on an internal residue, or pass an explicit 4-character "
+                f"hybrid_name=.")
+        return name
     if reverse:
         return (tgt + '2' + letter)[:4]
     return (letter + '2' + _target_code(tgt))[:4]
+
 
 _protein_residues_incl_pmx_mut = (
     _protein_residues

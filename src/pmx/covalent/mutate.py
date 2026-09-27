@@ -92,8 +92,9 @@ def _load_rtp(ff: str):
     return load_ff_rtp(ff), get_ff_path(ff)
 
 
-def _inter_residue_bonds(rtp, resname, term):
-    entr = _rtp_terminal(rtp[resname], term) if term else rtp[resname]
+def _inter_residue_bonds(rtp, resname, term, ff=None):
+    entr = (_rtp_terminal(rtp[resname], term, ff=ff, resname=resname)
+            if term else rtp[resname])
     return [[a1, a2] for a1, a2 in entr["bonds"]
             if a1.startswith(("+", "-")) or a2.startswith(("+", "-"))]
 
@@ -240,7 +241,7 @@ def build_hybrid_residue(residue1, residue2, ff: str, mut_resname: str,
     ii_list = _generate_improp_entries(im1, im2, residue1)
 
     bond_neigh = _inter_residue_bonds(rtp, residue1.resnA if hasattr(
-        residue1, "resnA") else residue1.resname, term)
+        residue1, "resnA") else residue1.resname, term, ff=ff)
 
     if reverse:
         # swap each atom's A and B state (types, charges, masses, names).  After
@@ -262,13 +263,16 @@ def build_hybrid_residue(residue1, residue2, ff: str, mut_resname: str,
                 a.name = ('D' + a.name[:-len('.gone')])[:4]
 
     if hybrid_name is None:
-        # Central namer (library.hybrid_name): forward = L2<first+last of target>
-        # so prefix-sharing targets stay distinct under the 4-char cap
-        # (MLZ->K2MZ vs MLY->K2MY vs M3L->K2ML; SP1->S2S1 vs SP2->S2S2).  A
-        # reverse hybrid front-loads the target so it never collides with its
-        # forward counterpart in the shared nsaa.rtp/nsaa.mtp.
+        # Central namer (library.hybrid_name).  Internal: L2<first+last of target>
+        # so prefix-sharing PTM targets stay distinct (MLZ->K2MZ vs MLY->K2MY vs
+        # M3L->K2ML).  Terminal (term set): the classic library spelling plus a
+        # lowercase terminus letter (L2Yn / L2Tc) -- a terminal hybrid is a
+        # different residue from the internal one of the same morph, so it gets
+        # its own name instead of shadowing the library's L2Y.  A reverse hybrid
+        # front-loads the target so it never collides with its forward
+        # counterpart in the shared nsaa.rtp/nsaa.mtp.
         hybrid_name = library.hybrid_name(residue1.resname, mut_resname,
-                                          reverse=reverse)
+                                          reverse=reverse, term=term)
     if reverse:
         residue1.resnA, residue1.resnB = mut_resname, residue1.resname
     else:
@@ -343,7 +347,7 @@ def _build_target_residue(target, ff, rtp, term, residue1,
         # Complete structures are left untouched, so every other structure=
         # workflow is unchanged.
         residue2 = complete_target_from_structure(residue2, target, ff, term)
-        _assign_rtp_entries(residue2, rtp, term)
+        _assign_rtp_entries(residue2, rtp, term, ff=ff)
         if not any(getattr(a, "bonds", None) for a in residue2.atoms):
             attach_bonds_from_rtp(residue2, ff)
         return residue2
@@ -439,13 +443,20 @@ def mutate(model, mut_resid: int, target: str, ff: str,
            refB: Optional[str] = None,
            mut_chain: Optional[str] = None, inplace: bool = False,
            write_files: bool = True, verbose: bool = False,
-           reverse: bool = False):
+           reverse: bool = False, hybrid_name: Optional[str] = None):
     """Mutate ``mut_resid`` in *model* to *target*, via one of three front ends.
 
     Parameters
     ----------
     target : str
         Target residue name (also used for the hybrid name and RTP lookup).
+    hybrid_name : str, optional
+        Override the generated 4-character hybrid name.  ``library.hybrid_name``
+        builds it from the source one-letter code plus the FIRST and LAST letters
+        of the target's 3-letter code, which is **not** collision-free: THR and
+        TYR both yield ``L2TR`` from LEU.  The cross-morph guard in
+        :func:`_accumulate_hybrid` refuses to reuse a name for a different morph
+        and tells the caller to pass this -- so it has to be reachable from here.
     structure : str, optional
         PDB/GRO with the target residue's geometry.  Overrides the default
         RDKit-embedded geometry; parameters still come from the RTP (or from
@@ -479,11 +490,13 @@ def mutate(model, mut_resid: int, target: str, ff: str,
 
     residue1 = m.fetch_residue(idx=mut_resid, chain=mut_chain)
     chain = residue1.chain
+    if residue1 == chain.cterminus() and residue1 == chain.nterminus():
+        _reject_lone_residue(residue1, "covalent.mutate")
     term = ("C" if residue1 == chain.cterminus()
             else ("N" if residue1 == chain.nterminus() else None))
 
     # parameterize + bond the WT residue from the force field
-    _assign_rtp_entries(residue1, rtp, term)
+    _assign_rtp_entries(residue1, rtp, term, ff=ff)
     if not any(getattr(a, "bonds", None) for a in residue1.atoms):
         attach_bonds_from_rtp(residue1, ff)
 
@@ -511,7 +524,7 @@ def mutate(model, mut_resid: int, target: str, ff: str,
 
     rtp_text, mtp_text, hybrid_name = build_hybrid_residue(
         residue1, residue2, ff, target, term=term, write_ff_types=write_files,
-        reverse=reverse)
+        reverse=reverse, hybrid_name=hybrid_name)
 
     if write_files:
         _accumulate_hybrid(ffpath, hybrid_name, rtp_text, mtp_text, bCharmm)
@@ -525,6 +538,28 @@ def mutate(model, mut_resid: int, target: str, ff: str,
 
 
 # ── terminal deletion (a residue morph through the same core) ──────────────────
+
+def _reject_lone_residue(residue, op: str) -> None:
+    """Refuse an op on a chain of ONE residue (it is N- AND C-terminal).
+
+    Such a residue needs BOTH terminal patches, and the engine applies only one
+    (``term`` resolves to a single side), so it would silently emit a hybrid whose
+    backbone is patched on one end and internal on the other.  A **dipeptide is
+    the minimum supported input**; a lone residue is out of scope and is rejected
+    here rather than half-handled.  The matching case on the deletion side -- a
+    deletion whose survivor would be a lone residue -- is caught by the strict
+    ``_validate_atom_parameters`` call in :func:`delete_terminal`.
+    """
+    chain = residue.chain
+    if chain is None:
+        return
+    if len(chain.residues) < 2:
+        raise ValueError(
+            f"{op}: residue {residue.resname}{residue.id} is the only residue in "
+            f"chain '{getattr(chain, 'id', '?')}', so it is both the N- and the "
+            f"C-terminus and would need both terminal patches.  pmx applies one, "
+            f"so this is refused: a dipeptide is the minimum supported input.")
+
 
 def _term_del_code(resname: str) -> str:
     """One-letter code for the deletion-neighbour hybrid name (``V`` -> ``VdeC``).
@@ -592,6 +627,13 @@ def delete_terminal(model, del_resid: int, ff: str,
 
     # parameterize + bond the neighbour as an internal residue (state A)
     _assign_rtp_entries(neighbor, rtp, None)
+    # The neighbour is typed as an INTERNAL residue in state A.  If it is also the
+    # opposite terminus (a one-residue chain survives the deletion) it still
+    # carries that terminus's atoms -- OT1/OT2 or H1/H2/H3 -- which the internal
+    # entry does not define, so they would stay untyped and surface as an
+    # unparseable three-field nsaa.rtp row inside pdb2gmx.  Fail here instead.
+    _validate_atom_parameters(neighbor, f"neighbour of a {term}-terminal deletion",
+                              strict=True)
     if not any(getattr(a, "bonds", None) for a in neighbor.atoms):
         attach_bonds_from_rtp(neighbor, ff)
 
@@ -612,7 +654,15 @@ def delete_terminal(model, del_resid: int, ff: str,
     # _write_atp_fnb register exactly those types -- the same mechanism every
     # engine hybrid uses.
     if write_files:
-        _assign_rtp_entries(del_res, rtp, term)
+        # ff= so the terminal patch comes from this force field's .tdb: the
+        # DUM_ types registered here must be the ones pdb2gmx will actually
+        # assign to the deleted residue (amber N-term CA is CX, not CHARMM CT1).
+        _assign_rtp_entries(del_res, rtp, term, ff=ff)
+        # strict: an untyped atom here means the survivor needs a patch this
+        # entry does not provide (e.g. a one-residue chain after the deletion is
+        # both N- and C-terminal).  Fail now, named, not later inside pdb2gmx.
+        _validate_atom_parameters(del_res, f"{term}-terminal deletion target",
+                                  strict=True)
         _make_bstate_dummies(del_res)
         _write_atp_fnb("atomtypes.atp", "ffnonbonded.itp", del_res, ffpath)
 
@@ -628,7 +678,8 @@ def delete_terminal(model, del_resid: int, ff: str,
 
 def amidate_cterminus(model, resid: int, ff: str, chain: Optional[str] = None,
                       inplace: bool = False, write_files: bool = True,
-                      verbose: bool = False):
+                      verbose: bool = False, reverse: bool = False,
+                      hybrid_name: Optional[str] = None):
     """Alchemically amidate a C-terminus: ``-COO-`` (A) -> ``-C(=O)NH2`` (B).
 
     The experimental "amidation" that blocks the free C-terminal carboxylate (a
@@ -645,21 +696,22 @@ def amidate_cterminus(model, resid: int, ff: str, chain: Optional[str] = None,
         m.nm2a()
 
     res = m.fetch_residue(idx=resid, chain=chain)
+    _reject_lone_residue(res, "amidate_cterminus")
     if res != res.chain.cterminus():
         raise ValueError("amidate_cterminus: residue %s (%s) is not the "
                          "C-terminus" % (res.id, res.resname))
     # the residue already carries its carboxylate (OT1/OT2 from pdb2gmx), so it
     # must be typed with the C-terminal patch -- not the internal RTP, which
     # would leave OT2 untyped and empty out the hybrid.
-    _assign_rtp_entries(res, rtp, "C")
+    _assign_rtp_entries(res, rtp, "C", ff=ff)
     if not any(getattr(a, "bonds", None) for a in res.atoms):
         attach_bonds_from_rtp(res, ff)
 
     residue2 = TargetResidue.from_rtp(res.resname, ff, term="C_amide").residue
     code = library._ext_one_letter.get(res.resname, res.resname[:1])
-    hybrid_name = (code + "am")[:4]
+    hybrid_name = hybrid_name or (code + "am")[:4]   # caller may override
     rtp_text, mtp_text, hn = build_hybrid_residue(
-        res, residue2, ff, res.resname, term="C", term_b="C_amide",
+        res, residue2, ff, res.resname, term="C", term_b="C_amide", reverse=reverse,
         hybrid_name=hybrid_name, write_ff_types=write_files)
     if write_files:
         _accumulate_hybrid(ffpath, hn, rtp_text, mtp_text, bCharmm)
