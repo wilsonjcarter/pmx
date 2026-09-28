@@ -87,6 +87,7 @@ CG2R52     12.01100 ; 5-mem ring, double bound to N, PYRZ, pyrazole
 CG2R53     12.01100 ; 5-mem ring, double bound to N and adjacent to another heteroatom, purine C8, his CE1 (0,+1), 2PDO, kevo
 CG2R57     12.01100 ; 5-mem ring, bipyrroles
 CG2R61     12.01100 ; 6-mem aromatic C
+CG2R6Q     12.01100 ; 6-mem aromatic C  ; quinoid Cz [ff_qmTYM]
 CG2R62     12.01100 ; 6-mem aromatic C for protonated pyridine (NIC) and rings containing carbonyls (see CG2R63) (NA)
 CG2R63     12.01100 ; 6-mem aromatic amide carbon (NA) (and other 6-mem aromatic carbonyls?)
 CG2R64     12.01100 ; 6-mem aromatic amidine and guanidine carbon (between 2 or 3 Ns and double-bound to one of them), NA, PYRM
@@ -486,7 +487,13 @@ DUM_HB2    1.008000
 DUM_CT1   12.011000
 DUM_CT2A   12.011000
 DUM_SS   32.060000
-DUM_SM   32.060000
 DUM_CS   12.011000
 DUM_CP2   12.011000
 DUM_CP3   12.011000
+DUM_P    30.974000
+DUM_ON4   15.999400
+DUM_HN4    1.008000
+DUM_ON2B   15.999400
+DUM_CG334   12.011000
+DUM_HGA3    1.008000
+DUM_HGP5    1.008000

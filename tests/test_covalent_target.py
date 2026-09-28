@@ -13,7 +13,7 @@ rdkit = pytest.importorskip("rdkit")
 
 from pmx.gmx import set_gmxlib
 from pmx.model import Model
-from pmx.ffparser import RTPParser
+from pmx.ffparser import RTPParser, load_ff_rtp
 from pmx.utils import get_ff_path
 from pmx.covalent import TargetResidue
 
@@ -32,11 +32,10 @@ def _dist(a, b):
 
 @lru_cache(maxsize=4)
 def _rtp_oracle(ff):
-    ffpath = get_ff_path(ff)
-    f = os.path.join(ffpath, "merged.rtp")
-    if not os.path.isfile(f):
-        f = os.path.join(ffpath, "aminoacids.rtp")
-    return RTPParser(f)
+    # Glob-aware loader: includes the overlay topic files (ptm_phospho.rtp etc.)
+    # where the clean FF set keeps SEP/TPO/PTR/MLZ..., not just base merged.rtp.
+    # (Matches how the engine resolves residues.)
+    return load_ff_rtp(ff)
 
 
 def _rtp_reference(resname, ff):

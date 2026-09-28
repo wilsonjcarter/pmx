@@ -48,59 +48,6 @@
 
  [ rotations ]
 
-[ AdeN ] ; ALA as N-term deletion neighbor
-
-
- [ morphes ]
-      N         NH1 ->      N         NH3
-     HN           H ->     H1          HC
-     CA         CT1 ->     CA         CT1
-     HA         HB1 ->     HA         HB1
-     CB         CT3 ->     CB         CT3
-    HB1         HA3 ->    HB1         HA3
-    HB2         HA3 ->    HB2         HA3
-    HB3         HA3 ->    HB3         HA3
-      C           C ->      C           C
-      O           O ->      O           O
-    DH2      DUM_HC ->     H2          HC
-    DH3      DUM_HC ->     H3          HC
-
- [ atoms ]
-      N         NH1   -0.470000      1   14.007000         NH3   -0.300000   14.007000   ;  types != | charge !=
-     HN           H    0.310000      1    1.008000          HC    0.330000    1.008000   ;  types != | charge !=
-     CA         CT1    0.070000      1   12.011000         CT1    0.210000   12.011000   ;  types == | charge !=
-     HA         HB1    0.090000      1    1.008000         HB1    0.100000    1.008000   ;  types == | charge !=
-     CB         CT3   -0.270000      1   12.011000         CT3   -0.270000   12.011000   ;  types == | charge ==
-    HB1         HA3    0.090000      1    1.008000         HA3    0.090000    1.008000   ;  types == | charge ==
-    HB2         HA3    0.090000      1    1.008000         HA3    0.090000    1.008000   ;  types == | charge ==
-    HB3         HA3    0.090000      1    1.008000         HA3    0.090000    1.008000   ;  types == | charge ==
-      C           C    0.510000      1   12.011000           C    0.510000   12.011000   ;  types == | charge ==
-      O           O   -0.510000      1   15.999000           O   -0.510000   15.999000   ;  types == | charge ==
-    DH2      DUM_HC    0.000000      1    1.008000          HC    0.330000    1.008000   ;  types != | charge !=
-    DH3      DUM_HC    0.000000      1    1.008000          HC    0.330000    1.008000   ;  types != | charge !=
-
- [ coords ]
-    0.000    0.000    0.000
-    0.000    0.000    0.000
-    0.000    0.000    0.000
-    0.000    0.000    0.000
-    0.000    0.000    0.000
-    0.000    0.000    0.000
-    0.000    0.000    0.000
-    0.000    0.000    0.000
-    0.000    0.000    0.000
-    0.000    0.000    0.000
-    0.000    0.000    0.000
-    0.000    0.000    0.000
-
- [ impropers ]
-      N     -C     CA     HN     default-A                 default-B
-      C     CA     +N      O     default-A                 default-B
-
- [ dihedrals ]
-
- [ rotations ]
-
 [ RdeC ] ; ARG as C-term deletion neighbor
 
 
@@ -1056,50 +1003,6 @@
  [ impropers ]
       N     -C     CA     HN     default-A                 default-B
       C     CA   DOT2      O     default-A                 default-B
-
- [ dihedrals ]
-
- [ rotations ]
-
-[ GdeN ] ; GLY as N-term deletion neighbor
-
-
- [ morphes ]
-      N         NH1 ->      N         NH3
-     HN           H ->     H1          HC
-     CA         CT2 ->     CA         CT2
-    HA1         HB2 ->    HA1         HB2
-    HA2         HB2 ->    HA2         HB2
-      C           C ->      C           C
-      O           O ->      O           O
-    DH2      DUM_HC ->     H2          HC
-    DH3      DUM_HC ->     H3          HC
-
- [ atoms ]
-      N         NH1   -0.470000      1   14.007000         NH3   -0.300000   14.007000   ;  types != | charge !=
-     HN           H    0.310000      1    1.008000          HC    0.330000    1.008000   ;  types != | charge !=
-     CA         CT2   -0.020000      1   12.011000         CT2    0.130000   12.011000   ;  types == | charge !=
-    HA1         HB2    0.090000      1    1.008000         HB2    0.090000    1.008000   ;  types == | charge ==
-    HA2         HB2    0.090000      1    1.008000         HB2    0.090000    1.008000   ;  types == | charge ==
-      C           C    0.510000      1   12.011000           C    0.510000   12.011000   ;  types == | charge ==
-      O           O   -0.510000      1   15.999000           O   -0.510000   15.999000   ;  types == | charge ==
-    DH2      DUM_HC    0.000000      1    1.008000          HC    0.330000    1.008000   ;  types != | charge !=
-    DH3      DUM_HC    0.000000      1    1.008000          HC    0.330000    1.008000   ;  types != | charge !=
-
- [ coords ]
-    0.000    0.000    0.000
-    0.000    0.000    0.000
-    0.000    0.000    0.000
-    0.000    0.000    0.000
-    0.000    0.000    0.000
-    0.000    0.000    0.000
-    0.000    0.000    0.000
-    0.000    0.000    0.000
-    0.000    0.000    0.000
-
- [ impropers ]
-      N     -C     CA     HN     default-A                 default-B
-      C     CA     +N      O     default-A                 default-B
 
  [ dihedrals ]
 
@@ -2106,80 +2009,6 @@
 
  [ rotations ]
 
-[ MdeN ] ; MET as N-term deletion neighbor
-
-
- [ morphes ]
-      N         NH1 ->      N         NH3
-     HN           H ->     H1          HC
-     CA         CT1 ->     CA         CT1
-     HA         HB1 ->     HA         HB1
-     CB         CT2 ->     CB         CT2
-    HB1         HA2 ->    HB1         HA2
-    HB2         HA2 ->    HB2         HA2
-     CG         CT2 ->     CG         CT2
-    HG1         HA2 ->    HG1         HA2
-    HG2         HA2 ->    HG2         HA2
-     SD           S ->     SD           S
-     CE         CT3 ->     CE         CT3
-    HE1         HA3 ->    HE1         HA3
-    HE2         HA3 ->    HE2         HA3
-    HE3         HA3 ->    HE3         HA3
-      C           C ->      C           C
-      O           O ->      O           O
-    DH2      DUM_HC ->     H2          HC
-    DH3      DUM_HC ->     H3          HC
-
- [ atoms ]
-      N         NH1   -0.470000      1   14.007000         NH3   -0.300000   14.007000   ;  types != | charge !=
-     HN           H    0.310000      1    1.008000          HC    0.330000    1.008000   ;  types != | charge !=
-     CA         CT1    0.070000      1   12.011000         CT1    0.210000   12.011000   ;  types == | charge !=
-     HA         HB1    0.090000      1    1.008000         HB1    0.100000    1.008000   ;  types == | charge !=
-     CB         CT2   -0.180000      1   12.011000         CT2   -0.180000   12.011000   ;  types == | charge ==
-    HB1         HA2    0.090000      1    1.008000         HA2    0.090000    1.008000   ;  types == | charge ==
-    HB2         HA2    0.090000      1    1.008000         HA2    0.090000    1.008000   ;  types == | charge ==
-     CG         CT2   -0.140000      1   12.011000         CT2   -0.140000   12.011000   ;  types == | charge ==
-    HG1         HA2    0.090000      1    1.008000         HA2    0.090000    1.008000   ;  types == | charge ==
-    HG2         HA2    0.090000      1    1.008000         HA2    0.090000    1.008000   ;  types == | charge ==
-     SD           S   -0.090000      1   32.060000           S   -0.090000   32.060000   ;  types == | charge ==
-     CE         CT3   -0.220000      1   12.011000         CT3   -0.220000   12.011000   ;  types == | charge ==
-    HE1         HA3    0.090000      1    1.008000         HA3    0.090000    1.008000   ;  types == | charge ==
-    HE2         HA3    0.090000      1    1.008000         HA3    0.090000    1.008000   ;  types == | charge ==
-    HE3         HA3    0.090000      1    1.008000         HA3    0.090000    1.008000   ;  types == | charge ==
-      C           C    0.510000      1   12.011000           C    0.510000   12.011000   ;  types == | charge ==
-      O           O   -0.510000      1   15.999000           O   -0.510000   15.999000   ;  types == | charge ==
-    DH2      DUM_HC    0.000000      1    1.008000          HC    0.330000    1.008000   ;  types != | charge !=
-    DH3      DUM_HC    0.000000      1    1.008000          HC    0.330000    1.008000   ;  types != | charge !=
-
- [ coords ]
-    0.000    0.000    0.000
-    0.000    0.000    0.000
-    0.000    0.000    0.000
-    0.000    0.000    0.000
-    0.000    0.000    0.000
-    0.000    0.000    0.000
-    0.000    0.000    0.000
-    0.000    0.000    0.000
-    0.000    0.000    0.000
-    0.000    0.000    0.000
-    0.000    0.000    0.000
-    0.000    0.000    0.000
-    0.000    0.000    0.000
-    0.000    0.000    0.000
-    0.000    0.000    0.000
-    0.000    0.000    0.000
-    0.000    0.000    0.000
-    0.000    0.000    0.000
-    0.000    0.000    0.000
-
- [ impropers ]
-      N     -C     CA     HN     default-A                 default-B
-      C     CA     +N      O     default-A                 default-B
-
- [ dihedrals ]
-
- [ rotations ]
-
 [ FdeC ] ; PHE as C-term deletion neighbor
 
 
@@ -2400,71 +2229,6 @@
  [ impropers ]
       N     -C     CA     HN     default-A                 default-B
       C     CA   DOT2      O     default-A                 default-B
-
- [ dihedrals ]
-
- [ rotations ]
-
-[ PdeN ] ; PRO as N-term deletion neighbor
-
-
- [ morphes ]
-      N           N ->      N          NP
-     CD         CP3 ->     CD         CP3
-    HD1         HA2 ->    HD1         HA2
-    HD2         HA2 ->    HD2         HA2
-     CA         CP1 ->     CA         CP1
-     HA         HB1 ->     HA         HB1
-     CB         CP2 ->     CB         CP2
-    HB1         HA2 ->    HB1         HA2
-    HB2         HA2 ->    HB2         HA2
-     CG         CP2 ->     CG         CP2
-    HG1         HA2 ->    HG1         HA2
-    HG2         HA2 ->    HG2         HA2
-      C           C ->      C           C
-      O           O ->      O           O
-   DHN1      DUM_HC ->    HN1          HC
-   DHN2      DUM_HC ->    HN2          HC
-
- [ atoms ]
-      N           N   -0.290000      1   14.007000          NP   -0.070000   14.007000   ;  types != | charge !=
-     CD         CP3    0.000000      1   12.011000         CP3    0.160000   12.011000   ;  types == | charge !=
-    HD1         HA2    0.090000      1    1.008000         HA2    0.090000    1.008000   ;  types == | charge ==
-    HD2         HA2    0.090000      1    1.008000         HA2    0.090000    1.008000   ;  types == | charge ==
-     CA         CP1    0.020000      1   12.011000         CP1    0.160000   12.011000   ;  types == | charge !=
-     HA         HB1    0.090000      1    1.008000         HB1    0.090000    1.008000   ;  types == | charge ==
-     CB         CP2   -0.180000      1   12.011000         CP2   -0.180000   12.011000   ;  types == | charge ==
-    HB1         HA2    0.090000      1    1.008000         HA2    0.090000    1.008000   ;  types == | charge ==
-    HB2         HA2    0.090000      1    1.008000         HA2    0.090000    1.008000   ;  types == | charge ==
-     CG         CP2   -0.180000      1   12.011000         CP2   -0.180000   12.011000   ;  types == | charge ==
-    HG1         HA2    0.090000      1    1.008000         HA2    0.090000    1.008000   ;  types == | charge ==
-    HG2         HA2    0.090000      1    1.008000         HA2    0.090000    1.008000   ;  types == | charge ==
-      C           C    0.510000      1   12.011000           C    0.510000   12.011000   ;  types == | charge ==
-      O           O   -0.510000      1   15.999000           O   -0.510000   15.999000   ;  types == | charge ==
-   DHN1      DUM_HC    0.000000      1    1.008000          HC    0.240000    1.008000   ;  types != | charge !=
-   DHN2      DUM_HC    0.000000      1    1.008000          HC    0.240000    1.008000   ;  types != | charge !=
-
- [ coords ]
-    0.000    0.000    0.000
-    0.000    0.000    0.000
-    0.000    0.000    0.000
-    0.000    0.000    0.000
-    0.000    0.000    0.000
-    0.000    0.000    0.000
-    0.000    0.000    0.000
-    0.000    0.000    0.000
-    0.000    0.000    0.000
-    0.000    0.000    0.000
-    0.000    0.000    0.000
-    0.000    0.000    0.000
-    0.000    0.000    0.000
-    0.000    0.000    0.000
-    0.000    0.000    0.000
-    0.000    0.000    0.000
-
- [ impropers ]
-      N     -C     CA     CD     default-A                 default-B
-      C     CA     +N      O     default-A                 default-B
 
  [ dihedrals ]
 

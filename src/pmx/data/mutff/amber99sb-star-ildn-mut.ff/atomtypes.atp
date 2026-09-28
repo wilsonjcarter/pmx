@@ -100,3 +100,26 @@ DUM_N3   14.010000
 DUM_S    32.060000
 DUM_N    14.010000
 DUM_N2   14.010000
+c            12.01 ; gaff c; sp2 carbonyl/phenoxide C-O carbon (TYM phenoxide)
+cc           12.01 ; gaff cc; sp2 aromatic C (TYM phenoxide)
+cd           12.01 ; gaff cd; sp2 aromatic C (TYM phenoxide)
+o            16.00 ; gaff o; sp2 phenoxide O (TYM phenoxide)
+ha           1.008 ; gaff ha; aromatic H (TYM phenoxide)
+
+; ---- pmx: GACE (glutathionyl cap) GAFF atom types
+
+; ---- pmx: GACE (glutathionyl cap) GAFF atom types
+      c3     12.01
+      hc     1.008
+      hn     1.008
+      hx     1.008
+      nz     14.01
+DUM_P    30.970000
+DUM_c3   12.010000
+DUM_hc    1.008000
+DUM_hx    1.008000
+DUM_nz   14.010000
+DUM_hn    1.008000
+DUM_c    12.010000
+DUM_o    16.000000
+cq            12.01 ; gaff c; sp2 carbonyl/phenoxide C-O carbon (TYM phenoxide)

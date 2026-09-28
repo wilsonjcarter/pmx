@@ -1,0 +1,59 @@
+
+
+[ C2CD ] ; Cys -> Cym
+
+ [ morphes ]
+     N          N      ->     N          N
+     H          H      ->     H          H
+    CA         CT      ->     CA         CT
+    HA         H1      ->     HA         H1
+    CB1        CT      ->     CB      DUM_CT
+   HB11        H1      ->     HB1     DUM_H1
+   HB12        H1      ->     HB2     DUM_H1
+    CB2      DUM_CT    ->     CB2       CT2
+   HB21      DUM_H1    ->    HB21       HA2
+   HB22      DUM_H1    ->    HB21       HA2
+    SG1        SH      ->     SG1     DUM_SH
+    HG1        HS      ->     HG1     DUM_HS
+    SG2       DUM_SM   ->     SG2        S
+     C          C      ->      C         C
+     O          O      ->      O         O
+
+
+ [ atoms ]
+      N          N      -0.41570        1  14.007000         N  -0.41570  14.007000   ;  types == | charge ==
+      H          H       0.27190        1   1.008000         H   0.27190   1.008000   ;  types == | charge ==
+     CA          CT      0.02130        1  12.011000        CT   0.04290  12.011000   ;  types == | charge ==
+     HA          H1      0.11240        1   1.008000        H1   0.07660   1.008000   ;  types == | charge ==
+     CB1         CT     -0.12310        1  12.011000    DUM_CT   0.00000  12.011000   ;  types == | charge !=
+     HB11        H1      0.11120        1   1.008000    DUM_H1   0.00000   1.008000   ;  types == | charge ==
+     HB12        H1      0.11120        1   1.008000    DUM_H1   0.00000   1.008000   ;  types == | charge ==
+     CB2        DUM_CT   0.00000        1  12.011000        CT  -0.07900  12.011000   ;
+     HB21       DUM_H1   0.00000        1   1.008000        H1   0.09100   1.008000   ;  types == | charge ==
+     HB22       DUM_H1   0.00000        1   1.008000        H1   0.09100   1.008000   ;  types == | charge ==
+      SG1         SH    -0.31190        1  32.060000     DUM_SH  0.00000  32.060000   ;  types != | charge !=
+      HG1         HS     0.19330        1   1.008000     DUM_HS  0.00000   1.008000   ;  types != | charge !=
+      SG2     DUM_SM     0.00000        1  32.060000         S  -0.10810  32.060000   ;  types != | charge !=
+       C          C      0.59730        1  12.011000         C   0.59730  12.011000   ;  types == | charge ==
+       O          O     -0.56790        1  15.999400         O  -0.56790  15.999400   ;  types == | charge ==
+
+ [ coords ]
+  -2.994   -4.470    6.993
+  -3.510   -5.332    7.063
+  -1.676   -4.415    7.600
+  -1.767   -4.903    8.571
+  -0.680   -5.185    6.708
+  -0.680   -5.185    6.708
+  -0.680   -5.185    6.708
+  -1.013   -6.213    6.554
+  -1.013   -6.213    6.554
+  -0.608   -4.724    5.722
+   0.972   -5.260    7.462
+   0.972   -5.260    7.462
+   0.548   -5.313    8.730
+  -1.234   -2.969    7.858
+  -1.305   -2.106    6.983
+
+ [ impropers ]
+      N     -C     CA     H     default-A                 default-B
+      C     CA     +N      O     default-A                 default-B

@@ -47,44 +47,6 @@
  [ cmap ]
      -C      N     CA      C     +N
 
-[ AdeN ] ; ALA as N-term deletion neighbor
-
-
- [ atoms ]
-      N   NH1              -0.47000  0
-     HN   H                 0.31000  1
-     CA   CT1               0.07000  2
-     HA   HB1               0.09000  3
-     CB   CT3              -0.27000  4
-    HB1   HA3               0.09000  5
-    HB2   HA3               0.09000  6
-    HB3   HA3               0.09000  7
-      C   C                 0.51000  8
-      O   O                -0.51000  9
-    DH2   DUM_HC            0.00000  10
-    DH3   DUM_HC            0.00000  11
-
- [ bonds ]
-     CB     CA
-      N     HN
-      N     CA
-      C     CA
-      C     +N
-     CA     HA
-     CB    HB1
-     CB    HB2
-     CB    HB3
-      O      C
-    DH2      N
-    DH3      N
-
- [ impropers ]
-      N     -C     CA     HN
-      C     CA     +N      O
-
- [ cmap ]
-     -C      N     CA      C     +N
-
 [ RdeC ] ; ARG as C-term deletion neighbor
 
 
@@ -795,38 +757,6 @@
       N     -C     CA     HN
       C     CA     +N      O
       C     CA   DOT2      O
-
- [ cmap ]
-     -C      N     CA      C     +N
-
-[ GdeN ] ; GLY as N-term deletion neighbor
-
-
- [ atoms ]
-      N   NH1              -0.47000  0
-     HN   H                 0.31000  1
-     CA   CT2              -0.02000  2
-    HA1   HB2               0.09000  3
-    HA2   HB2               0.09000  4
-      C   C                 0.51000  5
-      O   O                -0.51000  6
-    DH2   DUM_HC            0.00000  7
-    DH3   DUM_HC            0.00000  8
-
- [ bonds ]
-      N     HN
-      N     CA
-      C     CA
-      C     +N
-     CA    HA1
-     CA    HA2
-      O      C
-    DH2      N
-    DH3      N
-
- [ impropers ]
-      N     -C     CA     HN
-      C     CA     +N      O
 
  [ cmap ]
      -C      N     CA      C     +N
@@ -1578,58 +1508,6 @@
  [ cmap ]
      -C      N     CA      C     +N
 
-[ MdeN ] ; MET as N-term deletion neighbor
-
-
- [ atoms ]
-      N   NH1              -0.47000  0
-     HN   H                 0.31000  1
-     CA   CT1               0.07000  2
-     HA   HB1               0.09000  3
-     CB   CT2              -0.18000  4
-    HB1   HA2               0.09000  5
-    HB2   HA2               0.09000  6
-     CG   CT2              -0.14000  7
-    HG1   HA2               0.09000  8
-    HG2   HA2               0.09000  9
-     SD   S                -0.09000  10
-     CE   CT3              -0.22000  11
-    HE1   HA3               0.09000  12
-    HE2   HA3               0.09000  13
-    HE3   HA3               0.09000  14
-      C   C                 0.51000  15
-      O   O                -0.51000  16
-    DH2   DUM_HC            0.00000  17
-    DH3   DUM_HC            0.00000  18
-
- [ bonds ]
-     CB     CA
-     CG     CB
-     SD     CG
-     CE     SD
-      N     HN
-      N     CA
-      C     CA
-      C     +N
-     CA     HA
-     CB    HB1
-     CB    HB2
-     CG    HG1
-     CG    HG2
-     CE    HE1
-     CE    HE2
-     CE    HE3
-      O      C
-    DH2      N
-    DH3      N
-
- [ impropers ]
-      N     -C     CA     HN
-      C     CA     +N      O
-
- [ cmap ]
-     -C      N     CA      C     +N
-
 [ FdeC ] ; PHE as C-term deletion neighbor
 
 
@@ -1789,53 +1667,6 @@
       N     -C     CA     CD
       C     CA     +N      O
       C     CA   DOT2      O
-
- [ cmap ]
-     -C      N     CA      C     +N
-
-[ PdeN ] ; PRO as N-term deletion neighbor
-
-
- [ atoms ]
-      N   N                -0.29000  0
-     CD   CP3               0.00000  1
-    HD1   HA2               0.09000  2
-    HD2   HA2               0.09000  3
-     CA   CP1               0.02000  4
-     HA   HB1               0.09000  5
-     CB   CP2              -0.18000  6
-    HB1   HA2               0.09000  7
-    HB2   HA2               0.09000  8
-     CG   CP2              -0.18000  9
-    HG1   HA2               0.09000  10
-    HG2   HA2               0.09000  11
-      C   C                 0.51000  12
-      O   O                -0.51000  13
-   DHN1   DUM_HC            0.00000  14
-   DHN2   DUM_HC            0.00000  15
-
- [ bonds ]
-      C     CA
-      C     +N
-      N     CA
-     CA     CB
-     CB     CG
-     CG     CD
-      N     CD
-     HA     CA
-    HG1     CG
-    HG2     CG
-    HD1     CD
-    HD2     CD
-    HB1     CB
-    HB2     CB
-      O      C
-   DHN1      N
-   DHN2      N
-
- [ impropers ]
-      N     -C     CA     CD
-      C     CA     +N      O
 
  [ cmap ]
      -C      N     CA      C     +N

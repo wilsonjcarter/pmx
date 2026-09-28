@@ -1,0 +1,208 @@
+[ bondedtypes ]
+; Col 1: Type of bond
+; Col 2: Type of angles
+; Col 3: Type of proper dihedrals
+; Col 4: Type of improper dihedrals
+; Col 5: Generate all dihedrals if 1, only heavy atoms of 0.
+; Col 6: Number of excluded neighbors for nonbonded interactions
+; Col 7: Generate 1,4 interactions between pairs of hydrogens if 1
+; Col 8: Remove propers over the same bond as an improper if it is 1
+; bonds  angles  dihedrals  impropers all_dihedrals nrexcl HH14 RemoveDih
+     1       5          9        2        1           3      1     0
+
+[ MLY ]
+  [ atoms ]
+	    N   NH1   -0.470  0
+	   HN     H    0.310  1
+	   CA   CT1    0.070  2
+	   HA   HB1    0.090  3
+	   CB CG321   -0.180  4
+	  HB1  HGA2    0.090  5
+	  HB2  HGA2    0.090  6
+	   CG CG321   -0.180  7
+	  HG1  HGA2    0.090  8
+	  HG2  HGA2    0.090  9
+	   CD CG321   -0.180 10
+	  HD1  HGA2    0.090 11
+	  HD2  HGA2    0.090 12
+	   CE CG324    0.234 13
+	  HE1  HGA2    0.090 14
+	  HE2  HGA2    0.090 15
+	   NZ NG3P1   -0.562 16
+	   HZ  HGP2    0.320 17
+	  CH1 CG334    0.144 18
+	 HH11  HGA3    0.090 19
+	 HH12  HGA3    0.090 20
+	 HH13  HGA3    0.090 21
+	  CH2 CG334    0.144 22
+	 HH21  HGA3    0.090 23
+	 HH22  HGA3    0.090 24
+	 HH23  HGA3    0.090 25
+	    C     C    0.510 26
+	    O     O   -0.510 27
+  [ bonds ]
+	    N    CA
+	    C    CA
+	    C    +N
+	   CA    HA
+	   CA    CB
+	    N    HN
+	   CB   HB1
+	   CB   HB2
+	   CB    CG
+	   CG   HG1
+	   CG   HG2
+	   CG    CD
+	   CD   HD1
+	   CD   HD2
+	   CD    CE
+	   CE   HE1
+	   CE   HE2
+	   CE    NZ
+	   NZ    HZ
+	   NZ   CH1
+	   NZ   CH2
+	  CH1  HH11
+	  CH1  HH12
+	  CH1  HH13
+	  CH2  HH21
+	  CH2  HH22
+	  CH2  HH23
+	    O     C
+  [ impropers ]
+	    N    -C    CA    HN
+	    C    CA    +N     O
+  [ cmap ]
+	   -C     N    CA     C    +N
+
+[ MLZ ]
+; N-methyl-lysine
+  [ atoms ]
+        N      NH1 -0.4700   1
+       HN        H  0.3100   1
+       CA      CT1  0.0700   1
+       HA      HB1  0.0900   1
+       CB    CG321 -0.1800   2
+      HB1     HGA2  0.0900   2
+      HB2     HGA2  0.0900   2
+       CG    CG321 -0.1800   3
+      HG1     HGA2  0.0900   3
+      HG2     HGA2  0.0900   3
+       CD    CG321 -0.1230   4
+      HD1     HGA2  0.0900   4
+      HD2     HGA2  0.0900   4
+       CE    CG324  0.1780   4
+      HE1     HGA2  0.0900   4
+      HE2     HGA2  0.0900   4
+       NZ    NG3P2 -0.4720   4
+      HZ1     HGP2  0.3370   4
+      HZ2     HGP2  0.3370   4
+       CM    CG334  0.1130   4
+     HCM1     HGA3  0.0900   4
+     HCM3     HGA3  0.0900   4
+     HCM2     HGA3  0.0900   4
+        C        C  0.5100   5
+        O        O -0.5100   5
+  [ bonds ]
+        N    CA
+        C    CA
+        C    +N
+       CA    HA
+       CA    CB
+        N    HN
+       CB   HB1
+       CB   HB2
+       CB    CG
+       CG   HG1
+       CG   HG2
+       CG    CD
+       CD   HD1
+       CD   HD2
+       CD    CE
+       CE   HE1
+       CE   HE2
+       CE    NZ
+       NZ   HZ1
+       NZ   HZ2
+       NZ    CM
+       CM  HCM1
+       CM  HCM3
+       CM  HCM2
+        O     C
+  [ impropers ]
+        N    -C    CA    HN
+        C    CA    +N     O
+  [ cmap ]
+       -C     N    CA     C    +N
+
+[ M3L ]
+  [ atoms ]
+	    N   NH1   -0.470  0
+	   HN     H    0.310  1
+	   CA   CT1    0.070  2
+	   HA   HB1    0.090  3
+	   CB CG321   -0.180  4
+	  HB1  HGA2    0.090  5
+	  HB2  HGA2    0.090  6
+	   CG CG321   -0.180  7
+	  HG1  HGA2    0.090  8
+	  HG2  HGA2    0.090  9
+	   CD CG321   -0.180 10
+	  HD1  HGA2    0.090 11
+	  HD2  HGA2    0.090 12
+	   CE CG324   -0.100 13
+	  HE1  HGP5    0.250 14
+	  HE2  HGP5    0.250 15
+	   NZ NG3P0   -0.600 16
+	  CM1 CG334   -0.350 17
+	 HM11  HGP5    0.250 18
+	 HM12  HGP5    0.250 19
+	 HM13  HGP5    0.250 20
+	  CM2 CG334   -0.350 21
+	 HM21  HGP5    0.250 22
+	 HM22  HGP5    0.250 23
+	 HM23  HGP5    0.250 24
+	  CM3 CG334   -0.350 25
+	 HM31  HGP5    0.250 26
+	 HM32  HGP5    0.250 27
+	 HM33  HGP5    0.250 28
+	    C     C    0.510 29
+	    O     O   -0.510 30
+  [ bonds ]
+	    N    CA
+	    C    CA
+	    C    +N
+	   CA    HA
+	   CA    CB
+	    N    HN
+	   CB   HB1
+	   CB   HB2
+	   CB    CG
+	   CG   HG1
+	   CG   HG2
+	   CG    CD
+	   CD   HD1
+	   CD   HD2
+	   CD    CE
+	   CE   HE1
+	   CE   HE2
+	   CE    NZ
+	   NZ   CM1
+	   NZ   CM2
+	   NZ   CM3
+	  CM1  HM11
+	  CM1  HM12
+	  CM1  HM13
+	  CM2  HM21
+	  CM2  HM22
+	  CM2  HM23
+	  CM3  HM31
+	  CM3  HM32
+	  CM3  HM33
+	    O     C
+  [ impropers ]
+	    N    -C    CA    HN
+	    C    CA    +N     O
+  [ cmap ]
+	   -C     N    CA     C    +N
+

@@ -1,0 +1,361 @@
+[ None ]
+
+[ NH3+ ]
+[ replace ]
+ N   N   N3     14.01 -0.5211
+[ Add ]
+ 3   4   H       N       CA      C
+     H  1.008   0.4591  -1
+[ delete ]
+ H
+
+[ ALA-NH3+ ]
+[ replace ]
+ N   N   N3     14.01 -0.5211
+ HA  HA  HP     1.008 0.082300
+[ Add ]
+ 3   4   H       N       CA      C
+     H  1.008   0.4591  -1
+[ delete ]
+ H
+
+[ ALY-NH3+ ]
+[ replace ]
+ N   N   N3     14.01 -0.5211
+ HA  HA  HP     1.008 0.0990
+[ Add ]
+ 3   4   H       N       CA      C
+     H  1.008   0.4591  -1
+[ delete ]
+ H
+
+[ ARG-NH3+ ]
+[ replace ]
+ N   N   N3     14.01 -0.5211
+ HA  HA  HP     1.008 0.0672
+[ Add ]
+ 3   4   H       N       CA      C
+     H  1.008   0.4591  -1
+[ delete ]
+ H
+
+[ ASH-NH3+ ]
+[ replace ]
+ N   N   N3     14.01 -0.5211
+ HA  HA  HP     1.008 0.086400
+[ Add ]
+ 3   4   H       N       CA      C
+     H  1.008   0.4591  -1
+[ delete ]
+ H
+
+[ ASN-NH3+ ]
+[ replace ]
+ N   N   N3     14.01 -0.5211
+ HA  HA  HP     1.008 0.104800
+[ Add ]
+ 3   4   H       N       CA      C
+     H  1.008   0.4591  -1
+[ delete ]
+ H
+
+[ ASP-NH3+ ]
+[ replace ]
+ N   N   N3     14.01 -0.5211
+ HA  HA  HP     1.008 0.1049
+[ Add ]
+ 3   4   H       N       CA      C
+     H  1.008   0.4591  -1
+[ delete ]
+ H
+
+[ BTK-NH3+ ]
+[ replace ]
+ N   N   N3     14.01 -0.5211
+ HA  HA  HP     1.008 -0.140754
+[ Add ]
+ 3   4   H       N       CA      C
+     H  1.008   0.4591  -1
+[ delete ]
+ H
+
+[ CYM-NH3+ ]
+[ replace ]
+ N   N   N3     14.01 -0.5211
+ HA  HA  HP     1.008 0.0365
+[ Add ]
+ 3   4   H       N       CA      C
+     H  1.008   0.4591  -1
+[ delete ]
+ H
+
+[ CYN-NH3+ ]
+[ replace ]
+ N   N   N3     14.01 -0.5211
+ HA  HA  HP     1.008 0.0365
+[ Add ]
+ 3   4   H       N       CA      C
+     H  1.008   0.4591  -1
+[ delete ]
+ H
+
+[ CYS-NH3+ ]
+[ replace ]
+ N   N   N3     14.01 -0.5211
+ HA  HA  HP     1.008 0.112400
+[ Add ]
+ 3   4   H       N       CA      C
+     H  1.008   0.4591  -1
+[ delete ]
+ H
+
+[ CYX-NH3+ ]
+[ replace ]
+ N   N   N3     14.01 -0.5211
+ HA  HA  HP     1.008 0.076600
+[ Add ]
+ 3   4   H       N       CA      C
+     H  1.008   0.4591  -1
+[ delete ]
+ H
+
+[ GLH-NH3+ ]
+[ replace ]
+ N   N   N3     14.01 -0.5211
+ HA  HA  HP     1.008 0.077900
+[ Add ]
+ 3   4   H       N       CA      C
+     H  1.008   0.4591  -1
+[ delete ]
+ H
+
+[ GLN-NH3+ ]
+[ replace ]
+ N   N   N3     14.01 -0.5211
+ HA  HA  HP     1.008 0.085000
+[ Add ]
+ 3   4   H       N       CA      C
+     H  1.008   0.4591  -1
+[ delete ]
+ H
+
+[ GLU-NH3+ ]
+[ replace ]
+ N   N   N3     14.01 -0.5211
+ HA  HA  HP     1.008 0.1109
+[ Add ]
+ 3   4   H       N       CA      C
+     H  1.008   0.4591  -1
+[ delete ]
+ H
+
+[ GLY-NH3+ ]
+[ replace ]
+ N   N   N3     14.01 -0.5211
+ HA2  HA2  HP     1.008 0.069800
+ HA1  HA1  HP     1.008 0.069800
+[ Add ]
+ 3   4   H       N       CA      C
+     H  1.008   0.4591  -1
+[ delete ]
+ H
+
+[ HID-NH3+ ]
+[ replace ]
+ N   N   N3     14.01 -0.5211
+ HA  HA  HP     1.008 0.088100
+[ Add ]
+ 3   4   H       N       CA      C
+     H  1.008   0.4591  -1
+[ delete ]
+ H
+
+[ HIE-NH3+ ]
+[ replace ]
+ N   N   N3     14.01 -0.5211
+ HA  HA  HP     1.008 0.136000
+[ Add ]
+ 3   4   H       N       CA      C
+     H  1.008   0.4591  -1
+[ delete ]
+ H
+
+ [ HIS-NH3+ ]
+ [ replace ]
+  N   N   N3     14.01 -0.5211
+  HA  HA  HP     1.008 0.136000
+ [ Add ]
+  3   4   H       N       CA      C
+      H  1.008   0.4591  -1
+ [ delete ]
+  H
+
+[ HIP-NH3+ ]
+[ replace ]
+ N   N   N3     14.01 -0.5211
+ HA  HA  HP     1.008 0.0509
+[ Add ]
+ 3   4   H       N       CA      C
+     H  1.008   0.4591  -1
+[ delete ]
+ H
+
+[ ILE-NH3+ ]
+[ replace ]
+ N   N   N3     14.01 -0.5211
+ HA  HA  HP     1.008 0.086900
+[ Add ]
+ 3   4   H       N       CA      C
+     H  1.008   0.4591  -1
+[ delete ]
+ H
+
+[ LEU-NH3+ ]
+[ replace ]
+ N   N   N3     14.01 -0.5211
+ HA  HA  HP     1.008 0.092200
+[ Add ]
+ 3   4   H       N       CA      C
+     H  1.008   0.4591  -1
+[ delete ]
+ H
+
+[ LYN-NH3+ ]
+[ replace ]
+ N   N   N3     14.01 -0.5211
+ HA  HA  HP     1.008 0.0994
+[ Add ]
+ 3   4   H       N       CA      C
+     H  1.008   0.4591  -1
+[ delete ]
+ H
+
+[ LYS-NH3+ ]
+[ replace ]
+ N   N   N3     14.01 -0.5211
+ HA  HA  HP     1.008 0.0611
+[ Add ]
+ 3   4   H       N       CA      C
+     H  1.008   0.4591  -1
+[ delete ]
+ H
+
+[ M3L-NH3+ ]
+[ replace ]
+ N   N   N3     14.01 -0.5211
+ HA  HA  HP     1.008 0.091222
+[ Add ]
+ 3   4   H       N       CA      C
+     H  1.008   0.4591  -1
+[ delete ]
+ H
+
+[ MET-NH3+ ]
+[ replace ]
+ N   N   N3     14.01 -0.5211
+ HA  HA  HP     1.008 0.088000
+[ Add ]
+ 3   4   H       N       CA      C
+     H  1.008   0.4591  -1
+[ delete ]
+ H
+
+[ MLY-NH3+ ]
+[ replace ]
+ N   N   N3     14.01 -0.5211
+ HA  HA  HP     1.008 0.108711
+[ Add ]
+ 3   4   H       N       CA      C
+     H  1.008   0.4591  -1
+[ delete ]
+ H
+
+[ MLZ-NH3+ ]
+[ replace ]
+ N   N   N3     14.01 -0.5211
+ HA  HA  HP     1.008 0.080193
+[ Add ]
+ 3   4   H       N       CA      C
+     H  1.008   0.4591  -1
+[ delete ]
+ H
+
+[ PHE-NH3+ ]
+[ replace ]
+ N   N   N3     14.01 -0.5211
+ HA  HA  HP     1.008 0.097800
+[ Add ]
+ 3   4   H       N       CA      C
+     H  1.008   0.4591  -1
+[ delete ]
+ H
+
+[ PRK-NH3+ ]
+[ replace ]
+ N   N   N3     14.01 -0.5211
+ HA  HA  HP     1.008 -0.006214
+[ Add ]
+ 3   4   H       N       CA      C
+     H  1.008   0.4591  -1
+[ delete ]
+ H
+
+[ SER-NH3+ ]
+[ replace ]
+ N   N   N3     14.01 -0.5211
+ HA  HA  HP     1.008 0.084300
+[ Add ]
+ 3   4   H       N       CA      C
+     H  1.008   0.4591  -1
+[ delete ]
+ H
+
+[ THR-NH3+ ]
+[ replace ]
+ N   N   N3     14.01 -0.5211
+ HA  HA  HP     1.008 0.100700
+[ Add ]
+ 3   4   H       N       CA      C
+     H  1.008   0.4591  -1
+[ delete ]
+ H
+
+[ TRP-NH3+ ]
+[ replace ]
+ N   N   N3     14.01 -0.5211
+ HA  HA  HP     1.008 0.112300
+[ Add ]
+ 3   4   H       N       CA      C
+     H  1.008   0.4591  -1
+[ delete ]
+ H
+
+[ TYR-NH3+ ]
+[ replace ]
+ N   N   N3     14.01 -0.5211
+ HA  HA  HP     1.008 0.087600
+[ Add ]
+ 3   4   H       N       CA      C
+     H  1.008   0.4591  -1
+[ delete ]
+ H
+
+[ VAL-NH3+ ]
+[ replace ]
+ N   N   N3     14.01 -0.5211
+ HA  HA  HP     1.008 0.096900
+[ Add ]
+ 3   4   H       N       CA      C
+     H  1.008   0.4591  -1
+[ delete ]
+ H
+
+ [ PRO-NH2+ ]
+ [ replace ]
+  N   N   N3     14.01 -0.1730
+  HD1  HD1  HP    1.008  0.0391
+  HD2  HD2  HP    1.008  0.0391
+  HA   HA   HP    1.008  0.0641
+ [ Add ]
+  2   4   H       N       CA      C
+      H  1.008   0.4591  -1

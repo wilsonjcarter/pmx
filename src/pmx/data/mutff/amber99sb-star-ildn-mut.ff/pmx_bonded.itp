@@ -1,0 +1,38 @@
+; xFP phenoxide deprotonated Tyr (TYM) -- amber99sb-star-ildnp-q-mut (alpha-C = CT)
+; ring-internal: GAFF (frcmod.xFPchromophores.2022); junction: this FF's Tyr analog.
+[ bondtypes ]
+; i  j  func  b0(nm)   kb
+cc cd   1   0.13729   419153.1 ; frcmod cc-cd
+cd cd   1   0.14278   351288.6 ; frcmod cd-cd
+c  cc   1   0.14676   310452.8 ; frcmod cc-c
+c  o    1   0.12183   533627.4 ; frcmod c-o (phenoxide)
+cc ha   1   0.10837   292126.9 ; frcmod cc-ha
+cd ha   1   0.10837   292126.9 ; frcmod cd-ha
+CT cd   1   0.15015   280160.6 ; frcmod cd-CX analog (CB-CG junction)
+[ angletypes ]
+; i  j  k  func  th0      cth
+cd cd cc   1   114.190   570.698 ; frcmod cd-cd-cc
+cd cd ha   1   121.070   394.133 ; frcmod cd-cd-ha
+cd cc ha   1   121.760   405.848 ; frcmod cd-cc-ha
+cc cd ha   1   121.760   405.848 ; gaff sym cd-cc-ha
+c  cc cd   1   121.350   544.757 ; frcmod c-cc-cd
+c  cc ha   1   116.640   392.459 ; frcmod c-cc-ha
+cc c  cc   1   115.840   540.573 ; frcmod cc-c-cc
+cc c  o    1   123.930   578.229 ; frcmod cc-c-o
+cd cd cd   1   120.000   527.184 ; amber CA-CA-CA analog
+CT CT cd   1   114.000   527.184 ; amber CT-CT-CA analog (CA-CB-CG)
+HC CT cd   1   109.500   418.400 ; amber CA-CT-HC analog (HB-CB-CG)
+CT cd cd   1   120.000   585.760 ; amber CA-CA-CT analog (CB-CG-CD)
+[ dihedraltypes ] ; proper
+; i  j  k  l  func  phase   kd     pn
+X  cc cd X    9   180.00   16.73600   2 ; frcmod X-cc-cd-X
+X  cd cd X    9   180.00   16.73600   2 ; frcmod X-cd-cd-X
+X  cc c  X    9   180.00   12.02900   2 ; frcmod X-cc-c-X
+X  CT cd X    9     0.00    0.00000   2 ; CB-CG rotation (matches amber X-CA-CT-X=0)
+; chi1 (a-CT-CT-cd) left to this FF's generic X-CT-CT-X, as it treats Tyr.
+[ dihedraltypes ] ; improper
+; i  j  k  l  func  phase   kd      pn
+X  X  cd ha   4   180.00    4.60240   2 ; ring CH (frcmod X-X-cd-ha)
+X  X  cc ha   4   180.00    4.60240   2 ; ring CH (frcmod X-X-cc-ha)
+cd cd cd CT   4   180.00    4.60240   2 ; CG center (amber CA-CA-CA-CT analog)
+cc cc c  o    4   180.00   43.93200   2 ; CZ=O center (frcmod X-X-c-o)

@@ -1,0 +1,30 @@
+; Bonded parameters for phosphorylated amino acids (new-amber99sb-star-ildn-q-bb-scaled.ff)
+; Only NEW parameters not already in ffbonded.itp
+; Dihedral parameters are for charged (-2) forms (SP2/TP2/YP2)
+; Neutral forms (SP0/TP0/YP0) use these as approximation
+; Converted from Khoury et al. (ct400556v_si_002)
+
+[ bondtypes ]
+; i    j   func      b0          kb
+  CA     OS      1   0.13570   328527.7
+
+[ angletypes ]
+;  i    j    k   func      th0          cth
+  CA     OS     P       1   120.500000   836.800000
+  OH     P      OH      1   108.230000   1171.520000
+  CA     CA     OS      1   121.890000   594.462720
+
+[ dihedraltypes ]
+;   i    j    k    l   func     phi0        cp        mult
+  CA    CA    OS    P      9     180.00        4.39320     2
+  CA    OS    P     O2     9     179.94        0.64978     1
+  CA    OS    P     O2     9     121.39        0.42374     2
+  CA    OS    P     O2     9     -18.00        0.96985     3
+  CA    OS    P     O2     9     -32.40        0.21422     4
+  CT    OS    P     O2     9     -63.53        0.86888     1
+  CT    OS    P     O2     9    -145.69        0.29706     2
+  CT    OS    P     O2     9     -56.66        3.13242     3
+  CT    OS    P     O2     9     148.99        0.24546     4
+  CT    OS    P     O2     9      30.30        0.07113     5
+  CT    OS    P     O2     9    -137.38        0.26220     6
+

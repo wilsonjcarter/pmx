@@ -1,0 +1,69 @@
+[ None ]
+
+
+[ COO- ]
+[ replace ]
+ C      C   C   12.01  0.4656
+ O      OC1 O2  16.00 -0.5931
+ OXT    OC2 O2  16.00 -0.5931
+
+[ add ]
+ 2  8   OC  C   CA  N
+    O2  16.00 -0.5931   -1
+
+[ impropers ]
+ CA   OC1     C   OC2
+
+
+[ PRO-COO- ]
+[ replace ]
+ C      C   C   12.01  0.4510
+ O      OC1 O2  16.00 -0.5931
+ OXT    OC2 O2  16.00 -0.5931
+
+[ add ]
+ 2  8   OC  C   CA  N
+    O2  16.00 -0.5931   -1
+
+[ impropers ]
+ CA   OC1     C   OC2
+
+
+
+ [ CT2 ]
+ [ replace ]
+  C      C       12.011    0.5973     1
+  O      O       15.999   -0.5679     2
+  [ delete ]
+  OXT
+ [ add ]
+  1  2  NT  C  CA  N
+     N     14.0027      -0.4630           -1
+  2  3  HT  NT  C  CA
+     H      1.0080       0.2315           -1
+     [ impropers ]
+  C    HT1   NT    HT2
+ [ bonds ]
+  C    NT
+  NT   HT1
+  NT   HT2
+
+
+
+ [ PRO-CT2 ]
+ [ replace ]
+  C      C       12.011    0.5896     1
+  O      O       15.999   -0.5748     2
+  [ delete ]
+  OXT
+ [ add ]
+  1  2  NT  C  CA  N
+     N     14.0027      -0.4630           -1
+  2  3  HT  NT  C  CA
+     H      1.0080       0.2315           -1
+     [ impropers ]
+  C    HT1   NT    HT2
+ [ bonds ]
+  C    NT
+  NT   HT1
+  NT   HT2

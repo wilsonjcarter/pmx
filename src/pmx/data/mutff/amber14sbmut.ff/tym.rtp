@@ -1,0 +1,58 @@
+[ bondedtypes ]
+; bond angle dih imp all_dih nrexcl HH14 remove_dih
+   1       1          9          4        1         3      1     0
+
+[ TYM ]
+ [ atoms ]
+     N N         -0.41570     1
+     H H          0.27190     2
+    CA CX        -0.00140     3
+    HA H1         0.08760     4
+    CB CT         0.00970     5
+   HB1 HC         0.03700     6
+   HB2 HC         0.03700     7
+    CG cd        -0.34450     8
+   CD1 cd        -0.03920     9
+   HD1 ha         0.05330    10
+   CE1 cc        -0.32620    11
+   HE1 ha         0.07780    12
+    CZ cq          0.55050    13
+    OH o         -0.79290    14
+   CE2 cc        -0.32620    15
+   HE2 ha         0.07780    16
+   CD2 cd        -0.03920    17
+   HD2 ha         0.05330    18
+     C C          0.59730    19
+     O O         -0.56790    20
+ [ bonds ]
+     N     H
+     N    CA
+    CA    HA
+    CA    CB
+    CA     C
+    CB   HB1
+    CB   HB2
+    CB    CG
+    CG   CD1
+    CG   CD2
+   CD1   HD1
+   CD1   CE1
+   CE1   HE1
+   CE1    CZ
+    CZ    OH
+    CZ   CE2
+   CE2   HE2
+   CE2   CD2
+   CD2   HD2
+     C     O
+    -C     N
+ [ impropers ]
+    -C    CA     N     H
+    CA    +N     C     O
+    CG   CE2   CD2   HD2
+    CZ   CD2   CE2   HE2
+   CD1    CZ   CE1   HE1
+    CG   CE1   CD1   HD1
+   CD1   CD2    CG    CB
+   CE1   CE2    CZ    OH
+
