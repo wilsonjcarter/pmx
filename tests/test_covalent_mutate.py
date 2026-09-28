@@ -237,6 +237,41 @@ def _write_capped_sep_fragment(tmp_path):
     return itp, pdb
 
 
+def _write_tripeptide_internal_ser(tmp_path, FF, strip_h_from=None):
+    """Write a three-residue PDB (ALA1-SER2-ALA3) with SER INTERNAL.
+
+    Two constraints force a tripeptide.  A ONE-residue chain is both termini at
+    once, which pmx refuses (a dipeptide is the minimum supported input).  And in
+    a dipeptide BOTH residues are termini, so a PTM target there would need a
+    5-character terminal hybrid name (``S2SPc``), which cannot round-trip through
+    a PDB and is refused.  Neither of those is what these tests are about -- they
+    exercise the itp-fragment path and the unprotonated-WT warning -- so the
+    mutated residue is placed internally.  Geometry only has to be parseable;
+    these tests run the in-memory mutate, not pdb2gmx.
+    """
+    from pmx.covalent import TargetResidue
+    out = []
+    for resid, rn in ((1, "ALA"), (2, "SER"), (3, "ALA")):
+        tr = TargetResidue.from_rtp(rn, FF)
+        tmp = str(tmp_path / ("_%s.pdb" % rn))
+        tr.write(tmp)
+        for l in open(tmp):
+            if l[:4] != "ATOM":
+                continue
+            if strip_h_from == resid and l[76:78].strip() == "H":
+                continue
+            if strip_h_from == resid and not l[76:78].strip() \
+                    and l[12:16].strip().startswith("H"):
+                continue
+            x = float(l[30:38]) + (resid - 1) * 4.0      # separate the residues
+            out.append("%s%4d%s%8.3f%s" % (l[:22], resid, l[26:30], x, l[38:]))
+    path = str(tmp_path / "tripeptide.pdb")
+    with open(path, "w") as fh:
+        fh.writelines(out)
+        fh.write("END\n")
+    return path
+
+
 def test_mutate_via_itp_fragment(tmp_path):
     """End-to-end itp path: capped fragment -> hybrid with phosphate dummies."""
     from pmx.gmx import set_gmxlib
@@ -244,14 +279,14 @@ def test_mutate_via_itp_fragment(tmp_path):
     from pmx.covalent import TargetResidue, mutate
     set_gmxlib()
     itp, pdb = _write_capped_sep_fragment(tmp_path)
-    TargetResidue.from_rtp("SER", FF).write(str(tmp_path / "wt.pdb"))
-    m = Model(str(tmp_path / "wt.pdb"))
-    name = mutate(m, 1, "SEP", FF, itp=itp, structure=pdb,
+    m = Model(_write_tripeptide_internal_ser(tmp_path, FF))
+    name = mutate(m, 2, "SEP", FF, itp=itp, structure=pdb,
                   inplace=True, write_files=False)
-    names = [a.name for a in m.residues[0].atoms]
+    names = [a.name for a in m.residues[1].atoms]
+    # SER2 is internal, so this is the ordinary internal hybrid name.
     assert name == "S2SP"
     assert "HN" in names                      # WT backbone H mapped through
-    assert any(a.name == "DP" for a in m.residues[0].atoms)  # phosphate appears
+    assert any(a.name == "DP" for a in m.residues[1].atoms)  # phosphate appears
 
 
 def test_protonation_warning_on_hydrogenless_wt(tmp_path):
@@ -259,14 +294,10 @@ def test_protonation_warning_on_hydrogenless_wt(tmp_path):
     from pmx.model import Model
     from pmx.covalent import TargetResidue, mutate
     set_gmxlib()
-    tr = TargetResidue.from_rtp("SER", FF)
-    tr.residue.atoms = [a for a in tr.residue.atoms if a.symbol != "H"]
-    tr.model.atoms = tr.residue.atoms
-    p = str(tmp_path / "ser_heavy.pdb")
-    tr.model.write(p)
-    m = Model(p)
+    # tripeptide with the mutated SER internal, hydrogens stripped from it
+    m = Model(_write_tripeptide_internal_ser(tmp_path, FF, strip_h_from=2))
     with pytest.warns(UserWarning, match="unprotonated"):
-        mutate(m, 1, "SEP", FF, inplace=True, write_files=False)
+        mutate(m, 2, "SEP", FF, inplace=True, write_files=False)
 
 
 def test_cys_thiol_to_disulfide_type_morph_maps():
@@ -332,3 +363,15 @@ def test_phosphate_appears_as_bstate(hybrid):
         a_name, a_type, _, b_type = morphes[bname]
         assert a_type.startswith("DUM"), f"{bname} should be an A-state dummy"
         assert not b_type.startswith("DUM")
+
+def test_lone_residue_is_refused(tmp_path):
+    """A one-residue chain is both termini; pmx refuses rather than half-patching."""
+    from pmx.gmx import set_gmxlib
+    from pmx.model import Model
+    from pmx.covalent import TargetResidue
+    from pmx.alchemy import mutate as alchemy_mutate
+    set_gmxlib()
+    TargetResidue.from_rtp("SER", FF).write(str(tmp_path / "lone.pdb"))
+    m = Model(str(tmp_path / "lone.pdb"))
+    with pytest.raises(ValueError, match="dipeptide is the minimum"):
+        alchemy_mutate(m, 1, "ALA", FF, inplace=True)

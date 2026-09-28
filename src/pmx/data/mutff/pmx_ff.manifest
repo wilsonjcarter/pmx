@@ -179,7 +179,7 @@ charmm36m-ecc-mut  charge  YP1   -0.75
 charmm36m-ecc-mut  charge  YP2   -1.50
 charmm36m-ecc-mut  charge  MLY   +0.75
 charmm36m-ecc-mut  charge  M3L   +0.75
-charmm36m-ecc-mut  charge  MLYS  +0.75
+charmm36m-ecc-mut  charge  MLZ   +0.75
 # canonical residues, pinned so the two sets cannot drift apart
 charmm36m-ecc-mut  charge  LYS   +0.75
 charmm36m-ecc-mut  charge  ARG   +0.75

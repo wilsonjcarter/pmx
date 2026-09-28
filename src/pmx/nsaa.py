@@ -586,6 +586,8 @@ def _assign_rtp_entries(mol, rtp, term=None, ff=None):
                 f"Residue '{resname}' not found in RTP. "
                 "Check your RTP definitions.")
 
+    # _rtp_terminal resolves BOTH terminus conventions (tdb patch first, explicit
+    # N*/C* entry as fallback), so there is nothing to special-case here.
     entr = (_rtp_terminal(rtp[resname], term, ff=ff, resname=resname)
             if term else rtp[resname])
     logger.debug("RTP entry for %s: %d atoms", resname, len(entr['atoms']))
@@ -927,6 +929,9 @@ def _rtp_terminal(entr: dict, term: str, ff: str = None,
     suffix = 'n.tdb' if side == 'N' else 'c.tdb'
     path = _tdb_path(ff, side)
     if path is None:
+        explicit = _explicit_terminal_entry(ff, resname, term)
+        if explicit is not None:
+            return explicit
         raise ValueError(
             f"force field '{ff}' ships no {side}-terminus database (expected "
             f"merged.{suffix} or aminoacids.{suffix} in {get_ff_path(ff)}), so "
@@ -935,6 +940,14 @@ def _rtp_terminal(entr: dict, term: str, ff: str = None,
     variants = _parse_tdb(path)
     vname = _tdb_variant_name(variants, term, resname) if variants else None
     if vname is None:
+        # No usable tdb variant.  Before failing, check whether this force field
+        # uses the OTHER convention: the terminal form as its own RTP entry
+        # (NALA / CALA).  The plain amber ports ship placeholder .tdb files for
+        # exactly that reason.  The tdb is tried FIRST because the -q- ports have
+        # both, and the tdb patch is their established, validated path.
+        explicit = _explicit_terminal_entry(ff, resname, term)
+        if explicit is not None:
+            return explicit
         raise ValueError(
             f"force field '{ff}' defines no {term!r} variant for {resname} in "
             f"{path} (variants present: {sorted(variants) if variants else 'none'})."
@@ -1151,6 +1164,53 @@ def _generate_improp_entries(im1: list, im2: list, r) -> list:
 # =============================================================================
 # File generation
 # =============================================================================
+
+def explicit_terminal_resname(rtp, resname: str, term: str):
+    """Name of *ff*'s explicit terminal residue for (resname, term), or None.
+
+    Two conventions exist among the bundled force fields, and both are legitimate:
+
+    * **tdb style** -- the terminus is a PATCH in ``.n/.c.tdb`` applied to the
+      internal residue (``charmm*``, ``amber*-q-*``).  These ship no ``N<res>`` /
+      ``C<res>`` entries.
+    * **explicit-residue style** -- the terminus is its own RTP entry, ``NALA`` /
+      ``CALA`` and friends (the plain amber ports: ``amber14sbmut``,
+      ``amber19sbmut``, ``amber99sb-star-ildn*``).  Their ``.tdb`` files are
+      deliberate 10-byte placeholders, NOT a gap.
+
+    Nothing has to be patched in the second case -- the terminal form is simply a
+    different RTP entry -- so callers use it directly and skip
+    :func:`_rtp_terminal` entirely.
+    """
+    if not term:
+        return None
+    prefix = 'N' if str(term).upper().startswith('N') else 'C'
+    cand = prefix + resname.upper()
+    return cand if cand in rtp else None
+
+
+def _explicit_terminal_entry(ff: str, resname: str, term: str):
+    """The FF's explicit terminal RTP entry for (resname, term), or None.
+
+    Used only as a FALLBACK when no tdb variant applies -- see
+    :func:`explicit_terminal_resname` for why both conventions exist.  The entry
+    is already the terminal form, so it is returned as-is apart from dropping the
+    inter-residue bond the terminus removes.
+    """
+    try:
+        from .ffparser import load_ff_rtp
+        rtp = load_ff_rtp(ff)
+    except Exception:
+        return None
+    name = explicit_terminal_resname(rtp, resname, term)
+    if not name:
+        return None
+    entr = deepcopy(rtp[name])
+    for k in ('atoms', 'bonds', 'diheds', 'improps', 'cmap'):
+        entr.setdefault(k, [])
+    del_atoms(entr, '-C' if str(term).upper().startswith('N') else '+N')
+    return entr
+
 
 def _rtp_bondedtypes_header(ff: str) -> str:
     """Return the ``[ bondedtypes ]`` block from *ff*'s OWN main RTP.

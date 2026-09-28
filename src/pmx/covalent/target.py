@@ -316,6 +316,8 @@ class TargetResidue:
         """
         ffpath, resname, atom_rows, intra_bonds = _rtp_atoms_bonds(resname, ff)
         if term:
+            # _terminal_patch -> _rtp_terminal resolves both terminus conventions
+            # (tdb patch first, explicit N*/C* RTP entry as fallback).
             atom_rows, intra_bonds = _terminal_patch(atom_rows, intra_bonds, term,
                                                      ff=ff, resname=resname)
         masses = _load_atomtype_masses(ffpath)
