@@ -13,9 +13,12 @@ def test_phospho_protonation_states():
 
 
 def test_methylation_degrees():
-    assert ptm.resolve("LYS", "me1") == ("MLYS", 0)
+    assert ptm.resolve("LYS", "me1") == ("MLZ", 0)
     assert ptm.resolve("LYS", "me2") == ("MLY", 0)
     assert ptm.resolve("LYS", "me3") == ("M3L", 0)
+    # the charged lysine is renamed LYP (amber building block) before the PTM
+    # code is resolved -- it is the methylation substrate, so it must resolve too
+    assert ptm.resolve("LYP", "me1") == ("MLZ", 0)
 
 
 def test_case_insensitive():

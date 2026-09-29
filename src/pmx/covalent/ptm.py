@@ -28,6 +28,8 @@ from __future__ import annotations
 import re
 from typing import Optional, Tuple
 
+from .. import library
+
 # (WT residue) -> {code: target residue name}, per modification family.
 _PHOSPHO = {
     "SER": {"p1": "SP1", "p2": "SP2"},     # phospho-serine
@@ -35,8 +37,16 @@ _PHOSPHO = {
     "TYR": {"p1": "YP1", "p2": "YP2"},     # phospho-tyrosine
 }
 _METHYL = {
-    "LYS": {"me1": "MLYS", "me2": "MLY", "me3": "M3L"},  # mono/di/tri-methyl-Lys
+    "LYS": {"me1": "MLZ", "me2": "MLY", "me3": "M3L"},  # mono/di/tri-methyl-Lys
 }
+
+# Protonation-state aliases for the WT substrate.  pmx renames the charged
+# lysine (the one carrying HZ3) to the amber building-block name LYP before the
+# PTM code is resolved, so ``mutate --script 'N me1'`` on a normal (cationic)
+# lysine would otherwise fail to match the LYS methylation table.  The charged
+# lysine is exactly the methylation substrate (the Nz ammonium is retained), so
+# map it back to LYS.
+_WT_ALIAS = library.proton_state_alias   # single home: pmx.library
 
 # net charge change (target - WT) for each code -- phosphorylation deprotonates
 # the added phosphate (-1 or -2); methylation keeps the +1 ammonium.
@@ -71,7 +81,7 @@ def resolve(wt_resname: str, code: str) -> Optional[Tuple[str, int]]:
     c = code.strip().lower()
     if not _CODE_RE.match(c):
         return None
-    wt = wt_resname.strip().upper()
+    wt = _WT_ALIAS.get(wt_resname.strip().upper(), wt_resname.strip().upper())
     table = _PHOSPHO if c[0] == "p" else _METHYL
     family = "phosphorylation" if c[0] == "p" else "methylation"
     if wt not in table or c not in table[wt]:

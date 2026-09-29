@@ -555,7 +555,7 @@ def _assign_itp_entries(residue, itp_file: str, rtp, backbone_resname=None):
 # lysine under the force field's canonical name instead ('LYS' in amber/charmm),
 # so map the pmx name back when the RTP lacks it.  Applied only as a fallback
 # (see _assign_rtp_entries), so genuinely distinct entries are never touched.
-_RTP_PROTON_ALIAS = {"LYP": "LYS"}
+_RTP_PROTON_ALIAS = library.proton_state_alias   # single home: pmx.library
 
 
 def _assign_rtp_entries(mol, rtp, term=None, ff=None):

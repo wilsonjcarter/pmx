@@ -411,6 +411,16 @@ _term_deletion_residues = set(
 )
 
 
+# Protonation-state aliases for a WT substrate.  pmx renames a protonated residue
+# to its protonation-state building-block name before any table lookup -- the
+# charged lysine carrying HZ3 becomes LYP -- while the RTP and the PTM tables key
+# on the force field's canonical name (LYS).  The charged lysine is exactly the
+# methylation substrate (the NZ ammonium is retained), so it maps back to LYS.
+# Single home for this mapping: pmx.nsaa and pmx.covalent.ptm both consult it, and
+# they used to carry their own copies that could drift apart.
+proton_state_alias = {"LYP": "LYS"}
+
+
 def _target_code(target):
     """Two-char code for a hybrid target residue.
 
@@ -495,15 +505,20 @@ def hybrid_name(source, target, reverse=False, term=None):
             # CYM=CM, TYM=YM, LYSN=KN, CYSO=CO, phospho P1/P2.  Refuse rather
             # than emit a corrupt structure.
             raise ValueError(
-                f"terminal mutation {source}->{target} would need the hybrid name "
-                f"'{name}', which is {len(name)} characters and cannot round-trip "
-                f"through a PDB (resName is 4 wide; it would overwrite chainID and "
-                f"resSeq).  A terminal residue needs its own name, and there is no "
-                f"free character here because '{s_code}'/'{t_code or _target_code(tgt)}' "
-                f"is a two-character library code.  Terminal mutations involving "
-                f"CYM/TYM/LYSN/CYSO/SP1/SP2/TP1/TP2/YP1/YP2 are not supported; do "
-                f"the mutation on an internal residue, or pass an explicit 4-character "
-                f"hybrid_name=.")
+                f"terminal modification {source}->{target} is out of scope: it would "
+                f"need the hybrid name '{name}', which is {len(name)} characters and "
+                f"cannot round-trip through a PDB (resName spans columns 18-21, so the "
+                f"fifth overflows into chainID and garbles resSeq).  There is no free "
+                f"character because '{s_code}'/"
+                f"'{t_code or _target_code(tgt)}' is a two-character library code, and "
+                f"all 26 uppercase letters are taken by the canonical residues.\n"
+                f"This is a DELIBERATE limitation, not a bug: PTM/NSAA targets at a "
+                f"terminus (N-terminal acetylation or methylation, phospho or "
+                f"tyrosinate at a terminus) and the ten two-character-code residues "
+                f"CYM/CYSO/LYSN/TYM/SP1/SP2/TP1/TP2/YP1/YP2 are excluded.  Canonical "
+                f"20x20 mutations at a terminus are fully supported.\n"
+                f"Do the modification on an internal residue, or pass an explicit "
+                f"hybrid_name= of at most 4 characters.")
         return name
     if reverse:
         return (tgt + '2' + letter)[:4]
