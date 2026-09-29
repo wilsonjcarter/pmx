@@ -91,6 +91,52 @@ def cpp_parse_file(fn,  itp=False, ffpath=None, cpp_defs=[],
 # ==============================================================================
 # FIXME/QUESTION: is "old" version still needed? If not, we could simplify the
 # code by removing all if statements and arguments related to this
+def _include_path(line):
+    """The file path inside an ``#include`` statement, or '' if `line` is not one.
+
+    :meth:`TopolBase.write_footer` classifies footer includes by the *basename*
+    of this path, against the explicit name lists below.  With GMXLIB set,
+    pdb2gmx writes absolute include paths, so a filter that tests the whole line
+    also tests the directory the user happened to run in.
+    """
+    s = line.strip()
+    if not s.startswith('#include'):
+        return ''
+    if '"' in s:
+        return s.split('"')[1].replace('\\', '/')
+    parts = s.split()
+    return parts[-1].strip('<>').replace('\\', '/') if len(parts) > 1 else ''
+
+
+#: The water topologies GROMACS ships (share/top and every mutff force field).
+#: Matched as exact file names, never as substrings: GROMACS embeds the water
+#: model in the *ion* file name ('ions_tip3p.itp'), so 'tip' in name matches
+#: both classes and cannot separate them.
+WATER_ITPS = frozenset([
+    'spc.itp', 'spce.itp',
+    'tip3p.itp', 'tips3p.itp',
+    'tip4p.itp', 'tip4pew.itp',
+    'tip5p.itp', 'tip5pe.itp',
+    'opc.itp', 'opc3.itp',
+])
+
+
+def _is_water_itp(base):
+    """Whether `base` is one of the water topologies in :data:`WATER_ITPS`."""
+    return base in WATER_ITPS
+
+
+def _is_ion_itp(base):
+    """Whether `base` is an ion topology: 'ions.itp' or 'ions_<model>.itp'.
+
+    That is the GROMACS naming convention; the shipped set is ions.itp plus
+    ions_{spc,spce,opc,opc3,tip3p,tip4pew}.itp.  Matching the 'ions' prefix
+    structurally keeps a water model added by a future GROMACS working.
+    """
+    return base == 'ions.itp' or (base.startswith('ions_')
+                                  and base.endswith('.itp'))
+
+
 class TopolBase:
     """Base class for topology objects. It reads/writes topology files.
     """
@@ -993,15 +1039,27 @@ class TopolBase:
             The order of the sections will reflect the order of keywords in
             this list.
         '''
-        #present = []
+        # Includes already written, keyed on the include path.  The footer
+        # sections are written one keyword at a time, so without this a file
+        # classified into two sections would be included twice, and grompp
+        # rejects the second copy ("moleculetype SOL is redefined").
+        present = set()
+
+        def _emit(fp, line):
+            """Write `line`, skipping an #include that has already gone out."""
+            inc = _include_path(line)
+            if inc:
+                if inc in present:
+                    return
+                present.add(inc)
+            print(line, file=fp)
+
         def _write_foot_section(fp, keyword):
             '''writes only specific lines/sections of footer.
             '''
             if keyword == 'all':
                 for line in self.footer:
-                    if line not in present:
-                        print(line, file=fp)
-                    #present.append(line)
+                    _emit(fp, line)
 
             # posre for molecule
             elif keyword == 'posre':
@@ -1030,7 +1088,7 @@ class TopolBase:
                         write = True
 
                     if write is True:
-                        print(line, file=fp)
+                        _emit(fp, line)
 
                     if line.strip() == '#endif':
                         write = False
@@ -1038,9 +1096,8 @@ class TopolBase:
             # water params
             elif keyword == 'water':
                 for line in self.footer:
-                    if 'ff' in line and ('tip' in line or 'spc' in line or 'opc' in line) and "_" not in line:
-                        print(line, file=fp)
-                    #present.append(line)
+                    if _is_water_itp(os.path.basename(_include_path(line))):
+                        _emit(fp, line)
 
             # posre for water
             elif keyword == 'posre_water':
@@ -1050,7 +1107,7 @@ class TopolBase:
                         write = True
 
                     if write is True:
-                        print(line, file=fp)
+                        _emit(fp, line)
 
                     if line.strip() == '#endif':
                         write = False
@@ -1058,9 +1115,8 @@ class TopolBase:
             # ion params
             elif keyword == 'ions':
                 for line in self.footer:
-                    if 'ff' in line and 'ion' in line: # and line not in present:
-                        print(line, file=fp)
-                    #present.append(line)
+                    if _is_ion_itp(os.path.basename(_include_path(line))):
+                        _emit(fp, line)
 
             else:
                 raise ValueError('keyword does not exists/not implemented')
