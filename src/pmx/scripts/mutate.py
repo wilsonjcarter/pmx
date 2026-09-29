@@ -468,6 +468,18 @@ different protonation states. Use the --resinfo flag to print the dictionary.
                              'the hybrid on the fly instead of using mutres.mtp).',
                         default=False,
                         action='store_true')
+    parser.add_argument('--reverse',
+                        dest='reverse',
+                        help='Build the hybrid in the REVERSE alchemical '
+                             'direction: the target residue becomes state A and '
+                             'the wild-type state B (product -> reactant). Use '
+                             'for the charge-neutralising reference leg of a '
+                             'double-system-single-box: e.g. a peptide whose '
+                             'phosphoSer morphs back to Ser, opposite a protein '
+                             'whose Ser morphs to phosphoSer. Implies the '
+                             'generative engine.',
+                        default=False,
+                        action='store_true')
     parser.add_argument('--react',
                         dest='react',
                         nargs='*',
@@ -617,7 +629,8 @@ def main(args):
                        verbose=True,
                        itp=args.itp,
                        structure=args.structure,
-                       generative=args.generative)
+                       generative=args.generative,
+                       reverse=args.reverse)
 
     # if script not provided, interactive selection
     # ---------------------------------------------
@@ -658,7 +671,11 @@ def main(args):
                        ff=ff,
                        refB=infileB,
                        inplace=True,
-                       verbose=True)
+                       verbose=True,
+                       itp=args.itp,
+                       structure=args.structure,
+                       generative=args.generative,
+                       reverse=args.reverse)
 
             # ask whether to do more mutations or stop
             if not _ask_next():
