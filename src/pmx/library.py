@@ -447,6 +447,36 @@ def _canonical_code(resname):
     return _ext_one_letter.get(r, _one_letter.get(r))
 
 
+#: Phosphorylated residues that differ ONLY by phosphate protonation state.
+#: Maps residue name -> (parent one-letter code, state digit), where state 1 is
+#: the monoanion (-1, one P-OH) and state 2 the dianion (-2).  pKa2 of a
+#: phosphoamino acid is ~5.7-6.2, so both states are populated near neutral pH
+#: and morphing between them is a routine calculation.
+#:
+#: Only the pmx-native spellings are listed.  CHARMM's own ``TP1``/``TP2`` are
+#: the SAME chemistry as ``YP1``/``YP2`` (phospho-tyrosine) under different atom
+#: naming; registering both would make two different hybrids want one name, so
+#: they are deliberately left out.
+phospho_protonation_states = {
+    'SP1': ('S', 1), 'SP2': ('S', 2),        # phospho-serine
+    'THP1': ('T', 1), 'THP2': ('T', 2),      # phospho-threonine
+    'YP1': ('Y', 1), 'YP2': ('Y', 2),        # phospho-tyrosine
+}
+
+
+def phospho_protonation_pair(source, target):
+    """(parent letter, source state, target state) if this is a protonation change.
+
+    Returns ``None`` when *source* and *target* are not two protonation states of
+    the same phosphorylated residue.
+    """
+    a = phospho_protonation_states.get(str(source).upper())
+    b = phospho_protonation_states.get(str(target).upper())
+    if a and b and a[0] == b[0] and a[1] != b[1]:
+        return a[0], a[1], b[1]
+    return None
+
+
 def hybrid_name(source, target, reverse=False, term=None):
     """Deterministic name for a generative hybrid residue.
 
@@ -484,6 +514,21 @@ def hybrid_name(source, target, reverse=False, term=None):
     src = source.upper()
     letter = _one_letter.get(src, src[:1])
     tgt = target.upper()
+
+    # Phosphate protonation change (e.g. YP1 <-> YP2).  These need their own
+    # spelling: the generic rule gives _target_code('YP2') = 'Y2', so YP1->YP2
+    # would be named 'Y2Y2' -- exactly what TYR->YP2 is already called, and the
+    # cross-morph guard (rightly) refuses to reuse it.  Name them <X><X><from><to>
+    # instead, e.g. YY12 forward and YY21 reverse, which is direction-explicit and
+    # cannot collide with either the forward (``L2XX``) or reverse (``XXX2``)
+    # conventions.
+    _pp = phospho_protonation_pair(src, tgt)
+    if _pp and not term:
+        ltr, s_state, t_state = _pp
+        if reverse:
+            s_state, t_state = t_state, s_state
+        return '%s%s%d%d' % (ltr, ltr, s_state, t_state)
+
     if term:
         mark = 'n' if term.upper().startswith('N') else 'c'
         s_code = _canonical_code(src) or letter
