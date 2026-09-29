@@ -46,6 +46,8 @@ from pmx.nsaa import mutate_nsaa
 from pmx.covalent import amidate_cterminus
 
 PEPTIDE = os.path.join(HERE, "_peptide.pdb")
+# a second input whose cysteine is INTERNAL (PHE ARG THR LEU LYS ASN CYS TRP GLN)
+CYS_PEPTIDE = os.path.join(HERE, "..", "data", "chain_create_FRTLKNCWQ.pdb")
 FF = "charmm36m-mut"
 ALY_TMPL = os.path.join(HERE, "aly_lig.pdb")   # a complete acetyl-Lys template
 SFR_FRAG = os.path.join(HERE, "sfr_frag.itp")  # a CH3-capped side-chain ITP fragment
@@ -67,7 +69,12 @@ MATRIX = [
     ("proton__glu2glup", ("mutate", dict(resid=4, target="GLUP"))),
     ("proton__hsd2hsp",  ("mutate", dict(resid=8, target="HSP"))),
     ("proton__lys2lyn",  ("mutate", dict(resid=7, target="LYN"))),
-    ("proton__cys2cym",  ("mutate", dict(resid=9, target="CYM"))),
+    # CYS->CYM on an INTERNAL cysteine.  The shared peptide carries CYS only at
+    # position 9 (its C-terminus), and a terminal CYS->CYM would need the 5-char
+    # hybrid name C2CMc, which cannot round-trip through a PDB and is refused --
+    # so this case uses a peptide with an internal cysteine (FRTLKNCWQ, CYS7).
+    ("proton__cys2cym",  ("mutate", dict(resid=7, target="CYM",
+                                        peptide=CYS_PEPTIDE))),
     # -- NSAA (Stage-1 sources; these WRITE the hybrid into the FF, so build_case
     #    isolates them in a temp FF copy to avoid polluting the tracked force field) --
     ("nsaa__lys2aly_struct", ("mutate_nsaa", dict(resid=7, resname="ALY", nsapdb=ALY_TMPL))),
@@ -119,21 +126,35 @@ def build_case(name, kind, kwargs, outdir):
     saved_gmxlib = os.environ.get("GMXLIB")
     try:
         os.chdir(work)
-        # Generative cases write the hybrid into <GMXLIB>/<ff>.ff; isolate them in a
-        # throwaway FF copy so the tracked force field is never modified.
-        if kind in ("mutate_nsaa", "mutate_gen", "delete"):
-            src_ff = os.path.join(saved_gmxlib or "", FF + ".ff")
-            tmp_gmxlib = os.path.join(work, "ff")
-            os.makedirs(tmp_gmxlib)
-            dst_ff = os.path.join(tmp_gmxlib, FF + ".ff")
-            shutil.copytree(src_ff, dst_ff)
-            _strip_runtime_hybrids(dst_ff)   # pristine FF, no stale hybrids
-            for extra in ("residuetypes.dat",):
-                p = os.path.join(saved_gmxlib or "", extra)
-                if os.path.isfile(p):
-                    shutil.copy(p, tmp_gmxlib)
-            os.environ["GMXLIB"] = tmp_gmxlib
-        m = Model(PEPTIDE, rename_atoms=True)
+        # EVERY case gets its own throwaway force-field directory.
+        #
+        # `mutate` is the generative facade and `amidate` accumulates too, so any
+        # case can write hybrids into <GMXLIB>/<ff>.ff.  Isolating only some of
+        # them left the harness writing into the TRACKED force field and made it
+        # non-idempotent: the cases run sequentially, so each one built against a
+        # force field the earlier ones had mutated.  Measured on a clean tree,
+        # run 1 gave ok=14/no-top=4 and run 2 ok=4/no-top=14, and which case
+        # drifted moved between runs.  A fixture generated from a clean force
+        # field could therefore never match a --check run.
+        #
+        # This is a TEST-HARNESS measure only.  Ordinary use is unaffected: a
+        # user who wants hybrids kept beside their project passes `-ff <dir>`,
+        # which get_ff_path() accepts (it checks os.path.isdir first), and the
+        # engine then writes there instead of into the installation.
+        src_ff = os.path.join(saved_gmxlib or "", FF + ".ff")
+        tmp_gmxlib = os.path.join(work, "ff")
+        os.makedirs(tmp_gmxlib)
+        shutil.copytree(src_ff, os.path.join(tmp_gmxlib, FF + ".ff"))
+        _strip_runtime_hybrids(os.path.join(tmp_gmxlib, FF + ".ff"))
+        # mirror the whole top-level GMXLIB: copying only residuetypes.dat left the
+        # isolated run unable to resolve the water model, so pdb2gmx omitted the
+        # `#include "tip3p.itp"` line and every fixture showed a one-line drift.
+        for extra in sorted(os.listdir(saved_gmxlib or ".")):
+            q = os.path.join(saved_gmxlib or "", extra)
+            if os.path.isfile(q):
+                shutil.copy(q, tmp_gmxlib)
+        os.environ["GMXLIB"] = tmp_gmxlib
+        m = Model(kwargs.get("peptide", PEPTIDE), rename_atoms=True)
         if kind == "mutate":
             mut = mutate(m, mut_resid=kwargs["resid"], mut_resname=kwargs["target"], ff=FF)
         elif kind == "mutate_gen":

@@ -1425,6 +1425,7 @@ Protein_chain_X  3
 #ifdef POSRES
 #include "posre.itp"
 #endif
+#include "tip3p.itp"
 #ifdef POSRES_WATER
 [ position_restraints ]
 1    1       1000       1000       1000
