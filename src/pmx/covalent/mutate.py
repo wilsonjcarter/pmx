@@ -254,13 +254,20 @@ def build_hybrid_residue(residue1, residue2, ff: str, mut_resname: str,
             a.m, a.mB = a.mB, a.m
             a.name, a.nameB = a.nameB, a.name
             a.type, a.typeB = a.typeB, a.type
-            # A WT-only atom (removed in the forward morph) carries the sentinel
-            # name '<name>.gone' as its B-state name; after the swap that lands
-            # in state A, which is not a valid structure-atom name.  Give it a
-            # clean D-prefixed dummy name (pmx's added-atom convention), keeping
-            # RTP and written coordinates consistent so pdb2gmx sorts it.
+        # A WT-only atom (removed in the forward morph) carries the sentinel
+        # name '<name>.gone' as its B-state name; after the swap that lands in
+        # state A, which is not a valid structure-atom name.  Give it a clean
+        # D-prefixed dummy name (pmx's added-atom convention), keeping RTP and
+        # written coordinates consistent so pdb2gmx sorts it.  The name must stay
+        # unique within the residue: 'D' + a 4-character name truncated to 4
+        # would map ARG's HH11/HH12 both onto DHH1 (and LEU's HD11/HD12/HD13
+        # onto DHD1), and pdb2gmx then keeps only one of the pair, silently
+        # dropping atoms and their charge from state B.
+        used = {a.name for a in residue1.atoms if not a.name.endswith('.gone')}
+        for a in residue1.atoms:
             if a.name.endswith('.gone'):
-                a.name = ('D' + a.name[:-len('.gone')])[:4]
+                a.name = _unique_dummy_name(a.name[:-len('.gone')], used)
+                used.add(a.name)
 
     if hybrid_name is None:
         # Central namer (library.hybrid_name).  Internal: L2<first+last of target>
@@ -437,6 +444,24 @@ def _apply_ref_geometry(residue2, ref_path, mut_resid, mut_chain):
         if a.name in byname:
             a.x = list(byname[a.name].x)
 
+
+def _unique_dummy_name(name: str, used) -> str:
+    """A <=4-character 'D'-prefixed dummy name for *name*, unused in *used*.
+
+    GROMACS atom names are at most 4 characters, so 'D' + a 4-character name has
+    to lose a character.  Plain truncation is not injective -- ARG's HH11/HH12
+    and LEU's HD11/HD12/HD13 share their first three characters -- so fall back
+    to a numbered form ('DHH1', then 'DHH2'... 'DH10') until the name is free.
+    """
+    cand = ('D' + name)[:4]
+    if cand not in used:
+        return cand
+    for n in range(1, 100):
+        suf = str(n)
+        cand = ('D' + name)[:4 - len(suf)] + suf
+        if cand not in used:
+            return cand
+    raise ValueError('cannot build a unique dummy name for %r' % name)
 
 def mutate(model, mut_resid: int, target: str, ff: str,
            structure: Optional[str] = None, itp: Optional[str] = None,
