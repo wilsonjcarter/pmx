@@ -8,16 +8,24 @@
 ; not be built at all.  Same class of gap as CSO, KS0 and ABA -- see
 ; tests/test_residue_params_complete.py, which now enforces the invariant.
 ; Only the entries this tree lacks are written, so no directive is duplicated.
+;
+; NOTE: pmx ffparser applies ONE format to a whole [ dihedraltypes ] section
+; (parseList tries ssssiffffff, ssssiffi, ssiffi, ssssiff in turn), so a section
+; holding a MIX of shapes matches none and the parse dies with "Cannot convert
+; line into format".  Each shape therefore gets its own directive block.
 
-[ bondtypes ]
+[ bondtypes ]   ; shape ssiff
    CG2O3    NG2S1     1   0.13450000    309616.00 ; from CG2O1 NG2S1, PENALTY= 10 CXM KCX
 
-[ angletypes ]
+[ angletypes ]   ; shape sssiffff
    NG2S1    CG2O3    OG2D2     5   105.910000   665.088640   0.00000000         0.00 ; KCX, by ac_aa
    CG2O3    NG2S1    CG321     5   120.000000   418.400000   0.00000000         0.00 ; from CG2O1 NG2S1 CG321, penalty= 7.5 KCX
    CG2O3    NG2S1     HGP1     5   123.000000   284.512000   0.00000000         0.00 ; from CG2O1 NG2S1 HGP1, penalty= 7.5 KCX CXM
 
-[ dihedraltypes ]
+[ dihedraltypes ]   ; shape ssssiff
+   CG2O3    OG2D2    OG2D2    NG2S1     2     0.000000   461.029102  ; KCX, by ac_aa
+
+[ dihedraltypes ]   ; shape ssssiffi
    OG2D2    CG2O3    NG2S1    CG321     9     0.000000     6.496915     1 ; KCX, by ac_aa
    OG2D2    CG2O3    NG2S1    CG321     9   180.000000     8.929911     2 ; KCX, by ac_aa
    OG2D2    CG2O3    NG2S1    CG321     9     0.000000     2.026730     3 ; KCX, by ac_aa
@@ -28,4 +36,3 @@
     HGA2    CG321    NG2S1    CG2O3     9     0.000000     0.000000     3 ; from HGA2 CG321 NG2S1 CG2O1, penalty= 7.5 KCX
     CTD1    CG321    CG321    CG321     9     0.000000     2.092000     3 ; CARBOCY carbocyclic sugars MCL ALY 26P 6CL HHK KCX HRG IT1 LDO
     CTD1    CG321    CG321    CG321     9   180.000000     2.092000     6 ; CARBOCY carbocyclic sugars MCL ALY 26P 6CL HHK KCX HRG IT1 LDO
-   CG2O3    OG2D2    OG2D2    NG2S1     2     0.000000   461.029102  ; KCX, by ac_aa
