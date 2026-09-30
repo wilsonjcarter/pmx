@@ -27,7 +27,12 @@ from copy import deepcopy
 # clean FF (else pdb2gmx sees the same residue in a stale <hybrid>.rtp AND the
 # freshly written nsaa.rtp -> "defined in two places").  No shipped FF file has a
 # 4-char, '2'-in-second-position stem, so this pattern only ever matches hybrids.
-_HYBRID_STEM = re.compile(r'^[A-Za-z]2[A-Za-z]{2}$')
+# Since 2026-09-30 a hybrid name is the shipped-library spelling, which is often only
+# THREE characters (LEU->PHE = 'L2F', ARG->ALA = 'R2A'), and either side may carry a
+# two-character library code (CYM = 'CM', YP1 = 'P1'), e.g. 'C2CM' or 'CM2C'.  The old
+# 4-character-only pattern silently stopped matching those, leaving a stale <hybrid>.rtp
+# behind for pdb2gmx to find alongside the fresh nsaa.rtp ("defined in two places").
+_HYBRID_STEM = re.compile(r'^[A-Za-z]{1,2}2[A-Za-z]{1,2}$')
 
 
 def _strip_runtime_hybrids(ffdir):

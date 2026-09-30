@@ -541,21 +541,6 @@ def hybrid_name(source, target, reverse=False, term=None):
     # canonical pairs, identical to the shipped library spelling (all 380 inverses
     # are shipped), so a reverse hybrid lines up with the curated entry instead of
     # shadowing it under a second name.
-    if reverse and not term:
-        s_code, t_code = _canonical_code(src), _canonical_code(tgt)
-        if s_code and t_code:
-            # Both endpoints are classic-library residues, so the inverse morph has a
-            # shipped hybrid and this is its exact spelling: reverse(ARG->ALA) = 'A2R',
-            # reverse(LYS->LEU) = 'L2K'.  All 380 canonical X2Y entries in mutres.rtp
-            # have their inverse Y2X shipped, so this never names something that does
-            # not exist, and it lines up with the curated entry instead of shadowing it.
-            name = t_code + '2' + s_code
-            if len(name) <= 4:
-                return name
-        # A PTM/NSAA endpoint has no classic code, so the inverse has no shipped
-        # hybrid to match.  Keep front-loading the state-A residue: delegating to the
-        # forward namer would send MLZ->LYS to 'M2LS', which is already MET->LYS.
-        return (tgt + '2' + letter)[:4]
 
     if term:
         mark = 'n' if term.upper().startswith('N') else 'c'
@@ -593,9 +578,55 @@ def hybrid_name(source, target, reverse=False, term=None):
                 f"Do the modification on an internal residue, or pass an explicit "
                 f"hybrid_name= of at most 4 characters.")
         return name
+    # Forward name.  Prefer the classic-library spelling -- _canonical_code on BOTH
+    # sides -- because that is what the 660 shipped mutres.rtp entries use (it
+    # reproduces 652 of them exactly; the rest have a non-canonical endpoint).  Two
+    # things follow.  First, the engine stops inventing a second name for a morph the
+    # library already ships: TYR->YP1 used to be named 'Y2Y1' and generated, while
+    # mutres.rtp carries 'Y2P1' for that exact morph, so the curated entry was shadowed;
+    # with the library spelling _accumulate_hybrid reuses it instead.  Second, it is
+    # injective where the old rule was not.  The old rule's source side is
+    # _one_letter.get(src, src[:1]), which collapses ALA and ASPP both onto 'A', and its
+    # target side is _target_code (first+last char), which collapses THR and TYR both
+    # onto 'TR': measured over the 99 canonical residues, 877 of 1443 old names denoted
+    # more than one morph, against 0 here.  Real collisions this removes, all of them
+    # already on disk: 'L2TR' was LEU->TRP as well as the LEU->THR / LEU->TYR pair,
+    # 'C2CY' named three morphs (CYS->CYX, CYS->CYS2, CYS->CYM), and LEU->PHE was
+    # spelled 'L2PE' in one force field and 'L2PH' in another.
+    #
+    # Three cases fall back to the old spelling rather than lose information:
+    #   * an endpoint with no canonical code (a true NSAA/PTM target);
+    #   * both codes EQUAL -- CYS->CYX would become the useless 'C2C', so keep 'C2CY';
+    #   * a name over 4 characters, i.e. the 90 two-character x two-character pairs among
+    #     CYM/CYSO/LYSN/TYM/SP1/SP2/TP1/TP2/YP1/YP2.  Of those the only realistic ones
+    #     are same-residue protonation changes, already handled by the branch above.
+    s_code, t_code = _canonical_code(src), _canonical_code(tgt)
+    _both = bool(s_code and t_code and s_code != t_code)
+    _fits = _both and len(s_code) + len(t_code) + 1 <= 4
+    if _both and not _fits:
+        # Two two-character codes cannot fit '<s>2<t>' into the four characters a PDB
+        # allows for a residue name, and neither escape works: falling back to
+        # _target_code spells TYM->CYM as 'Y2CM', which is already TYR->CYM, and
+        # truncating the code form makes 'CM2C' mean CYM->CYS as well as CYM->CYSO.
+        # There is nothing left to encode, so refuse instead of colliding silently --
+        # the same call the terminal branch above makes for the same reason.  The only
+        # realistic members of this set are same-residue protonation changes
+        # (SP1<->SP2, TP1<->TP2, YP1<->YP2), and the branch above has already claimed
+        # those, so nothing legitimate reaches here.
+        raise ValueError(
+            "cannot name the hybrid for %s->%s: both residues have a two-character "
+            "library code ('%s' and '%s'), so '<source>2<target>' needs five "
+            "characters and a PDB resName has four (columns 18-21).  The ten "
+            "two-character-code residues are CYM/CYSO/LYSN/TYM/SP1/SP2/TP1/TP2/YP1/"
+            "YP2; a morph between two of them cannot be spelled.  Pass an explicit "
+            "hybrid_name= of at most 4 characters."
+            % (src, tgt, s_code, t_code))
     if reverse:
-        return (tgt + '2' + letter)[:4]
-    return (letter + '2' + _target_code(tgt))[:4]
+        # A reverse hybrid is the inverse mutation, so it is the forward name with the
+        # endpoints swapped.  Where that is not available, front-load the state-A
+        # residue: delegating would send MLZ->LYS to 'M2LS', already MET->LYS.
+        return t_code + '2' + s_code if _fits else (tgt + '2' + letter)[:4]
+    return s_code + '2' + t_code if _fits else (letter + '2' + _target_code(tgt))[:4]
 
 
 _protein_residues_incl_pmx_mut = (

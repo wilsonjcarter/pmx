@@ -73,8 +73,12 @@ def test_the_two_directions_are_distinct():
 
 def test_does_not_shadow_the_generic_rule():
     """The names that made this necessary must still mean what they meant."""
-    assert L.hybrid_name("TYR", "YP1") == "Y2Y1"
-    assert L.hybrid_name("TYR", "YP2") == "Y2Y2"
+    # The forward rule changed 2026-09-30 to the shipped library spelling, which uses
+    # _canonical_code on both sides: TYR->YP1 is 'Y2P1' (Y = TYR, P1 = YP1), exactly as
+    # mutres.rtp names it.  It used to be 'Y2Y1' via _target_code, which SHADOWED the
+    # shipped Y2P1 under a second name.
+    assert L.hybrid_name("TYR", "YP1") == "Y2P1"
+    assert L.hybrid_name("TYR", "YP2") == "Y2P2"
     # The reverse convention changed 2026-09-30: a reverse hybrid is now named the
     # way the shipped library names that mutation, using the canonical codes.  The
     # library spells TYR->YP1 as 'Y2P1' (Y = TYR, P1 = YP1), so the inverse YP1->TYR
@@ -82,7 +86,7 @@ def test_does_not_shadow_the_generic_rule():
     # (state-A residue + '2'), which dropped the target and collided -- every reverse
     # morph into ALA was 'ALA2'.  See tests/test_reverse_hybrid_equivalence.py.
     assert L.hybrid_name("TYR", "YP1", reverse=True) == "P12Y"
-    assert L.hybrid_name("LEU", "PHE") == "L2PE"
+    assert L.hybrid_name("LEU", "PHE") == "L2F"    # was 'L2PE' (and 'L2PH' elsewhere)
     assert L.hybrid_name("LYS", "MLZ") == "K2MZ"
     # a protonation name must not be produced by any of those
     generic = {L.hybrid_name(s, t, reverse=r)

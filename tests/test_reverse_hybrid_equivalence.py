@@ -82,7 +82,11 @@ def test_no_collisions_across_the_whole_canonical_set():
             cs, ct = _canonical_code(src), _canonical_code(tgt)
             if not cs or not ct:
                 continue
-            name = hybrid_name(src, tgt, reverse=True)
+            try:
+                name = hybrid_name(src, tgt, reverse=True)
+            except ValueError:
+                # deliberate: two two-character codes cannot be spelled in 4 chars
+                continue
             morph = (ct, cs)
             if name in seen:
                 assert seen[name] == morph, (
@@ -98,7 +102,27 @@ def test_reverse_names_fit_gromacs_four_characters():
         for tgt in res:
             if src == tgt:
                 continue
-            assert len(hybrid_name(src, tgt, reverse=True)) <= 4
+            try:
+                got = hybrid_name(src, tgt, reverse=True)
+            except ValueError:
+                continue          # refused rather than truncated -- see below
+            assert len(got) <= 4, (src, tgt, got)
+
+
+def test_two_two_character_codes_are_refused_not_collided():
+    """'<source>2<target>' needs 5 characters when both codes are 2 long, and every
+    escape collides: _target_code spells TYM->CYM as 'Y2CM' which is already TYR->CYM,
+    and truncating the code form makes 'CM2C' mean CYM->CYS as well as CYM->CYSO.  So it
+    must refuse.  Nothing legitimate reaches here: the only realistic members are the
+    same-residue protonation changes, which the phospho branch claims first."""
+    import pytest
+    with pytest.raises(ValueError):
+        hybrid_name("CYM", "TYM")
+    with pytest.raises(ValueError):
+        hybrid_name("CYM", "TYM", reverse=True)
+    # ...but the protonation pairs, which ARE 2-char x 2-char, still work
+    assert hybrid_name("YP1", "YP2") == "YY12"
+    assert hybrid_name("YP1", "YP2", reverse=True) == "YY21"
 
 
 def test_phosphate_protonation_naming_is_untouched():
