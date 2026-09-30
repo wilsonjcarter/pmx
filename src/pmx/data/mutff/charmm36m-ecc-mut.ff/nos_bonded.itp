@@ -1,0 +1,59 @@
+; NOS / SONOS / sulfenic bonded parameters needed by the CN0/KN0/KS0 cross-link
+; endpoints in nos.rtp.  Ported from charmm36m-mut.ff/nos_bonded.itp on 2026-09-30.
+;
+; This is deliberately a SUBSET: 20 of that file's 41 entries are already carried by
+; this tree (7 of them as MULTI-LINE type-9 dihedral blocks), and a duplicated
+; multi-line dihedral block is a HARD grompp error -- "Encountered a second block of
+; parameters for dihedral type 9 for the same atom types".  Only the 31 entries this
+; tree lacks are here.  Charges are NOT ECC-scaled and must not be: CN0/KN0 carry
+; fractional net charges that sum to zero across the pair (-0.154/+0.154), i.e. a
+; neutral covalent bridge rather than an ionic group, and this tree keeps neutral
+; residues byte-identical to the plain tree (verified on CSO/CYS/LSN; only formally
+; ionic ones are scaled, CYM -1->-0.75, LYS +1->+0.75).
+
+[ bondtypes ]
+   CT2    NG311  1   0.14740    220078.40  ; CG321-NG311 (CE-NZ)
+   CT2    SG301  1   0.18160    179075.20  ; CG321-SG301 (CB-SG)
+
+[ angletypes ]
+   CT2    NG311  OG301  5   103.80    578.229  0.0   0.0     ; CE-NZ-OD  OPTIMISED Jun15
+   CT2    CT2    NG311  5   110.00    365.682  0.0   0.0     ; CD-CE-NZ  <-CG321CG321NG311
+   HA2    CT2    NG311  5   109.50    271.123  0.2130 418.40 ; HE-CE-NZ  <-NG311CG321HGA2 (w/UB)
+   CT2    NG311  HGP1   5   111.00    384.928  0.0   0.0     ; CE-NZ-HZ  <-CG321NG311HGP1
+   CT1    CT2    SG301  5   112.50    485.344  0.0   0.0     ; CA-CB-SG  <-CHARMM S-CT2-CT1
+   HA2    CT2    SG301  5   111.00    317.984  0.0   0.0     ; HB-CB-SG  <-SG301CG321HGA2
+   CT2    SG301  OG311  5    99.37    582.580  0.0   0.0     ; CB-SG-OD sulfenic <-CG321SG301OG311
+   CT2    SG301  OG301  5   101.70    431.036  0.0   0.0     ; CB-SG-OD nos <-CG321SG301OG301
+
+[ dihedraltypes ]
+   CT2    CT2    NG311  OG301  9     0.0    1.5230  1 ; CD-CE-NZ-OD r13
+   CT2    CT2    NG311  OG301  9     0.0    0.3515  2 ; CD-CE-NZ-OD r13
+   CT2    CT2    NG311  OG301  9     0.0   16.9996  3 ; CD-CE-NZ-OD r13
+   CT2    CT2    NG311  OG301  9     0.0    1.4811  4 ; CD-CE-NZ-OD r13
+   CT2    NG311  OG301  SG301  9     0.0    7.6651  3 ; CE-NZ-OD-SG r13
+   CT2    NG311  OG301  SG301  9     0.0    0.4351  6 ; CE-NZ-OD-SG r13
+   HA2    CT2    NG311  OG301  9   180.0    5.5898  3 ; HE-CE-NZ-OD r13
+   NG311  OG301  SG301  CT2    9   180.0    0.0335  1 ; NZ-OD-SG-CB r13
+   NG311  OG301  SG301  CT2    9     0.0    8.5228  2 ; NZ-OD-SG-CB r13
+   NG311  OG301  SG301  CT2    9     0.0    3.7572  3 ; NZ-OD-SG-CB r13
+   NG311  OG301  SG301  CT2    9   180.0    0.4644  6 ; NZ-OD-SG-CB r13
+   CT1    CT2    SG301  OG311  9   180.0    3.0476  1 ; CA-CB-SG-OD(sulf) <-cgenff
+   CT1    CT2    SG301  OG311  9     0.0    1.3724  3 ; CA-CB-SG-OD(sulf) <-cgenff
+   HA2    CT2    SG301  OG311  9     0.0    1.7272  3 ; HB-CB-SG-OD(sulf) <-cgenff
+   HGP1   OG311  SG301  CT2    9     0.0    1.6723  1 ; HD-OD-SG-CB(sulf) <-cgenff
+   HGP1   OG311  SG301  CT2    9     0.0   11.9173  2 ; HD-OD-SG-CB(sulf) <-cgenff
+   CT2    CT2    NG311  HGP1   9     0.0    0.4184  3 ; CD-CE-NZ-HZ  <-cgenff CG321CG321NG311HGP1
+   HA2    CT2    NG311  HGP1   9     0.0    0.2092  3 ; HE-CE-NZ-HZ  <-cgenff HGA2CG321NG311HGP1
+   CT1    CT2    SG301  OG301  9   180.0    3.0476  1 ; CA-CB-SG-OD(nos) <-sulfenic OG311 analogy
+   CT1    CT2    SG301  OG301  9     0.0    1.3724  3 ; CA-CB-SG-OD(nos) <-sulfenic OG311 analogy
+   HA2    CT2    SG301  OG301  9     0.0    1.7272  3 ; HB-CB-SG-OD(nos) <-sulfenic OG311 analogy
+
+[ bondtypes ]
+; KS0 (SONOS sulfenamide Lys endpoint) CE-NZ.  CHARMM types the Lys CE as CT2 but
+; the only NG301 bond to an sp3 CH2 carbon in stock charmm36-jul2022.ff is the CGenFF
+; equivalent CG321-NG301 (CG321 IS CGenFF's CT2), so this is that entry re-typed --
+; the same [analogy] convention cgenff_link.itp PART 1 already uses for the
+; CHARMM<->CGenFF junction.  Without it KS0's own CE-NZ bond is untyped and grompp
+; cannot build a SONOS endpoint.  This gap pre-dated the 2026-09-30 ECC port and was
+; present in the plain tree too.  [analogy: CG321-NG301, stock value verbatim]
+  CT2      NG301    1   0.14500000    167360.00

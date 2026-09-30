@@ -123,3 +123,13 @@
 [ dihedraltypes ]
    CG321      CT1        C        N     9   180.000000    11.506000     2 ; from CT1 C N CP1, ALLOW PRO
    CG321      CT1        C        N     9     0.000000     1.255200     4 ; from CT1 C N CP1, ALLOW PRO
+
+[ bondtypes ]
+; KS0 (SONOS sulfenamide Lys endpoint) CE-NZ.  CHARMM types the Lys CE as CT2 but
+; the only NG301 bond to an sp3 CH2 carbon in stock charmm36-jul2022.ff is the CGenFF
+; equivalent CG321-NG301 (CG321 IS CGenFF's CT2), so this is that entry re-typed --
+; the same [analogy] convention cgenff_link.itp PART 1 already uses for the
+; CHARMM<->CGenFF junction.  Without it KS0's own CE-NZ bond is untyped and grompp
+; cannot build a SONOS endpoint.  This gap pre-dated the 2026-09-30 ECC port and was
+; present in the plain tree too.  [analogy: CG321-NG301, stock value verbatim]
+  CT2      NG301    1   0.14500000    167360.00

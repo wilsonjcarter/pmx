@@ -152,3 +152,103 @@ def test_nos_linkage_bonded_terms_are_present():
         if miss:
             bad[os.path.basename(d)] = miss
     assert not bad, "NOS linkage terms unresolved: %s" % bad
+
+
+def _rtp_bonds(ffdir, name):
+    """-> (atom->type map, [(a,b)]) for one rtp entry."""
+    import glob
+    types = {}; bonds = []
+    for p in glob.glob(os.path.join(ffdir, "*.rtp")):
+        cur = sec = None
+        for l in open(p, errors="replace"):
+            s = l.split(";")[0].strip()
+            if s.startswith("[") and s.endswith("]"):
+                nm = s[1:-1].strip()
+                if nm in _SUB:
+                    sec = nm
+                else:
+                    cur, sec = nm, None
+                continue
+            if cur != name or not s:
+                continue
+            f = s.split()
+            if sec == "atoms" and len(f) >= 4:
+                types[f[0]] = f[1]
+            elif sec == "bonds" and len(f) >= 2:
+                bonds.append((f[0], f[1]))
+        if types:
+            break
+    return types, bonds
+
+
+CROSSLINK_ENDPOINTS = ("CN0", "KN0", "KS0")
+
+
+def test_crosslink_endpoints_are_shipped_wherever_nos_is():
+    """CN0/KN0/KS0 are the reacted NOS/SONOS endpoints decouple_mutate morphs to.
+
+    They lived only in the PLAIN trees' nos.rtp for a long time, so an ECC cross-link
+    build failed with "cross-link target is not in the force field" even though every
+    atom type it needed was already defined.  Ported 2026-09-30.
+    """
+    trees = [d for d in sorted(glob.glob(os.path.join(MUTFF, "*.ff")))
+             if os.path.exists(os.path.join(d, "nos.rtp"))]
+    assert trees, "no shipped force field carries nos.rtp"
+    bad = {}
+    for d in trees:
+        got = _rtp_entries(d)
+        miss = [r for r in CROSSLINK_ENDPOINTS if r not in got]
+        if miss:
+            bad[os.path.basename(d)] = miss
+    assert not bad, "force fields with nos.rtp but missing endpoints: %s" % bad
+
+
+def test_crosslink_endpoint_atom_types_are_defined():
+    for d in sorted(glob.glob(os.path.join(MUTFF, "*.ff"))):
+        got = _rtp_entries(d)
+        if not any(r in got for r in CROSSLINK_ENDPOINTS):
+            continue
+        defined = set()
+        for p in (glob.glob(os.path.join(d, "*.atp"))
+                  + glob.glob(os.path.join(d, "ffnonbonded.itp"))):
+            sec = None
+            for l in open(p, errors="replace"):
+                s = l.split(";")[0].strip()
+                if s.startswith("["):
+                    sec = s.strip("[] ")
+                    continue
+                if s and (p.endswith(".atp") or sec == "atomtypes"):
+                    defined.add(s.split()[0])
+        for r in CROSSLINK_ENDPOINTS:
+            if r not in got:
+                continue
+            types, _ = _rtp_bonds(d, r)
+            miss = sorted({t for t in types.values()
+                           if t not in defined and not t.startswith("DUM_")})
+            assert not miss, "%s/%s references undefined atom types %s" % (
+                os.path.basename(d), r, miss)
+
+
+def test_crosslink_endpoint_internal_bonds_are_typed():
+    """Every bond INSIDE CN0/KN0/KS0 must have a bondtype, or grompp cannot build it."""
+    bad = {}
+    for d in sorted(glob.glob(os.path.join(MUTFF, "*.ff"))):
+        got = _rtp_entries(d)
+        if not any(r in got for r in CROSSLINK_ENDPOINTS):
+            continue
+        keys = _bonded_keys(d)
+        for r in CROSSLINK_ENDPOINTS:
+            if r not in got:
+                continue
+            types, bonds = _rtp_bonds(d, r)
+            miss = []
+            for a, b in bonds:
+                ta, tb = types.get(a), types.get(b)
+                if not ta or not tb:
+                    continue          # bond to a neighbouring residue (+N/-C)
+                if ("bondtypes", (ta, tb)) not in keys:
+                    miss.append("%s-%s (%s-%s)" % (a, b, ta, tb))
+            if miss:
+                bad["%s/%s" % (os.path.basename(d), r)] = miss
+    assert not bad, "untyped internal bonds in the cross-link endpoints: %s" % bad
+
