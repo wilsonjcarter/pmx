@@ -380,3 +380,12 @@ VAL     5
 NME		2
 1	1	HN	N	-C	CH3
 3	4	HH3 CH3 N	-C
+; CSO (cysteine sulfenic acid).  Without this pdb2gmx -ignh strips CSO's hydrogens
+; and cannot rebuild them -- "There were 5 missing atoms in molecule Protein" -- so
+; no structure containing a sulfenic cysteine could be built against this tree.
+; Present in charmm36m-ecc-mut.ff and in the bundle trees; it was missing only here.
+CSO        4
+1       1       HN      N       CA      -C
+1       5       HA      CA      C       CB      N
+2       6       HB      CB      CA      SG
+1       2       HD      OD      SG      CB

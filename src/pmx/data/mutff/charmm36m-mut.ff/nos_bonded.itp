@@ -113,3 +113,13 @@
 
 ; protein <-> CGenFF link terms (CT1-CG321 etc); present but never included before
 #include "cgenff_link.itp"
+
+; ---- CSO followed by PROLINE: the CB-CA-C-N(+1) backbone dihedral where the next
+; residue's N is type 'N' (proline) rather than 'NH1'.  Only the NH1 case was
+; covered, so a CSO immediately before a Pro failed with 'No default Proper Dih.
+; types' (hit on 1puf: CSO18 followed by PRO19).  VERBATIM from
+; charmm36-jul2022.ff/ffbonded.itp -- stock CHARMM36+CGenFF has the term
+; (comment 'from CT1 C N CP1, ALLOW PRO'), so no analogy is involved.
+[ dihedraltypes ]
+   CG321      CT1        C        N     9   180.000000    11.506000     2 ; from CT1 C N CP1, ALLOW PRO
+   CG321      CT1        C        N     9     0.000000     1.255200     4 ; from CT1 C N CP1, ALLOW PRO
