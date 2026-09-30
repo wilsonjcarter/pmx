@@ -75,7 +75,13 @@ def test_does_not_shadow_the_generic_rule():
     """The names that made this necessary must still mean what they meant."""
     assert L.hybrid_name("TYR", "YP1") == "Y2Y1"
     assert L.hybrid_name("TYR", "YP2") == "Y2Y2"
-    assert L.hybrid_name("TYR", "YP1", reverse=True) == "YP12"
+    # The reverse convention changed 2026-09-30: a reverse hybrid is now named the
+    # way the shipped library names that mutation, using the canonical codes.  The
+    # library spells TYR->YP1 as 'Y2P1' (Y = TYR, P1 = YP1), so the inverse YP1->TYR
+    # is 'P12Y'.  The old value here, 'YP12', was the front-loaded form
+    # (state-A residue + '2'), which dropped the target and collided -- every reverse
+    # morph into ALA was 'ALA2'.  See tests/test_reverse_hybrid_equivalence.py.
+    assert L.hybrid_name("TYR", "YP1", reverse=True) == "P12Y"
     assert L.hybrid_name("LEU", "PHE") == "L2PE"
     assert L.hybrid_name("LYS", "MLZ") == "K2MZ"
     # a protonation name must not be produced by any of those

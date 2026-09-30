@@ -20,6 +20,8 @@ Two entry points:
 
 from __future__ import annotations
 
+import glob
+import logging
 import os
 import re
 import warnings
@@ -51,6 +53,9 @@ from ..nsaa import (
 
 
 # ── coordinate placement ──────────────────────────────────────────────────────
+
+
+logger = logging.getLogger(__name__)
 
 def _kabsch(P: np.ndarray, Q: np.ndarray):
     """Rigid transform (R, t) minimizing ||R P + t - Q|| (Kabsch)."""
@@ -263,11 +268,31 @@ def build_hybrid_residue(residue1, residue2, ff: str, mut_resname: str,
         # would map ARG's HH11/HH12 both onto DHH1 (and LEU's HD11/HD12/HD13
         # onto DHD1), and pdb2gmx then keeps only one of the pair, silently
         # dropping atoms and their charge from state B.
+        # Hydrogens get pmx's HV<n> counter, exactly as the FORWARD generator does
+        # (nsaa._merge_molecules) and exactly as the shipped library spells them: the
+        # pre-built ALA->ARG hybrid A2R names its nine hydrogen dummies HV1..HV9.
+        # Using the same convention here makes a generated reverse hybrid come out
+        # atom-for-atom identical to the library entry for the same morph, which is
+        # the point -- reversing X->Y must be indistinguishable from asking for Y->X.
+        # It also removes the collision class outright: every name that used to clash
+        # under ('D'+name)[:4] was a hydrogen (ARG HH11/HH12, LEU HD11/HD12/HD13,
+        # VAL/ILE/THR HG1x, ASN HD2x, GLN HE2x), and an HV counter cannot collide.
+        # Heavy atoms keep 'D'+name, still guarded for the 4-character cap.
         used = {a.name for a in residue1.atoms if not a.name.endswith('.gone')}
+        hv = 1
         for a in residue1.atoms:
-            if a.name.endswith('.gone'):
-                a.name = _unique_dummy_name(a.name[:-len('.gone')], used)
-                used.add(a.name)
+            if not a.name.endswith('.gone'):
+                continue
+            base = a.name[:-len('.gone')]
+            if base.startswith('H') or (base[0].isdigit() and len(base) > 1
+                                        and base[1] == 'H'):
+                while ('HV%d' % hv) in used:
+                    hv += 1
+                a.name = 'HV%d' % hv
+                hv += 1
+            else:
+                a.name = _unique_dummy_name(base, used)
+            used.add(a.name)
 
     if hybrid_name is None:
         # Central namer (library.hybrid_name).  Internal: L2<first+last of target>
@@ -397,6 +422,30 @@ def _accumulate_hybrid(ffpath, hybrid_name, rtp_text, mtp_text, bCharmm):
     # same morph is fine (it replaces its own entry).
     rtp_path = os.path.join(ffpath, "nsaa.rtp")
     incoming = _entry_morph(rtp_text, hybrid_name)
+    # A reverse hybrid of a canonical morph is now named exactly as the shipped
+    # library names that mutation (reverse of ARG->ALA is 'A2R'), so the entry we are
+    # about to write may ALREADY exist in mutres.rtp.  Writing a second definition
+    # under the same name would leave two [ A2R ] blocks in one force field -- pdb2gmx
+    # globs *.rtp -- which is the nsaa-pollution failure mode.  The shipped entry is
+    # hand-curated, so it wins: skip the write.  A same-named entry for a DIFFERENT
+    # morph is a genuine collision and still raises.
+    if incoming:
+        for other in sorted(glob.glob(os.path.join(ffpath, "*.rtp"))):
+            if os.path.basename(other).startswith("nsaa."):
+                continue
+            shipped = _entry_morph(open(other, errors="replace").read(), hybrid_name)
+            if not shipped:
+                continue
+            if tuple(x.upper() for x in shipped) == tuple(x.upper() for x in incoming):
+                logger.info("hybrid %s already shipped in %s (%s->%s); keeping the "
+                            "library entry", hybrid_name, os.path.basename(other),
+                            *shipped)
+                return
+            raise ValueError(
+                f"hybrid name '{hybrid_name}' is already used by "
+                f"{os.path.basename(other)} for {shipped[0]}->{shipped[1]}; refusing "
+                f"to shadow it with {incoming[0]}->{incoming[1]}. Pass an explicit "
+                f"hybrid_name= to disambiguate.")
     if incoming and os.path.isfile(rtp_path):
         existing = _entry_morph(open(rtp_path).read(), hybrid_name)
         if existing and existing != incoming:

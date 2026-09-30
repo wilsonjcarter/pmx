@@ -515,6 +515,7 @@ def hybrid_name(source, target, reverse=False, term=None):
     letter = _one_letter.get(src, src[:1])
     tgt = target.upper()
 
+
     # Phosphate protonation change (e.g. YP1 <-> YP2).  These need their own
     # spelling: the generic rule gives _target_code('YP2') = 'Y2', so YP1->YP2
     # would be named 'Y2Y2' -- exactly what TYR->YP2 is already called, and the
@@ -528,6 +529,33 @@ def hybrid_name(source, target, reverse=False, term=None):
         if reverse:
             s_state, t_state = t_state, s_state
         return '%s%s%d%d' % (ltr, ltr, s_state, t_state)
+
+    # A reverse hybrid for src->tgt IS the mutation tgt->src, so it must be named
+    # exactly as that mutation would be: reverse(LYS->LEU) is L2K, the very name the
+    # shipped library uses for LEU->LYS.  The old rule front-loaded the state-A
+    # residue and truncated to four characters, `(tgt + '2' + letter)[:4]`, which for
+    # a 3-letter canonical target chopped off the one character identifying the
+    # source: EVERY reverse morph into ALA was 'ALA2', so ALA->CYS and ALA->LYS
+    # collided, and the name said nothing about where it came from.  Delegating to
+    # the forward namer of the inverse morph is both informative and, for the 380
+    # canonical pairs, identical to the shipped library spelling (all 380 inverses
+    # are shipped), so a reverse hybrid lines up with the curated entry instead of
+    # shadowing it under a second name.
+    if reverse and not term:
+        s_code, t_code = _canonical_code(src), _canonical_code(tgt)
+        if s_code and t_code:
+            # Both endpoints are classic-library residues, so the inverse morph has a
+            # shipped hybrid and this is its exact spelling: reverse(ARG->ALA) = 'A2R',
+            # reverse(LYS->LEU) = 'L2K'.  All 380 canonical X2Y entries in mutres.rtp
+            # have their inverse Y2X shipped, so this never names something that does
+            # not exist, and it lines up with the curated entry instead of shadowing it.
+            name = t_code + '2' + s_code
+            if len(name) <= 4:
+                return name
+        # A PTM/NSAA endpoint has no classic code, so the inverse has no shipped
+        # hybrid to match.  Keep front-loading the state-A residue: delegating to the
+        # forward namer would send MLZ->LYS to 'M2LS', which is already MET->LYS.
+        return (tgt + '2' + letter)[:4]
 
     if term:
         mark = 'n' if term.upper().startswith('N') else 'c'
