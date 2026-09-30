@@ -389,3 +389,9 @@ CSO        4
 1       5       HA      CA      C       CB      N
 2       6       HB      CB      CA      SG
 1       2       HD      OD      SG      CB
+; ABA (Abu) -- so pdb2gmx -ignh can rebuild its hydrogens.
+ABA        4
+1       1       HN      N       CA      -C     
+1       5       HA      CA      C       CB      N      
+2       6       HB      CB      CA      CG     
+3       4       HG      CG      CB      CA     

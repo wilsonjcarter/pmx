@@ -1,0 +1,57 @@
+; ABA -- 2-aminobutyric acid (Abu), the 4th rung of the GB1 hydrocarbon ladder
+; (Chiu et al. JACS 131, 13192: ddG_unfold +0.387 kcal/mol at position 53).
+; Copied VERBATIM from charmm36-jul2022.ff/aminoacids.rtp -- stock CHARMM36 ships it,
+; so no parameterisation is involved.  Side chain is CH2-CH3 on CGenFF types
+; (CG321/CG331/HGA2/HGA3), net charge 0.  The CA-CB junction is CT1-CG321, i.e. the
+; CHARMM<->CGenFF junction already supplied by cgenff_link.itp PART 1.
+
+; a standalone .rtp must carry its own [ bondedtypes ] or pdb2gmx cannot read it
+; (same trap as the bundle nsaa.rtp).  Copied from this tree's merged.rtp.
+[ bondedtypes ]
+; Col 1: Type of bond
+; Col 2: Type of angles
+; Col 3: Type of proper dihedrals
+; Col 4: Type of improper dihedrals
+; Col 5: Generate all dihedrals if 1, only heavy atoms of 0.
+; Col 6: Number of excluded neighbors for nonbonded interactions
+; Col 7: Generate 1,4 interactions between pairs of hydrogens if 1
+; Col 8: Remove propers over the same bond as an improper if it is 1
+; bonds  angles  dihedrals  impropers all_dihedrals nrexcl HH14 RemoveDih
+     1       5          9        2        1           3      1     0
+
+[ ABA ]
+; 2-aminobutyric acid
+  [ atoms ]
+        N      NH1 -0.4700   1
+       HN        H  0.3100   1
+       CA      CT1  0.0700   1
+       HA      HB1  0.0900   1
+       CB    CG321 -0.1800   2
+      HB1     HGA2  0.0900   2
+      HB2     HGA2  0.0900   2
+       CG    CG331 -0.2700   3
+      HG1     HGA3  0.0900   3
+      HG2     HGA3  0.0900   3
+      HG3     HGA3  0.0900   3
+        C        C  0.5100   4
+        O        O -0.5100   4
+  [ bonds ]
+        N    CA
+        C    CA
+        C    +N
+       CA    HA
+       CA    CB
+        N    HN
+       CB   HB1
+       CB   HB2
+       CB    CG
+       CG   HG1
+       CG   HG2
+       CG   HG3
+        O     C
+  [ impropers ]
+        N    -C    CA    HN
+        C    CA    +N     O
+  [ cmap ]
+       -C     N    CA     C    +N
+

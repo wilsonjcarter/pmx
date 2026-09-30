@@ -15165,3 +15165,7 @@ HGR61  CG2R6Q  CG2R6Q  HGR61  9  180.000000  10.041600  2
 ; pmx: NOS/SONOS bonded parameters (S-O-N endpoints CN0/KN0/KS0).  Declared in
 ; pmx_ff.manifest; without this include the terms are present on disk but unused.
 #include "nos_bonded.itp"
+
+#include "aba_bonded.itp"
+
+#include "glycation_bonded.itp"

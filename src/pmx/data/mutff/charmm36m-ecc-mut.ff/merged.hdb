@@ -473,3 +473,9 @@ GACE	4
 2	6	HD	CD	CG	CZ
 1	5	HZ	CZ	C1	N1	CD
 3	4	HN1	N1	CZ	HZ
+; ABA (Abu) -- so pdb2gmx -ignh can rebuild its hydrogens.
+ABA        4
+1       1       HN      N       CA      -C     
+1       5       HA      CA      C       CB      N      
+2       6       HB      CB      CA      CG     
+3       4       HG      CG      CB      CA     
