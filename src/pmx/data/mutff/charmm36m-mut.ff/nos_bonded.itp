@@ -111,8 +111,9 @@
    CG321  SG301  OG311  HGP1   9     0.00    1.6723   1 ; CB-SG-OD-HD
    CG321  SG301  OG311  HGP1   9     0.00   11.9173   2 ; CB-SG-OD-HD
 
-; protein <-> CGenFF link terms (CT1-CG321 etc); present but never included before
-#include "cgenff_link.itp"
+; protein <-> CGenFF link terms (CT1-CG321 etc) are #included from ffbonded.itp,
+; not here: a bonded file including another made cgenff_link load twice the moment
+; ffbonded also included it, duplicating every multi-line type-9 block (fatal).
 
 ; ---- CSO followed by PROLINE: the CB-CA-C-N(+1) backbone dihedral where the next
 ; residue's N is type 'N' (proline) rather than 'NH1'.  Only the NH1 case was

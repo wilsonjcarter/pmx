@@ -1,0 +1,564 @@
+; fluorinated non-canonical amino acids, ported from
+; ~/projects/pmx_glycans/charmm36m.ff/aminoacids.rtp (CHARMM36m + CGenFF).
+; All atom types and ALL F bonded params (24 bond / 84 angle / 193 dihedral)
+; already exist in charmm36m-mut and charmm36m-ecc-mut -- verified 2026-10-01.
+; Every residue is NET NEUTRAL, so the ECC copy is byte-identical (ECC scales
+; charged groups only).
+
+[ bondedtypes ]
+; bonds  angles  dihedrals  impropers  all_dihedrals  nrexcl  HH14  RemoveDih
+     1       5          9          2             1       3     1        0
+
+[ 2FM ]
+; s-(difluoromethyl)-homocysteine
+  [ atoms ]
+        N      NH1 -0.4700   1
+       HN        H  0.3100   1
+       CA      CT1  0.0700   1
+       HA      HB1  0.0900   1
+       CB    CG321 -0.1800   2
+      HB1     HGA2  0.0900   2
+      HB2     HGA2  0.0900   2
+       CG    CG321  0.0190   3
+      HG1     HGA2  0.0900   3
+      HG2     HGA2  0.0900   3
+       SD    SG311 -0.1240   3
+       CE    CG312  0.0110   3
+       HE     HGA7  0.2180   3
+      FZ1     FGA2 -0.1520   3
+      FZ2     FGA2 -0.1520   3
+        C        C  0.5100   4
+        O        O -0.5100   4
+  [ bonds ]
+        N    CA
+        C    CA
+        C    +N
+       CA    HA
+       CA    CB
+        N    HN
+       CB   HB1
+       CB   HB2
+       CB    CG
+       CG   HG1
+       CG   HG2
+       CG    SD
+       SD    CE
+       CE    HE
+       CE   FZ1
+       CE   FZ2
+        O     C
+  [ impropers ]
+        N    -C    CA    HN
+        C    CA    +N     O
+  [ cmap ]
+       -C     N    CA     C    +N
+
+
+[ F2F ]
+; 3,4-difluoro-phenylalanine
+  [ atoms ]
+        N      NH1 -0.4700   1
+       HN        H  0.3100   1
+       CA      CT1  0.0700   1
+       HA      HB1  0.0900   1
+       CB    CG321 -0.1800   2
+      HB1     HGA2  0.0900   2
+      HB2     HGA2  0.0900   2
+       CG   CG2R61  0.1340   3
+      CD1   CG2R61 -0.1750   3
+      HD1    HGR62  0.1500   3
+      CD2   CG2R61 -0.0770   3
+      HD2    HGR61  0.1150   3
+      CE1   CG2R66  0.0850   3
+      FE1     FGR1 -0.1380   3
+      CE2   CG2R61 -0.1980   3
+      HE2    HGR62  0.1710   3
+       CZ   CG2R66  0.0690   3
+       FZ     FGR1 -0.1360   3
+        C        C  0.5100   4
+        O        O -0.5100   4
+  [ bonds ]
+        N    CA
+        C    CA
+        C    +N
+       CA    HA
+       CA    CB
+        N    HN
+       CB   HB1
+       CB   HB2
+       CB    CG
+       CG   CD2
+      CD1   HD1
+      CD1   CE1
+      CD2   HD2
+      CE1   FE1
+      CE2   HE2
+      CE2    CZ
+       CZ    FZ
+        O     C
+       CG   CD1
+       CZ   CE1
+      CD2   CE2
+  [ impropers ]
+        N    -C    CA    HN
+        C    CA    +N     O
+  [ cmap ]
+       -C     N    CA     C    +N
+
+
+[ FTR ]
+; 5-fluoro-tryptophan
+  [ atoms ]
+        N      NH1 -0.4700   1
+       HN        H  0.3100   1
+       CA      CT1  0.0700   1
+       HA      HB1  0.0900   1
+       CB    CG321 -0.1800   2
+      HB1     HGA2  0.0900   2
+      HB2     HGA2  0.0900   2
+       CG   CG2R51 -0.0000   3
+      CD1   CG2R51 -0.0550   3
+      HD1    HGR52  0.1370   3
+      CD2   CG2RC0 -0.0040   3
+      NE1   NG2R51 -0.4240   3
+      HE1     HGP1  0.3230   3
+      CE2   CG2RC0  0.3200   3
+      CE3   CG2R61 -0.2630   3
+      HE3    HGR62  0.1910   3
+      CZ2   CG2R61 -0.2870   3
+      HZ2    HGR61  0.1830   3
+      CZ3   CG2R66  0.0630   3
+      FZ3     FGR1 -0.1830   3
+      CH2   CG2R61 -0.1920   3
+      HH2    HGR62  0.1910   3
+        C        C  0.5100   4
+        O        O -0.5100   4
+  [ bonds ]
+        N    CA
+        C    CA
+        C    +N
+       CA    HA
+       CA    CB
+        N    HN
+       CB   HB1
+       CB   HB2
+       CB    CG
+       CG   CD2
+      CD1   HD1
+      CD1   NE1
+      CD2   CE3
+      NE1   HE1
+      NE1   CE2
+      CE2   CZ2
+      CE3   HE3
+      CZ2   HZ2
+      CZ3   FZ3
+      CZ3   CH2
+      CH2   HH2
+        O     C
+       CG   CD1
+      CD2   CE2
+      CE3   CZ3
+      CZ2   CH2
+  [ impropers ]
+        N    -C    CA    HN
+        C    CA    +N     O
+  [ cmap ]
+       -C     N    CA     C    +N
+
+
+[ FVAL ]
+; 3-fluoro-valine
+  [ atoms ]
+        N      NH1 -0.4700   1
+       HN        H  0.3100   1
+       CA      CT1  0.0700   1
+       HA      HB1  0.0900   1
+       CB    CG322  0.2650   2
+      FG3     FGA1 -0.2650   2
+      CG1    CG331 -0.2700   2
+     HG11     HGA3  0.0900   2
+     HG12     HGA3  0.0900   2
+     HG13     HGA3  0.0900   2
+      CG2    CG331 -0.2700   2
+     HG21     HGA3  0.0900   2
+     HG22     HGA3  0.0900   2
+     HG23     HGA3  0.0900   2
+        C        C  0.5100   3
+        O        O -0.5100   3
+  [ bonds ]
+        N    CA
+        C    CA
+        C    +N
+       CA    HA
+       CA    CB
+        N    HN
+       CB   FG3
+       CB   CG1
+       CB   CG2
+      CG1  HG11
+      CG1  HG12
+      CG1  HG13
+      CG2  HG21
+      CG2  HG22
+      CG2  HG23
+        O     C
+  [ impropers ]
+        N    -C    CA    HN
+        C    CA    +N     O
+  [ cmap ]
+       -C     N    CA     C    +N
+
+
+[ LEF ]
+; (4s)-5-fluoro-l-leucine
+  [ atoms ]
+        N      NH1 -0.4700   1
+       HN        H  0.3100   1
+       CA      CT1  0.0700   1
+       HA      HB1  0.0900   1
+       CB    CG321 -0.1800   2
+      HB1     HGA2  0.0900   2
+      HB2     HGA2  0.0900   2
+       CG    CG311  0.0080   3
+       HG     HGA1  0.0900   3
+      CD1    CG322 -0.1710   3
+     HD11     HGA6  0.1410   3
+     HD12     HGA6  0.1410   3
+       F1     FGA1 -0.2090   3
+      CD2    CG331 -0.2700   3
+     HD21     HGA3  0.0900   3
+     HD22     HGA3  0.0900   3
+     HD23     HGA3  0.0900   3
+        C        C  0.5100   4
+        O        O -0.5100   4
+  [ bonds ]
+        N    CA
+        C    CA
+        C    +N
+       CA    HA
+       CA    CB
+        N    HN
+       CB   HB2
+       CB   HB1
+       CB    CG
+       CG    HG
+       CG   CD1
+       CG   CD2
+      CD1  HD11
+      CD1  HD12
+      CD1    F1
+      CD2  HD21
+      CD2  HD22
+      CD2  HD23
+        O     C
+  [ impropers ]
+        N    -C    CA    HN
+        C    CA    +N     O
+  [ cmap ]
+       -C     N    CA     C    +N
+
+
+[ OBF ]
+; (2s)-2-amino-4,4-difluorobutanoic acid
+  [ atoms ]
+        N      NH1 -0.4700   1
+       HN        H  0.3100   1
+       CA      CT1  0.0700   1
+       HA      HB1  0.0900   1
+       CB    CG321 -0.0590   2
+      HB1     HGA2  0.0900   2
+      HB2     HGA2  0.0900   2
+       CG    CG312  0.0920   2
+       HG     HGA7  0.1490   2
+      FG1     FGA2 -0.1810   2
+      FG2     FGA2 -0.1810   2
+        C        C  0.5100   3
+        O        O -0.5100   3
+  [ bonds ]
+        N    CA
+        C    CA
+        C    +N
+       CA    HA
+       CA    CB
+        N    HN
+       CB   HB1
+       CB   HB2
+       CB    CG
+       CG    HG
+       CG   FG1
+       CG   FG2
+        O     C
+  [ impropers ]
+        N    -C    CA    HN
+        C    CA    +N     O
+  [ cmap ]
+       -C     N    CA     C    +N
+
+
+[ PF5 ]
+; pentafluoro-phenylalanine
+  [ atoms ]
+        N      NH1 -0.4700   1
+       HN        H  0.3100   1
+       CA      CT1  0.0700   1
+       HA      HB1  0.0900   1
+       CB    CG321 -0.1800   2
+      HB1     HGA2  0.0900   2
+      HB2     HGA2  0.0900   2
+       CG   CG2R61  0.1820   3
+      CD1   CG2R66  0.2080   3
+      FD1     FGR1 -0.1550   3
+      CD2   CG2R66  0.2080   3
+      FD2     FGR1 -0.1550   3
+      CE1   CG2R66 -0.1330   3
+      FE1     FGR1 -0.0820   3
+      CE2   CG2R66 -0.1330   3
+      FE2     FGR1 -0.0820   3
+       CZ   CG2R66  0.2640   3
+       FZ     FGR1 -0.1220   3
+        C        C  0.5100   4
+        O        O -0.5100   4
+  [ bonds ]
+        N    CA
+        C    CA
+        C    +N
+       CA    HA
+       CA    CB
+        N    HN
+       CB   HB1
+       CB   HB2
+       CB    CG
+       CG   CD2
+      CD1   FD1
+      CD1   CE1
+      CD2   FD2
+      CE1   FE1
+      CE2   FE2
+      CE2    CZ
+       CZ    FZ
+        O     C
+       CG   CD1
+       CZ   CE1
+      CD2   CE2
+  [ impropers ]
+        N    -C    CA    HN
+        C    CA    +N     O
+  [ cmap ]
+       -C     N    CA     C    +N
+
+
+[ TFG4 ]
+; 4-(trifluoromethyl)-phenylglycine
+  [ atoms ]
+        N      NH1 -0.4700   1
+       HN        H  0.3100   1
+       CA      CT1  0.0700   1
+       HA      HB1  0.0900   1
+       CB   CG2R61  0.1620   2
+      CG1   CG2R61 -0.0680   2
+      HG1    HGR61  0.1150   2
+      CG2   CG2R61 -0.0680   2
+      HG2    HGR61  0.1150   2
+      CD1   CG2R61 -0.1810   2
+      HD1    HGR61  0.2110   2
+      CD2   CG2R61 -0.1810   2
+      HD2    HGR61  0.2110   2
+       CE   CG2R61 -0.3740   2
+       CH    CG302  0.5530   2
+      FH1     FGA3 -0.1650   2
+      FH2     FGA3 -0.1650   2
+      FH3     FGA3 -0.1650   2
+        C        C  0.5100   3
+        O        O -0.5100   3
+  [ bonds ]
+        N    CA
+        C    CA
+        C    +N
+       CA    HA
+       CA    CB
+        N    HN
+       CB   CG2
+      CG1   HG1
+      CG1   CD1
+      CG2   HG2
+      CD1   HD1
+      CD2   HD2
+      CD2    CE
+       CE    CH
+       CH   FH1
+       CH   FH2
+       CH   FH3
+        O     C
+       CB   CG1
+       CE   CD1
+      CG2   CD2
+  [ impropers ]
+        N    -C    CA    HN
+        C    CA    +N     O
+  [ cmap ]
+       -C     N    CA     C    +N
+
+
+[ TFLE ]
+; 5,5,5-trifluoro-leucine
+  [ atoms ]
+        N      NH1 -0.4700   1
+       HN        H  0.3100   1
+       CA      CT1  0.0700   1
+       HA      HB1  0.0900   1
+       CB    CG321 -0.1800   2
+      HB1     HGA2  0.0900   2
+      HB2     HGA2  0.0900   2
+       CG    CG311  0.1220   3
+       HG     HGA1  0.0900   3
+      CD1    CG302  0.1380   3
+      FD1     FGA3 -0.1210   3
+      FD2     FGA3 -0.1210   3
+      FD3     FGA3 -0.1210   3
+      CD2    CG331 -0.2570   3
+     HD21     HGA3  0.0900   3
+     HD22     HGA3  0.0900   3
+     HD23     HGA3  0.0900   3
+        C        C  0.5100   4
+        O        O -0.5100   4
+  [ bonds ]
+        N    CA
+        C    CA
+        C    +N
+       CA    HA
+       CA    CB
+        N    HN
+       CB   HB1
+       CB   HB2
+       CB    CG
+       CG    HG
+       CG   CD1
+       CG   CD2
+      CD1   FD1
+      CD1   FD2
+      CD1   FD3
+      CD2  HD21
+      CD2  HD22
+      CD2  HD23
+        O     C
+  [ impropers ]
+        N    -C    CA    HN
+        C    CA    +N     O
+  [ cmap ]
+       -C     N    CA     C    +N
+
+
+[ TFP4 ]
+; 4-(Trifluoromethyl)-phenylalanine
+  [ atoms ]
+        N      NH1 -0.4700   1
+       HN        H  0.3100   1
+       CA      CT1  0.0700   1
+       HA      HB1  0.0900   1
+       CB    CG321 -0.1800   2
+      HB1     HGA2  0.0900   2
+      HB2     HGA2  0.0900   2
+       CG   CG2R61  0.1650   3
+      CD1   CG2R61 -0.0680   3
+      HD1    HGR61  0.1150   3
+      CD2   CG2R61 -0.0680   3
+      HD2    HGR61  0.1150   3
+      CE1   CG2R61 -0.1810   3
+      HE1    HGR61  0.2110   3
+      CE2   CG2R61 -0.1810   3
+      HE2    HGR61  0.2110   3
+       CZ   CG2R61 -0.3740   3
+       CH    CG302  0.5530   3
+      FH1     FGA3 -0.1660   3
+      FH2     FGA3 -0.1660   3
+      FH3     FGA3 -0.1660   3
+        C        C  0.5100   4
+        O        O -0.5100   4
+  [ bonds ]
+        N    CA
+        C    CA
+        C    +N
+       CA    HA
+       CA    CB
+        N    HN
+       CB   HB1
+       CB   HB2
+       CB    CG
+       CG   CD2
+      CD1   HD1
+      CD1   CE1
+      CD2   HD2
+      CE1   HE1
+      CE2   HE2
+      CE2    CZ
+       CZ    CH
+       CH   FH1
+       CH   FH2
+       CH   FH3
+        O     C
+       CG   CD1
+       CZ   CE1
+      CD2   CE2
+  [ impropers ]
+        N    -C    CA    HN
+        C    CA    +N     O
+  [ cmap ]
+       -C     N    CA     C    +N
+
+
+[ YOF ]
+; 3-fluorotyrosine
+  [ atoms ]
+        N      NH1 -0.4700   1
+       HN        H  0.3100   1
+       CA      CT1  0.0700   1
+       HA      HB1  0.0900   1
+       CB    CG321 -0.1800   2
+      HB1     HGA2  0.0900   2
+      HB2     HGA2  0.0900   2
+       CG   CG2R61  0.0730   3
+      CD1   CG2R61 -0.1630   3
+      HD1    HGR62  0.1650   3
+      CD2   CG2R61 -0.1030   3
+      HD2    HGR61  0.1150   3
+      CE1   CG2R66 -0.0020   3
+      FE1     FGR1 -0.1620   3
+      CE2   CG2R61 -0.1090   3
+      HE2    HGR61  0.1150   3
+       CZ   CG2R61  0.1740   3
+       OH    OG311 -0.5740   3
+       HH     HGP1  0.4710   3
+        C        C  0.5100   4
+        O        O -0.5100   4
+  [ bonds ]
+        N    CA
+        C    CA
+        C    +N
+       CA    HA
+       CA    CB
+        N    HN
+       CB   HB1
+       CB   HB2
+       CB    CG
+       CG   CD2
+      CD1   HD1
+      CD1   CE1
+      CD2   HD2
+      CE1   FE1
+      CE2   HE2
+      CE2    CZ
+       CZ    OH
+       OH    HH
+        O     C
+       CG   CD1
+       CZ   CE1
+      CD2   CE2
+  [ impropers ]
+        N    -C    CA    HN
+        C    CA    +N     O
+  [ cmap ]
+       -C     N    CA     C    +N
+
+; residue topologies from file toppar_c36_jul22/stream/prot/toppar_all36_prot_na_combined.str
+

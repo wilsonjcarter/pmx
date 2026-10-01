@@ -15210,3 +15210,6 @@ HGR61  CG2R6Q  CG2R6Q  HGR61  9  180.000000  10.041600  2
 #include "nos_bonded.itp"
 
 #include "aba_bonded.itp"
+
+#include "fluoro_bonded.itp"
+#include "glycation_bonded.itp"
