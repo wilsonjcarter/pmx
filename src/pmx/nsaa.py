@@ -976,9 +976,39 @@ def _rename_model_charmm(m) -> None:
             atom.name = 'HG1'
 
 
+def _unique_heavy_dummy(name: str, used) -> str:
+    """A <=4-character 'D'-prefixed dummy name for *name*, unused in *used*.
+
+    GROMACS caps atom names at 4 characters, so 'D' + a 4-character name has to lose
+    one, and plain truncation is not injective: hexafluoroleucine's FD11/FD12/FD13 all
+    collapse to DFD1. The colliding atoms are then silently merged -- the residue loses
+    four fluorines, every name stays unique, pdb2gmx and grompp are both happy, and the
+    only symptom is a non-integral end state (qB = +0.484 = 4 x 0.121).
+
+    The legacy name is returned whenever it is free, so this only changes behaviour for
+    residues that were previously built wrong. Mirrors _unique_dummy_name in
+    pmx.covalent.mutate, which already guards the generative path.
+    """
+    if len(name) == 4:
+        cand = 'D' + name[:3]
+        if cand[1].isdigit():
+            cand = cand[0] + cand[2:] + cand[1]
+    else:
+        cand = 'D' + name
+    if cand not in used:
+        return cand
+    for n in range(1, 100):
+        suf = str(n)
+        alt = ('D' + name)[:4 - len(suf)] + suf
+        if alt not in used:
+            return alt
+    raise ValueError('cannot build a unique dummy name for %r' % name)
+
+
 def _merge_molecules(r1, dummies: list) -> None:
     """Append dummy atoms (B-state-only atoms from *dummies*) onto *r1*."""
     dum_h_counter = 1
+    used = {a.name for a in r1.atoms}
     for atom in dummies:
         new = atom.copy()
         new.atomtypeB = new.atomtype
@@ -993,12 +1023,9 @@ def _merge_molecules(r1, dummies: list) -> None:
                                          new.name[1] == 'H'):
             new.name = 'HV' + str(dum_h_counter)
             dum_h_counter += 1
-        elif len(new.name) == 4:
-            new.name = 'D' + new.name[:3]
-            if new.name[1].isdigit():
-                new.name = new.name[0] + new.name[2:] + new.name[1]
         else:
-            new.name = 'D' + atom.name
+            new.name = _unique_heavy_dummy(new.name, used)
+        used.add(new.name)
         r1.append(new)
         logger.debug("dummy: %s -> %s", atom.name, new.name)
 
