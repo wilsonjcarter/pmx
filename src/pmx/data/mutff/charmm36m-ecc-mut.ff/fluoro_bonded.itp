@@ -154,3 +154,36 @@
    OG311   CG2R61   CG2R66   CG2R61     9   180.000000    12.970400     2 ; from CG2R61 CG2R61 CG2R61 OG311, PENALTY= 5 YOF
    OG311   CG2R61   CG2R66     FGR1     9   180.000000    17.110886     2 ; YOF, by ac_aa
 
+; --- appended 2026-10-03 -------------------------------------------------------
+; Bonded terms for ATB / QFL / HFL, from CGenFF 4.6 on the CA-methyl side-chain
+; analogs. Terms involving the analog's capping methyl are retyped CG331 -> CT1 and
+; HGA3 -> HB1, since in the residue that position IS the protein CA; that retyping is
+; how core's existing 'CT1 CG321 CG311 CG302 ... PENALTY=12 TFLE' term was produced,
+; and it is numerically identical to the 4.6 value. Terms already present in core are
+; omitted. Use CGenFF 4.6, not 5.0: 5.0 gives a different torsion profile for that
+; same dihedral (two terms, 180/1.757/m3 + 0/1.966/m4) and would contradict TFLE.
+
+[ bondtypes ]
+CG311     CG312     1         0.15200000  142256.00 ; QFL
+
+[ angletypes ]
+CT1       CG321     CG302     5         111.629997  443.671356  0.25105000  6694.40  ; ATB, cap CG331->CT1 HGA3->HB1
+CG321     CG311     CG312     5         111.980003  444.340790  0.25015000  6694.40  ; QFL
+HGA1      CG311     CG312     5         110.099998  289.532806  0.21789999  18853.10 ; QFL
+CG312     CG311     CG312     5         111.980003  444.340790  0.25015000  6694.40  ; QFL
+CG311     CG312     HGA7      5         112.000000  267.776001  0.21680000  2510.40  ; QFL
+CG311     CG312     FGA2      5         112.000000  418.399994  0.23570000  25104.00 ; QFL
+CG302     CG311     CG302     5         108.650002  446.432800  0.24925999  6660.93  ; HFL
+
+[ dihedraltypes ]
+HB1       CT1       CG321     CG302     9         0.000000  0.376560  3        ; ATB, cap CG331->CT1 HGA3->HB1
+CT1       CG321     CG302     FGA3      9         0.000000  1.046000  3        ; ATB, cap CG331->CT1 HGA3->HB1
+CT1       CG321     CG311     CG312     9         0.000000  0.836800  3        ; QFL, cap CG331->CT1 HGA3->HB1
+HGA2      CG321     CG311     CG312     9         0.000000  0.209200  3        ; QFL
+CG321     CG311     CG312     HGA7      9         0.000000  0.753120  3        ; QFL
+CG321     CG311     CG312     FGA2      9         0.000000  1.046000  3        ; QFL
+HGA1      CG311     CG312     HGA7      9         0.000000  0.753120  3        ; QFL
+HGA1      CG311     CG312     FGA2      9         0.000000  0.753120  3        ; QFL
+CG312     CG311     CG312     HGA7      9         0.000000  0.753120  3        ; QFL
+CG312     CG311     CG312     FGA2      9         0.000000  1.046000  3        ; QFL
+CG302     CG311     CG302     FGA3      9         0.000000  1.046000  3        ; HFL

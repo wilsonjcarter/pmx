@@ -562,3 +562,148 @@
 
 ; residue topologies from file toppar_c36_jul22/stream/prot/toppar_all36_prot_na_combined.str
 
+; --- appended 2026-10-03 -------------------------------------------------------
+; Three fluorinated residues completing the GB1 position-53 experimental ladder.
+; Charges from CGenFF 4.6 on a side-chain analog with a METHYL at the CA position
+; (CH3-CB...), the convention the SI itself uses for FVAL. The cap came back at
+; -0.271/-0.272 i.e. the CHARMM CT3 methyl value, confirming the side chain is a
+; closed neutral group; the cap is then discarded and CB onward is used as computed.
+; CB is NOT renormalised to the -0.180 CH2 standard: the shipped set only shows that
+; value where fluorine is remote, and keeps the computed one where it is close
+; (OBF CB -0.059, FVAL CB +0.265). ATB sits in that second regime.
+;
+
+[ ATB ]
+; 4,4,4-trifluoro-2-aminobutyric acid (Atb); GB1 ddG_unfold +0.737 kcal/mol
+;   side chain residual +0.002 e absorbed on CB (-0.097 -> -0.099)
+  [ atoms ]
+        N      NH1 -0.4700   1
+       HN        H  0.3100   1
+       CA      CT1  0.0700   1
+       HA      HB1  0.0900   1
+       CB    CG321 -0.0990   2
+      HB1     HGA2  0.0900   2
+      HB2     HGA2  0.0900   2
+       CG    CG302  0.3390   2
+      FG1     FGA3 -0.1400   2
+      FG2     FGA3 -0.1400   2
+      FG3     FGA3 -0.1400   2
+        C        C  0.5100   3
+        O        O -0.5100   3
+  [ bonds ]
+        N    CA
+        C    CA
+        C    +N
+       CA    HA
+       CA    CB
+        N    HN
+       CB   HB1
+       CB   HB2
+       CB    CG
+       CG   FG1
+       CG   FG2
+       CG   FG3
+        O     C
+  [ impropers ]
+        N    -C    CA    HN
+        C    CA    +N     O
+  [ cmap ]
+       -C     N    CA     C    +N
+
+[ QFL ]
+; 5,5,5',5'-tetrafluoroleucine (Qfl); GB1 ddG_unfold +0.722 kcal/mol
+;   side chain residual +0.001 e absorbed on CB (-0.165 -> -0.166)
+  [ atoms ]
+        N      NH1 -0.4700   1
+       HN        H  0.3100   1
+       CA      CT1  0.0700   1
+       HA      HB1  0.0900   1
+       CB    CG321 -0.1660   2
+      HB1     HGA2  0.0900   2
+      HB2     HGA2  0.0900   2
+       CG    CG311  0.1220   2
+       HG     HGA1  0.0900   2
+      CD1    CG312  0.1000   2
+      HD1     HGA7  0.1490   2
+     FD11     FGA2 -0.1810   2
+     FD12     FGA2 -0.1810   2
+      CD2    CG312  0.1000   2
+      HD2     HGA7  0.1490   2
+     FD21     FGA2 -0.1810   2
+     FD22     FGA2 -0.1810   2
+        C        C  0.5100   3
+        O        O -0.5100   3
+  [ bonds ]
+        N    CA
+        C    CA
+        C    +N
+       CA    HA
+       CA    CB
+        N    HN
+       CB   HB1
+       CB   HB2
+       CB    CG
+       CG    HG
+       CG   CD1
+       CG   CD2
+      CD1   HD1
+      CD1  FD11
+      CD1  FD12
+      CD2   HD2
+      CD2  FD21
+      CD2  FD22
+        O     C
+  [ impropers ]
+        N    -C    CA    HN
+        C    CA    +N     O
+  [ cmap ]
+       -C     N    CA     C    +N
+
+[ HFL ]
+; 5,5,5,5',5',5'-hexafluoroleucine (Hfl); GB1 ddG_unfold +0.806 kcal/mol
+;   side chain residual +0.001 e absorbed on CB (-0.151 -> -0.152)
+  [ atoms ]
+        N      NH1 -0.4700   1
+       HN        H  0.3100   1
+       CA      CT1  0.0700   1
+       HA      HB1  0.0900   1
+       CB    CG321 -0.1520   2
+      HB1     HGA2  0.0900   2
+      HB2     HGA2  0.0900   2
+       CG    CG311  0.3420   2
+       HG     HGA1  0.0900   2
+      CD1    CG302  0.1330   2
+     FD11     FGA3 -0.1210   2
+     FD12     FGA3 -0.1210   2
+     FD13     FGA3 -0.1210   2
+      CD2    CG302  0.1330   2
+     FD21     FGA3 -0.1210   2
+     FD22     FGA3 -0.1210   2
+     FD23     FGA3 -0.1210   2
+        C        C  0.5100   3
+        O        O -0.5100   3
+  [ bonds ]
+        N    CA
+        C    CA
+        C    +N
+       CA    HA
+       CA    CB
+        N    HN
+       CB   HB1
+       CB   HB2
+       CB    CG
+       CG    HG
+       CG   CD1
+       CG   CD2
+      CD1  FD11
+      CD1  FD12
+      CD1  FD13
+      CD2  FD21
+      CD2  FD22
+      CD2  FD23
+        O     C
+  [ impropers ]
+        N    -C    CA    HN
+        C    CA    +N     O
+  [ cmap ]
+       -C     N    CA     C    +N
