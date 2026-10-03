@@ -976,8 +976,12 @@ def _rename_model_charmm(m) -> None:
             atom.name = 'HG1'
 
 
-def _unique_heavy_dummy(name: str, used) -> str:
+def _unique_dummy_name(name: str, used) -> str:
     """A <=4-character 'D'-prefixed dummy name for *name*, unused in *used*.
+
+    THE single dummy namer for both directions. pmx.covalent.mutate imports it for the
+    reverse path rather than keeping its own copy -- two implementations of this is how
+    the forward path stayed broken after the reverse one was fixed.
 
     GROMACS caps atom names at 4 characters, so 'D' + a 4-character name has to lose
     one, and plain truncation is not injective: hexafluoroleucine's FD11/FD12/FD13 all
@@ -986,8 +990,11 @@ def _unique_heavy_dummy(name: str, used) -> str:
     only symptom is a non-integral end state (qB = +0.484 = 4 x 0.121).
 
     The legacy name is returned whenever it is free, so this only changes behaviour for
-    residues that were previously built wrong. Mirrors _unique_dummy_name in
-    pmx.covalent.mutate, which already guards the generative path.
+    residues that were previously built wrong.
+
+    The digit rotation ('1HB2' -> 'D1HB' -> 'DHB1') is legacy nsaa behaviour for
+    PDB-style names that lead with a digit; it is a no-op for every protein heavy atom,
+    which is all this is ever asked for, since hydrogens take the HV counter instead.
     """
     if len(name) == 4:
         cand = 'D' + name[:3]
@@ -1024,7 +1031,7 @@ def _merge_molecules(r1, dummies: list) -> None:
             new.name = 'HV' + str(dum_h_counter)
             dum_h_counter += 1
         else:
-            new.name = _unique_heavy_dummy(new.name, used)
+            new.name = _unique_dummy_name(new.name, used)
         used.add(new.name)
         r1.append(new)
         logger.debug("dummy: %s -> %s", atom.name, new.name)

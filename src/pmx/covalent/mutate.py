@@ -42,7 +42,7 @@ from .target import TargetResidue, complete_target_from_structure
 # Reuse the battle-tested emit + ITP-fragment helpers from nsaa (import, do not
 # modify).
 from ..nsaa import (
-    _merge_molecules, _make_bstate_dummies, _make_transition_dics,
+    _merge_molecules, _make_bstate_dummies, _make_transition_dics, _unique_dummy_name,
     _update_bond_lists, _improps_as_atoms, _generate_dihedral_entries,
     _generate_improp_entries, _make_rtp, _make_mtp, _write_atp_fnb,
     _rtp_terminal, _assign_rtp_entries, _assign_mass_atp,
@@ -494,23 +494,6 @@ def _apply_ref_geometry(residue2, ref_path, mut_resid, mut_chain):
             a.x = list(byname[a.name].x)
 
 
-def _unique_dummy_name(name: str, used) -> str:
-    """A <=4-character 'D'-prefixed dummy name for *name*, unused in *used*.
-
-    GROMACS atom names are at most 4 characters, so 'D' + a 4-character name has
-    to lose a character.  Plain truncation is not injective -- ARG's HH11/HH12
-    and LEU's HD11/HD12/HD13 share their first three characters -- so fall back
-    to a numbered form ('DHH1', then 'DHH2'... 'DH10') until the name is free.
-    """
-    cand = ('D' + name)[:4]
-    if cand not in used:
-        return cand
-    for n in range(1, 100):
-        suf = str(n)
-        cand = ('D' + name)[:4 - len(suf)] + suf
-        if cand not in used:
-            return cand
-    raise ValueError('cannot build a unique dummy name for %r' % name)
 
 def mutate(model, mut_resid: int, target: str, ff: str,
            structure: Optional[str] = None, itp: Optional[str] = None,
