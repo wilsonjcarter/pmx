@@ -421,6 +421,19 @@ different protonation states. Use the --resinfo flag to print the dictionary.
                         type=str,
                         help='Text file with list of mutations (optional).',
                         default=None)
+    parser.add_argument('--hybrid_name',
+                        metavar='name',
+                        dest='hybrid_name',
+                        type=str,
+                        help='Override the generated 4-character hybrid\n'
+                        'residue name. The default is built from the source\n'
+                        'one-letter code plus the first and last letters of\n'
+                        'the target, which is not collision-free: a\n'
+                        'non-canonical source falls back to its first letter,\n'
+                        'so KCR->ALY and LYS->ALY both want K2AY. The engine\n'
+                        'refuses to reuse a name for a different morph and\n'
+                        'asks for this flag.',
+                        default=None)
     exclus.add_argument('--keep_resid',
                         dest='renumber',
                         help='Whether to renumber all residues or to keep the\n'
@@ -630,7 +643,8 @@ def main(args):
                        itp=args.itp,
                        structure=args.structure,
                        generative=args.generative,
-                       reverse=args.reverse)
+                       reverse=args.reverse,
+                       hybrid_name=args.hybrid_name)
 
     # if script not provided, interactive selection
     # ---------------------------------------------
@@ -675,7 +689,8 @@ def main(args):
                        itp=args.itp,
                        structure=args.structure,
                        generative=args.generative,
-                       reverse=args.reverse)
+                       reverse=args.reverse,
+                       hybrid_name=args.hybrid_name)
 
             # ask whether to do more mutations or stop
             if not _ask_next():

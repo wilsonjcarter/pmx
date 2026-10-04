@@ -193,6 +193,21 @@ def parse_options():
         ),
     )
     parser.add_argument(
+        '--hybrid_name',
+        metavar='NAME',
+        dest='hybrid_name',
+        type=str,
+        default=None,
+        help=(
+            "Override the generated 4-character hybrid residue name.  The\n"
+            "default name is built from the source one-letter code plus the\n"
+            "first and last letters of the target, which is not collision-\n"
+            "free: a non-canonical source falls back to its first letter, so\n"
+            "KCR->ALY and LYS->ALY both want K2AY.  The engine refuses to\n"
+            "reuse a name for a different morph and asks for this flag."
+        ),
+    )
+    parser.add_argument(
         '-v', '--verbose',
         dest='verbose',
         action='store_true',
@@ -273,6 +288,7 @@ def main(args):
         nonstandardPDB=args.nsapdb,
         mut_chain=args.chain,
         inplace=True,
+        hybrid_name=args.hybrid_name,
         verbose=args.verbose,
     )
 

@@ -212,6 +212,43 @@ def get_pmxdata(fname):
 
 
 
+def residuetype_from_ff(resname, ffpath):
+    """Looks a residue name up in the force field's own residuetypes.dat.
+
+    pmx classifies residues by the hardcoded name sets in :mod:`pmx.library`,
+    which cannot know about residues the generative engine has built.  The
+    force field already answers the same question for GROMACS, so ask it.
+
+    Parameters
+    ----------
+    resname : str
+        residue name to classify
+    ffpath : str
+        path to the force field directory
+
+    Returns
+    -------
+    moltype : str or None
+        'protein', 'dna' or 'rna' where residuetypes.dat classifies the
+        residue, None where it says nothing about it.
+    """
+    _map = {'protein': 'protein', 'dna': 'dna', 'rna': 'rna'}
+    seen = set()
+    for d in [ffpath, os.path.dirname(ffpath), os.environ.get('GMXLIB', '')]:
+        if not d or d in seen:
+            continue
+        seen.add(d)
+        fn = os.path.join(d, 'residuetypes.dat')
+        if not os.path.isfile(fn):
+            continue
+        with open(fn) as fp:
+            for line in fp:
+                f = line.split()
+                if len(f) >= 2 and f[0] == resname:
+                    return _map.get(f[1].lower())
+    return None
+
+
 def get_mtp_file(residue, ff):
     """Returns the correct mutres mtp file depending on the nature of the
     residue.
@@ -246,8 +283,23 @@ def get_mtp_file(residue, ff):
     elif residue.moltype == 'protein':
         mtp_file = os.path.join(ffpath, 'mutres.mtp')
     else:
-        raise ValueError('Cannot understand mutation type needed '
-                         'from the input structure provided')
+        # The residue is not in library's hardcoded name sets.  It may still be
+        # one the generative engine built, in which case the force field itself
+        # knows what it is: residuetypes.dat is what GROMACS reads to answer
+        # exactly this question.
+        fftype = residuetype_from_ff(residue.resname, ffpath)
+        if fftype == 'protein':
+            mtp_file = os.path.join(ffpath, 'mutres.mtp')
+        elif fftype == 'dna':
+            mtp_file = os.path.join(ffpath, 'mutres_dna.mtp')
+        elif fftype == 'rna':
+            mtp_file = os.path.join(ffpath, 'mutres_rna.mtp')
+        else:
+            raise ValueError('Cannot understand mutation type needed '
+                             'from the input structure provided: residue '
+                             '%s is in none of pmx\'s residue sets and the '
+                             'force field does not classify it either'
+                             % residue.resname)
     return mtp_file
 
 

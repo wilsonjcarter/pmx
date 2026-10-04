@@ -1459,6 +1459,7 @@ def _write_atp_fnb(fn_atp: str, fn_nb: str, r, ffpath: str) -> None:
 def mutate_nsaa(m, mut_resid: int, mut_resname: str, ff: str,
                 itp: str = None, nonstandardPDB: str = None,
                 mut_chain: str = None, inplace: bool = False,
+                hybrid_name: str = None,
                 verbose: bool = False) -> None:
     """Mutate residue *mut_resid* to a non-standard amino acid.
 
@@ -1520,7 +1521,8 @@ def mutate_nsaa(m, mut_resid: int, mut_resname: str, ff: str,
     from .covalent import mutate as _covalent_mutate
     _covalent_mutate(m, mut_resid=mut_resid, target=mut_resname, ff=ff,
                      structure=nonstandardPDB, itp=itp, mut_chain=mut_chain,
-                     inplace=inplace, verbose=verbose)
+                     inplace=inplace, hybrid_name=hybrid_name,
+                     verbose=verbose)
 
 
 # =============================================================================
