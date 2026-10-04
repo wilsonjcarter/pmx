@@ -220,3 +220,191 @@ NH1       CT1       CT1       CG302     9     0.000000   2.468560   3 ; TFV chi1
 C         CT1       CT1       CG302     9   180.000000   0.585760   1 ; TFV chi1, mirrors C-CT1-CT1-CT3
 C         CT1       CT1       CG302     9   180.000000   1.087840   2 ; TFV chi1
 C         CT1       CT1       CG302     9   180.000000   1.380720   3 ; TFV chi1
+
+; ===========================================================================
+; Bonded parameters for the GB1 position-53 guest set, completed 2026-10-04.
+;
+; ATB, QFL and HFL were shipped as rtp entries without their bonded terms, so
+; a morph whose hybrid actually used them failed in gentop/grompp:
+;     Error B: No bond entry found for bstate CA-CB (CT1-CG311 -> CT1-CG311)
+;     ERROR: No default U-B types for interaction  (CT1-CG321-CG302)
+; ATB is the sharpest case: Abu has only a two-carbon side chain, so its CF3
+; sits one bond closer to the backbone than in QFL/HFL/TFLE and creates a
+; CT1-CG321-CG302 junction no other fluoro residue produces.
+;
+; Every line below is copied VERBATIM, with its original provenance comment,
+; from the CGenFF 5.0 distribution (charmm36-feb2026_cgenff-5.0.ff/ffbonded.itp).
+; Nothing here is an analogy or a fitted guess.  Selection rule: every atom type
+; in the term is one used by ALA/GLY/ABA/LEU/PHE/ATB/QFL/HFL/PF5 or by the
+; protein backbone they attach to, and core did not already carry the term.
+; ===========================================================================
+
+[ bondtypes ]
+   CG311     HGA3     1   0.11110000    269449.60 ; PROT alkane
+   CG312    CG312     1   0.14563000    227869.01 ; aa, 23008H
+     CT1    CG311     1   0.15000000    186188.00 ; PROT alkane update, adm jr., 3/2/92 BIU CTH OLT
+     CT1    CG331     1   0.15380000    186188.00 ; PROT alkane update, adm jr., 3/2/92
+
+[ angletypes ]
+  CG2R61    CG311   CG2R61     5   107.500000   433.462400   0.00000000         0.00 ; from CG2R61 CG321 CG2R61, PENALTY= 4 2GX CYF DIPH
+  CG2R61    CG311    CG311     5   107.500000   433.462400   0.00000000         0.00 ; aa, from CG2R61 CG311 CG321, penalty= 0.6
+   CG302    CG311    CG311     5   108.650000   446.432800   0.24926000      6660.93 ; aa, from CG302 CG311 CG321, penalty= 0.6
+   CG312    CG311    CG331     5   111.980000   444.340800   0.25015000      6694.40 ; aa, from CG322 CG311 CG331, penalty= 1.2
+  CG2R61    CG312    CG321     5   123.286200   317.565600   0.00000000         0.00 ; aa, 2300OH
+  CG2R61    CG312    CG331     5   122.031800   305.348320   0.00000000         0.00 ; aa, 2300NZ
+  CG2R61    CG312     HGA7     5   119.043400   301.080640   0.00000000         0.00 ; aa, 2300Q9
+   CG311    CG312    CG311     5   122.040000   383.003360   0.25228000     25104.00 ; aa, from CG331 CG322 CG331, penalty= 7
+   CG311    CG312    CG321     5   122.040000   383.003360   0.25228000     25104.00 ; aa, from CG331 CG322 CG331, penalty= 6.4
+   CG312    CG312     FGA2     5   120.931400   418.902080   0.00000000         0.00 ; aa, 23008H
+   CG321    CG312    CG321     5   122.040000   383.003360   0.25228000     25104.00 ; aa, from CG331 CG322 CG331, penalty= 5.8
+   CG312    CG321    CG321     5   111.630000   443.671360   0.25105000      6694.40 ; aa, from CG312 CG321 CG331, penalty= 0.9
+   CG312    CG321    CG331     5   111.630000   443.671360   0.25105000      6694.40 ; OBF, by ac_aa
+     CT1      CT2     HGA3     5   110.100000   289.532800   0.00000000         0.00 ; CG321 CG331 HGA3 !
+       C      CT1    CG311     5   108.000000   435.136000   0.00000000         0.00 ; PROT Alanine Dipeptide ab initio calc's (LK) BIU 0TD CTH LMQ
+  CG2R61    CG311      CT1     5   107.500000   433.462400   0.00000000         0.00 ; from CG2R61 CG311 CG321, PENALTY= 0.6 2GX BB8 DIPH
+   CG311      CT1      HB1     5   110.100000   288.696000   0.21790000     18853.10 ; PROT alkane update, adm jr., 3/2/92 BIU CTH 0TD DILE HIL4
+   CG311      CT1      NH1     5   113.500000   585.760000   0.00000000         0.00 ; PROT Alanine Dipeptide ab initio calc's (LK) BIU 0TD CTH LMQ
+     CT1   CG2R61   CG2R66     5   120.000000   383.254400   0.00000000         0.00 ; from CG2R66 CG2R61 CG331, PENALTY= 1.5 FPG2
+     CT1    CG311    CG311     5   111.000000   446.432800   0.25610000      6694.40 ; PROT alkane update, adm jr., 3/2/92 HIL4 HL2 HLU ILX
+     CT1    CG311    CG321     5   111.000000   446.432800   0.25610000      6694.40 ; PROT alkane update, adm jr., 3/2/92 BIU CTH DILE LME LMQ
+     CT1    CG311    CG331     5   108.500000   446.432800   0.25610000      6694.40 ; PROT alkane update, adm jr., 3/2/92 BIU OLT 2AS ALO HIL4
+     CT1    CG311     HGA1     5   110.100000   288.696000   0.21790000     18853.10 ; PROT alkane update, adm jr., 3/2/92 BIU CTH 0TD DILE HIL4
+
+[ dihedraltypes ]
+  CG2R66   CG2R61   CG2R61   CG2R66     9   180.000000     0.000000     2 ; aa, 230119
+  CG2R66   CG2R61   CG2R61    CG302     9   180.000000    12.970400     2 ; aa, from CG2R61 CG2R61 CG2R61 CG302, penalty= 1.5
+  CG2R66   CG2R61   CG2R61    CG311     9   180.000000    12.970400     2 ; aa, from CG2R66 CG2R61 CG2R61 CG321, penalty= 0.6
+  CG2R66   CG2R61   CG2R61    CG331     9   180.000000    12.970400     2 ; sidechai , from CG2R61 CG2R61 CG2R61 CG331, penalty= 1.5 F2F YOF
+   CG302   CG2R61   CG2R61    CG321     9   180.000000     8.269258     2 ; from CG302 CG2R61 CG2R61 CG331, TFP2
+   CG302   CG2R61   CG2R61    CG331     9   180.000000     8.269258     2 ; TFG2, by ac_aa
+   CG311   CG2R61   CG2R61    CG311     9   180.000000    10.041600     2 ; aa, from CG321 CG2R61 CG2R61 CG331, penalty= 2.1
+   CG311   CG2R61   CG2R61    CG321     9   180.000000    10.041600     2 ; aa, from CG321 CG2R61 CG2R61 CG331, penalty= 1.5
+   CG311   CG2R61   CG2R61    CG331     9   180.000000    10.041600     2 ; aa, from CG321 CG2R61 CG2R61 CG331, penalty= 0.6
+   CG321   CG2R61   CG2R61    CG321     9   180.000000    10.041600     2 ; aa, from CG321 CG2R61 CG2R61 CG331, penalty= 0.9
+   CG321   CG2R61   CG2R61    CG331     9   180.000000    10.041600     2 ; from CG331 CG2R61 CG2R61 CG331, PENALTY= 0.9 MPH2
+   CG321   CG2R61   CG2R66   CG2R61     9   180.000000    12.970400     2 ; from CG331 CG2R61 CG2R66 CG2R61, PENALTY= 0.9 FPH2
+   CG331   CG2R61   CG2R66   CG2R66     9   180.000000    12.970400     2 ; sidechai , from CG331 CG2R61 CG2R66 CG2R61, penalty= 1.5 PF5
+  CG2R61   CG2R61    CG311   CG2R61     9   180.000000     0.962320     2 ; from CG2R61 CG2R61 CG321 CG2R61, PENALTY= 4 2GX CYF DIPH
+  CG2R61   CG2R61    CG311    CG311     9   180.000000     0.962320     2 ; aa, from CG2R61 CG2R61 CG311 CG321, penalty= 0.6
+  CG2R61   CG2R61    CG312    CG321     9     0.000000     0.000000     2 ; aa, 2300OH
+  CG2R61   CG2R61    CG312    CG331     9     0.000000     3.514560     2 ; aa, 2300NZ
+  CG2R61   CG2R61    CG312    CG331     9   180.000000     2.092000     6 ; aa, 2300NZ
+  CG2R66   CG2R61    CG321    CG331     9   180.000000     0.962320     2 ; from CG2R61 CG2R61 CG321 CG331, penalty= 1.5 FPH2
+    FGA3    CG302    CG311    CG311     9     0.000000     1.046000     3 ; aa, from FGA3 CG302 CG311 CG321, penalty= 0.6
+  CG2R61    CG311    CG311    CG321     9     0.000000     0.167360     3 ; aa, from CG321 CG311 CG321 CG2R61, penalty= 4
+  CG2R61    CG311    CG311    CG331     9     0.000000     0.167360     3 ; aa, from CG331 CG311 CG321 CG2R61, penalty= 4
+  CG2R61    CG311    CG311     HGA1     9     0.000000     0.000000     3 ; aa, from CG2R61 CG311 CG321 HGA2, penalty= 4
+   CG302    CG311    CG311    CG321     9   180.000000     0.753120     3 ; aa, 2300F8
+   CG302    CG311    CG311    CG321     9     0.000000     0.418400     4 ; aa, 2300F8
+   CG302    CG311    CG311    CG331     9   180.000000     3.305360     3 ; aa, 2300NP
+   CG302    CG311    CG311    CG331     9   180.000000     3.347200     4 ; aa, 2300NP
+   CG302    CG311    CG311     HGA1     9   180.000000     0.209200     3 ; aa, from CG302 CG311 CG321 HGA2, penalty= 4
+   CG311    CG311    CG311    CG311     9   180.000000     2.092000     4 ; aa, from CG311 CG311 CG311 CG321, penalty= 0.6
+   CG311    CG311    CG311    CG331     9   180.000000     2.092000     4 ; flavin
+   CG321    CG311    CG311    CG331     9   180.000000     2.092000     4 ; from CG321 CG311 CG311 CG321, PENALTY= 0.9 ILX
+   CG321    CG311    CG312    CG311     9   180.000000     1.799120     3 ; aa, 2300KA
+   CG331    CG311    CG312    CG321     9   180.000000     0.167360     3 ; aa, 2300TA
+   CG331    CG311    CG312     FGA2     9   180.000000     3.179840     1 ; aa, from FGA2 CG312 CG321 CG331, penalty= 4
+   CG331    CG311    CG312     FGA2     9     0.000000     1.338880     3 ; aa, from FGA2 CG312 CG321 CG331, penalty= 4
+    HGA1    CG311    CG312    CG311     9     0.000000     0.000000     3 ; aa, 2300KA
+    HGA1    CG311    CG312    CG321     9     0.000000     0.000000     3 ; aa, 2300TA
+  CG2R61    CG311    CG321   CG2R61     9     0.000000     4.309520     3 ; aa, 23008Q
+  CG2R61    CG311    CG321    CG321     9     0.000000     0.167360     3 ; aa, from CG2R61 CG321 CG321 CG321, penalty= 4
+   CG302    CG311    CG321    CG321     9   180.000000     1.757280     3 ; aa, 2300B2
+   CG302    CG311    CG321    CG321     9     0.000000     1.966480     4 ; aa, 2300B2
+   CG312    CG311    CG321    CG311     9     0.000000     0.920480     3 ; aa, 2300KA
+   CG312    CG311    CG321    CG321     9     0.000000     1.422560     3 ; aa, 2300NE
+   CG312    CG311    CG321    CG321     9     0.000000     0.292880     6 ; aa, 2300NE
+   CG321    CG311    CG321   CG2R61     9     0.000000     0.167360     3 ; from CG331 CG311 CG321 CG2R61, PENALTY= 0.9 B3Y
+   CG321    CG311    CG321    CG331     9     0.000000     0.836800     3 ; from CG311 CG311 CG321 CG331, PENALTY= 0.6 DILE
+   CG312    CG311    CG331     HGA3     9     0.000000     0.209200     3 ; aa, from CG322 CG311 CG331 HGA3, penalty= 1.2
+    FGA2    CG312    CG312     FGA2     9     0.000000     1.840960     3 ; aa, 23008H
+  CG2R61    CG312    CG321    CG321     9   180.000000     0.878640     3 ; aa, 2300OH
+  CG2R61    CG312    CG321    CG321     9   180.000000     4.309520     4 ; aa, 2300OH
+  CG2R61    CG312    CG321     HGA2     9     0.000000     0.000000     3 ; aa, 2300OH
+   CG311    CG312    CG321     HGA2     9     0.000000     0.000000     3 ; aa, 2300TA
+   CG321    CG312    CG321     HGA2     9     0.000000     0.000000     3 ; aa, 230111
+    FGA2    CG312    CG321    CG321     9   180.000000     3.179840     1 ; aa, from FGA2 CG312 CG321 CG331, penalty= 0.9
+    FGA2    CG312    CG321    CG321     9     0.000000     1.338880     3 ; aa, from FGA2 CG312 CG321 CG331, penalty= 0.9
+    FGA2    CG312    CG321    CG331     9   180.000000     3.196576     1 ; OBF, by ac_aa
+    FGA2    CG312    CG321    CG331     9     0.000000     1.356871     3 ; OBF, by ac_aa
+    HGA7    CG312    CG321    CG331     9     0.000000     0.753120     3 ; OBF, by ac_aa
+  CG2R61    CG312    CG331     HGA3     9     0.000000     0.711280     3 ; aa, from HGA2 CG321 CG322 CG2O3, penalty= 44
+  CG2R61    CG321    CG321   CG2R61     9     0.000000     3.891120     2 ; aa, 230001
+  CG2R61    CG321    CG321   CG2R61     9     0.000000     2.803280     3 ; aa, 230001
+  CG2R61    CG321    CG321    CG311     9     0.000000     0.167360     3 ; aa, from CG2R61 CG321 CG321 CG321, penalty= 0.6
+   CG312    CG321    CG321    CG321     9     0.000000     2.133840     2 ; aa, 2300NF
+   CG312    CG321    CG321    CG321     9   180.000000     0.125520     3 ; aa, 2300NF
+   CG312    CG321    CG321    CG321     9   180.000000     2.343040     4 ; aa, 2300NF
+   CG312    CG321    CG321    CG321     9   180.000000     3.347200     5 ; aa, 2300NF
+   CG312    CG321    CG321     HGA2     9     0.000000     0.209200     3 ; aa, from CG322 CG311 CG321 HGA2, penalty= 5.2
+   CG312    CG321    CG331     HGA3     9     0.000000     0.362753     3 ; OBF, by ac_aa
+   CG302   CG2R61   CG2R61      CT1     9   180.000000     8.269258     2 ; from CG302 CG2R61 CG2R61 CG331, TFG2
+  CG2R61    CG311      CT1        C     9     0.000000     0.167360     3 ; from CG2O1 CG311 CG321 CG2R61, PENALTY= 4 2GX BB8 DIPH
+  CG2R61    CG321      CT1        C     9     0.000000     0.167360     3 ; PROT 2.7 kcal/mole CH3 rot in ethylbenzene, adm jr, 3/7/92 F2F NIY
+   CG311    CG311      CT1        C     9     0.000000     0.836800     3 ; from CG2O1 CG311 CG311 CG321, PENALTY= 0.6 HIL4 HL2 HLU
+   CG311    CG321      CT1        C     9     0.000000     0.836800     3 ; PROT alkane update, adm jr., 3/2/92 GHG ARO CGU LED LEF SYM
+   CG311      CT1        C      NH1     9     0.000000     0.000000     1 ; PROT ala dipeptide, new C VDW Rmin, 4/10/93 (LK) BIU CTH OLT
+   CG311      CT1        C        O     9     0.000000     5.857600     1 ; PROT ala dipeptide, new C VDW Rmin, adm jr., 3/3/93c BIU CTH
+   CG321    CG311      CT1        C     9     0.000000     0.836800     3 ; PROT alkane update, adm jr., 3/2/92 BIU CTH DILE CHG LME LMQ
+   CG321    CG321      CT1        C     9     0.000000     0.836800     3 ; PROT alkane update, adm jr., 3/2/92 2MR HGA MCL 26P 6CL ALY
+   CG331    CG311      CT1        C     9     0.000000     0.836800     3 ; PROT alkane update, adm jr., 3/2/92 BIU OLT HIL4 2AS ALO LMQ
+       C      NH1      CT1   CG2R61     9     0.000000     0.062760     1 ; from CG2R61 CG321 NG2S1 CG2O1, PENALTY= 4 3FG D4P FPG4
+       C      NH1      CT1   CG2R61     9     0.000000     1.246832     2 ; from CG2R61 CG321 NG2S1 CG2O1, PENALTY= 4 3FG D4P FPG4
+       C      NH1      CT1   CG2R61     9   180.000000     0.317984     3 ; from CG2R61 CG321 NG2S1 CG2O1, PENALTY= 4 3FG D4P FPG4
+       C      NH1      CT1   CG2R61     9     0.000000     0.619232     6 ; from CG2R61 CG321 NG2S1 CG2O1, PENALTY= 4 3FG D4P FPG4
+       C      NH1      CT1    CG311     9     0.000000     7.531200     1 ; PROT ala dipeptide, new C VDW Rmin, adm jr., 3/3/93c BIU CTH
+     CT1   CG2R61   CG2R61   CG2R66     9   180.000000    12.970400     2 ; from CG2R61 CG2R61 CG2R61 CG311, PENALTY= 1.5 FPG3
+     CT1   CG2R61   CG2R66   CG2R61     9   180.000000    12.970400     2 ; from CG331 CG2R61 CG2R66 CG2R61, PENALTY= 1.5 FPG2
+     CT1   CG2R61   CG2R66     FGR1     9   180.000000    18.828000     2 ; from CG331 CG2R61 CG2R66 FGR1, PENALTY= 1.5 FPG2
+     CT1    CG311   CG2R61   CG2R61     9   180.000000     0.962320     2 ; from CG2R61 CG2R61 CG311 CG321, PENALTY= 0.6 2GX BB8 DIPH
+     CT1    CG311    CG311    CG321     9   180.000000     2.092000     4 ; NA bkb ILX
+     CT1    CG311    CG311    CG331     9   180.000000     2.092000     4 ; from CG311 CG311 CG311 CG321, PENALTY= 0.9 HIL4 HL2 HLU
+     CT1    CG311    CG311     HGA1     9     0.000000     0.815880     3 ; NA, sugar HIL4 HL2 HLU ILX
+     CT1    CG311    CG321    CG321     9     0.000000     0.836800     3 ; CHL1, Cholesterol reset to default by kevo BIU CHG
+     CT1    CG311    CG321    CG331     9     0.000000     0.836800     3 ; PROT alkane update, adm jr., 3/2/92 DILE IIL VAH
+     CT1    CG311    CG321     HGA2     9     0.000000     0.815880     3 ; NA, sugar BIU CTH DILE LMQ LME CHG IIL MEG TH6 VAH
+     CT1    CG311    CG331     HGA3     9     0.000000     0.836800     3 ; PROT alkane update, adm jr., 3/2/92 BIU OLT HIL4 2AS ALO LMQ
+     CT1    CG321    CG311    CG321     9     0.000000     0.836800     3 ; PROT alkane update, adm jr., 3/2/92 ALC
+     CT1    CG321    CG321   CG2R61     9     0.000000     0.167360     3 ; from CG2R61 CG321 CG321 CG321, PENALTY= 0.6 HPE
+     CT1    CG321    CG321    CG311     9     0.000000     0.815880     3 ; PROT alkane update, adm jr., 3/2/92 LYZ HLEU ACZ
+     CT1    CG321    CG321    CG331     9     0.000000     0.629692     2 ; from CG321 CG321 CG321 CG331, PENALTY= 0.6 NVA
+     CT1    CG321    CG321    CG331     9   180.000000     0.340159     3 ; from CG321 CG321 CG321 CG331, PENALTY= 0.6 NVA
+     CT1    CG321    CG321    CG331     9     0.000000     0.452709     4 ; from CG321 CG321 CG321 CG331, PENALTY= 0.6 NVA
+     CT1    CG321    CG321    CG331     9     0.000000     0.853118     5 ; from CG321 CG321 CG321 CG331, PENALTY= 0.6 NVA
+     HB1      CT1   CG2R61   CG2R66     9   180.000000     0.418400     6 ; from CG2R61 CG2R61 CG311 HGA1, PENALTY= 1.5 FPG2
+     HB1      CT1    CG311   CG2R61     9     0.000000     0.000000     3 ; from CG2R61 CG311 CG321 HGA2, PENALTY= 4 2GX BB8 DIPH
+     HB1      CT1    CG311    CG311     9     0.000000     0.815880     3 ; NA, sugar HIL4 HL2 HLU ILX
+     HB1      CT1    CG311    CG321     9     0.000000     0.815880     3 ; NA, sugar BIU CTH DILE LMQ LME CHG IIL MEG TH6 VAH
+     HB1      CT1    CG311    CG331     9     0.000000     0.815880     3 ; NA, sugar BIU OLT HIL4 ALO 2AS LMQ LME IIL LVN MEG
+     HB1      CT1    CG311     HGA1     9     0.000000     0.815880     3 ; NA, sugar BIU CTH OLT 0TD HIL4 ALO 2AS BHD DILE LMQ
+     HB1      CT1    CG321   CG2R61     9     0.000000     0.167360     3 ; PROT 2.7 kcal/mole CH3 rot in ethylbenzene, adm jr, 3/7/92 F2F NIY
+     HB1      CT1    CG321    CG311     9     0.000000     0.815880     3 ; NA, sugar GHG ARO CGU SYM LEF LED 3GL ALC CGUH TFLE
+     HB1      CT1    CG321    CG321     9     0.000000     0.815880     3 ; NA abasic nucleoside 2MR HGA MCL ALY 26P 6CL 4CY CAN HHK
+     HB1      CT1    CG321     HGA2     9     0.000000     0.815880     3 ; NA, sugar 2MR OAS F2F TOX SGB CSPP NIY 2AG 2CO IYR
+    HGA1    CG311      CT1        C     9     0.000000     0.836800     3 ; PROT alkane update, adm jr., 3/2/92 BIU CTH OLT 0TD ALO HIL4
+    HGA2    CG321      CT1        C     9     0.000000     0.836800     3 ; PROT alkane update, adm jr., 3/2/92 2MR OAS F2F CSPP SGB TOX
+       H      NH1      CT1    CG311     9     0.000000     0.000000     1 ; PROT Alanine Dipeptide ab initio calc's (LK) BIU CTH 0TD HIL4 OLT
+     NH1      CT1   CG2R61   CG2R66     9     0.000000     0.497896     2 ; from CG2R61 CG2R61 CG321 NG2S1, PENALTY= 5.5 FPG2
+     NH1      CT1   CG2R61   CG2R66     9   180.000000     0.552288     4 ; from CG2R61 CG2R61 CG321 NG2S1, PENALTY= 5.5 FPG2
+     NH1      CT1   CG2R61   CG2R66     9   180.000000     0.054392     6 ; from CG2R61 CG2R61 CG321 NG2S1, PENALTY= 5.5 FPG2
+     NH1      CT1    CG311   CG2R61     9     0.000000     0.836800     3 ; from NG2S1 CG311 CG321 CG2R61, PENALTY= 4 2GX BB8 DIPH
+     NH1      CT1    CG311    CG311     9     0.000000     0.836800     3 ; from CG321 CG311 CG311 NG2S1, PENALTY= 0.6 HIL4 HL2 HLU
+     NH1      CT1    CG311    CG321     9     0.000000     0.836800     3 ; PROT alkane update, adm jr., 3/2/92 BIU CTH DILE CHG LME LMQ
+     NH1      CT1    CG311    CG331     9     0.000000     0.836800     3 ; PROT alkane update, adm jr., 3/2/92 BIU OLT HIL4 2AS ALO LMQ
+     NH1      CT1    CG311     HGA1     9     0.000000     0.836800     3 ; PROT alkane update, adm jr., 3/2/92 BIU CTH OLT 0TD ALO HIL4
+     NH1      CT1    CG321   CG2R61     9     0.000000     0.836800     3 ; PROT alkane update, adm jr., 3/2/92 F2F NIY IYR 0A1 2LT ALN
+     NH1      CT1    CG321    CG311     9     0.000000     0.836800     3 ; PROT alkane update, adm jr., 3/2/92 GHG ARO CGU LED LEF SYM
+     NH1      CT1    CG321    CG321     9     0.000000     0.836800     3 ; PROT alkane update, adm jr., 3/2/92 2MR HGA MCL 26P 6CL ALY
+     NH1      CT1    CG321     HGA2     9     0.000000     0.836800     3 ; PROT alkane update, adm jr., 3/2/92 2MR OAS F2F CSPP SGB TOX
+     NH1        C      CT1   CG2R61     9     0.000000     0.000000     1 ; from NH1 C CT1 CT2, 004
+     NH1        C      CT1   CG2R61     9   180.000000     3.168543     2 ; 004, by ac_aa
+     NH1        C      CT1   CG2R61     9     0.000000    12.935673     3 ; 004, by ac_aa
+  CG2R66   CG2R61      CT1        C     9   180.000000     2.484459     2 ; from CG2R61 CG2R61 CG311 CG2O3, PENALTY= 15, FPG2
+   CG312    CG321      CT1        C     9   180.000000     2.348898     1 ; OBF, by ac_aa
+   CG312    CG321      CT1        C     9   180.000000     4.127934     2 ; OBF, by ac_aa
+   CG312    CG321      CT1        C     9   180.000000     0.673206     3 ; OBF, by ac_aa
+   CG312    CG321      CT1      HB1     9     0.000000     0.820482     3 ; OBF, by ac_aa
+   CG312    CG321      CT1      NH1     9     0.000000     7.652118     1 ; OBF, by ac_aa
+   CG312    CG321      CT1      NH1     9     0.000000     2.702027     2 ; OBF, by ac_aa
+   CG312    CG321      CT1      NH1     9   180.000000     0.116734     3 ; OBF, by ac_aa
