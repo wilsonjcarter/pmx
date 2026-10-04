@@ -707,3 +707,49 @@
         C    CA    +N     O
   [ cmap ]
        -C     N    CA     C    +N
+
+[ TFV ]
+; 4,4,4-trifluorovaline -- the residue Raleigh measured at NTL9 V3 and V21.
+; Charges are those already carried by the shipped V2TV hybrid topology, which
+; reproduces both measured points to within 0.04 kcal/mol; CGenFF 4.6 on the
+; matching CA-methyl analog (CH3-CH(CF3)(CH3), i.e. the TFLE control) gives the
+; same numbers to within 0.04 e. Side chain is net neutral by construction.
+  [ atoms ]
+        N      NH1 -0.4700   1
+       HN        H  0.3100   1
+       CA      CT1  0.0700   1
+       HA      HB1  0.0900   1
+       CB      CT1  0.1350   2
+       HB      HA1  0.0900   2
+      CG1    CG302  0.1380   2
+     FG11     FGA3 -0.1210   2
+     FG12     FGA3 -0.1210   2
+     FG13     FGA3 -0.1210   2
+      CG2      CT3 -0.2700   2
+     HG21      HA3  0.0900   2
+     HG22      HA3  0.0900   2
+     HG23      HA3  0.0900   2
+        C        C  0.5100   3
+        O        O -0.5100   3
+  [ bonds ]
+        N    CA
+        C    CA
+        C    +N
+       CA    HA
+       CA    CB
+        N    HN
+       CB    HB
+       CB   CG1
+       CB   CG2
+      CG1  FG11
+      CG1  FG12
+      CG1  FG13
+      CG2  HG21
+      CG2  HG22
+      CG2  HG23
+        O     C
+  [ impropers ]
+        N    -C    CA    HN
+        C    CA    +N     O
+  [ cmap ]
+       -C     N    CA     C    +N

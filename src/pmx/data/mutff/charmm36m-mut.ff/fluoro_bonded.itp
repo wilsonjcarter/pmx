@@ -186,3 +186,37 @@ HGA1      CG311     CG312     FGA2      9         0.000000  0.753120  3        ;
 CG312     CG311     CG312     HGA7      9         0.000000  0.753120  3        ; QFL
 CG312     CG311     CG312     FGA2      9         0.000000  1.046000  3        ; QFL
 CG302     CG311     CG302     FGA3      9         0.000000  1.046000  3        ; HFL
+
+; --- appended 2026-10-04: 4,4,4-trifluorovaline (TFV) ------------------------
+; Harvested from the shipped V2TV topology, which carried these as explicit
+; per-interaction parameters rather than as types -- which is why NTL9 ran but was
+; NOT reproducible from core. B-state (trifluorovaline) values are used.
+;
+; The chi1 series is the one thing NOT taken from that topology. There the
+; backbone->CG1 torsions kept only a generic 3-fold term in the trifluoro state,
+; so VAL's 1/2/3-fold series was flattened: 4 terms (NH1/C -CT1-CT1-CG302 at
+; multiplicities 1 and 2) had no B-state counterpart at all. CF3 is sterically a
+; methyl, so CG302 is given the same series CT3 has in VAL.
+[ bondtypes ]
+CT1       CG302     1   0.15200000   209200.00 ; TFV
+CG302     FGA3      1   0.13400000   221752.00 ; TFV
+
+[ angletypes ]
+CT1       CT1       CG302     5   112.000000   446.433000   0.00000000        0.00 ; TFV
+HA1       CT1       CG302     5   110.100000   288.696000   0.21790000    18853.10 ; TFV
+CG302     CT1       CT3       5   112.000000   446.433000   0.00000000        0.00 ; TFV
+CT1       CG302     FGA3      5   112.000000   351.456000   0.23570000    25104.00 ; TFV
+FGA3      CG302     FGA3      5   107.000000   987.424000   0.21550000    25104.00 ; TFV
+
+[ dihedraltypes ]
+CT1       CT1       CG302     FGA3      9     0.000000   0.650800   3 ; TFV
+HA1       CT1       CG302     FGA3      9     0.000000   0.661100   3 ; TFV
+CT3       CT1       CG302     FGA3      9     0.000000   0.650800   3 ; TFV
+HB1       CT1       CT1       CG302     9     0.000000   0.836800   3 ; TFV, mirrors HB1-CT1-CT1-CT3
+CG302     CT1       CT3       HA3       9     0.000000   0.836800   3 ; TFV, mirrors CT3-CT1-CT3-HA3
+NH1       CT1       CT1       CG302     9     0.000000   0.753120   1 ; TFV chi1, mirrors CT3-CT1-CT1-NH1
+NH1       CT1       CT1       CG302     9     0.000000   0.251040   2 ; TFV chi1
+NH1       CT1       CT1       CG302     9     0.000000   2.468560   3 ; TFV chi1
+C         CT1       CT1       CG302     9   180.000000   0.585760   1 ; TFV chi1, mirrors C-CT1-CT1-CT3
+C         CT1       CT1       CG302     9   180.000000   1.087840   2 ; TFV chi1
+C         CT1       CT1       CG302     9   180.000000   1.380720   3 ; TFV chi1
