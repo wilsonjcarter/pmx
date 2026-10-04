@@ -98,19 +98,30 @@ def mutate(m, mut_resid, mut_resname, ff, mut_chain=None,
     # get the correct mtp file
     mtp_file = get_mtp_file(residue, ff)
 
+    # Molecule.moltype comes from the hardcoded name sets in pmx.library, so a
+    # residue the generative engine built is 'unknown' there.  Ask the force field
+    # instead -- exactly as get_mtp_file does -- or the dispatch below matches no
+    # branch at all.  That used to fall straight through and return None having
+    # changed nothing: ABA53->ATB "succeeded" and wrote back a pure ABA residue,
+    # so twelve GB1 all-to-all edges were silent zero-dG no-ops.
+    moltype = residue.moltype
+    if moltype == 'unknown':
+        from .utils import residuetype_from_ff, get_ff_path
+        moltype = residuetype_from_ff(residue.resname, get_ff_path(ff=ff)) or moltype
+
     # Terminal residue deletion -- a residue morph through the generative core:
     # the neighbour morphs internal->terminus (an ordinary build_hybrid_residue
     # graph map, emitted into nsaa.{rtp,mtp}), the target is dummified at
     # gen_hybrid_top.  No pre-built XdeC/XdeN library, no bespoke structure prep.
     if mut_resname.upper() == 'DEL':
-        if residue.moltype != 'protein':
+        if moltype != 'protein':
             raise RuntimeError("Terminal deletion is only supported for "
                                "protein residues")
         from .covalent import delete_terminal
         delete_terminal(m2, del_resid=mut_resid, ff=ff, del_chain=mut_chain,
                         inplace=True, verbose=verbose)
     # Mutation if Protein
-    elif residue.moltype == 'protein':
+    elif moltype == 'protein':
         # PTM aliases (P1/P2, me1/2/3), a direct PTM/NSAA target name, or an
         # --itp fragment go through the generative engine (covalent.mutate),
         # which builds the hybrid on the fly and accumulates it into nsaa.{rtp,
@@ -129,8 +140,13 @@ def mutate(m, mut_resid, mut_resname, ff, mut_chain=None,
         # --generative override all go through the generative engine; otherwise
         # use the shipped hybrid.
         target = ptm.target_for(residue.resname, mut_resname)
+        # The shipped 20x20 library is indexed by the SOURCE's one-letter code, so
+        # it cannot serve a non-canonical source however ordinary the target is:
+        # ABA->LEU used to reach _convert_aa_name('ABA') and die on KeyError.
+        source_is_classic = library._canonical_code(residue.resname) is not None
         if target is None and (itp is not None or generative or reverse
                                or is_terminal
+                               or not source_is_classic
                                or not _is_classic_mutation(mut_resname)):
             target = mut_resname
         if target is not None:
@@ -144,10 +160,17 @@ def mutate(m, mut_resid, mut_resname, ff, mut_chain=None,
             apply_aa_mutation(m=m2, residue=residue, new_aa_name=new_aa_name,
                               mtp_file=mtp_file, refB=refB, verbose=verbose)
     # Mutation if DNA or RNA
-    elif residue.moltype in ['dna', 'rna']:
+    elif moltype in ['dna', 'rna']:
         new_nuc_name = mut_resname.upper()
         apply_nuc_mutation(m=m2, residue=residue, new_nuc_name=new_nuc_name,
                            mtp_file=mtp_file, verbose=verbose)
+    else:
+        # Never fall through silently.  Doing nothing and returning the model
+        # unchanged is indistinguishable from success to every caller.
+        raise ValueError(
+            "Cannot mutate residue %s%s: pmx classifies it as moltype %r and the "
+            "force field does not identify it as protein, DNA or RNA either."
+            % (residue.resname, residue.id, residue.moltype))
 
     if inplace is False:
         return m2
