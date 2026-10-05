@@ -250,6 +250,88 @@ def _force_backbone(res1, res2, heavy_pairs, method):
     return forced + kept
 
 
+# The alchemical anchor.  Forcing the backbone to map by name (above) pins CA, but it
+# does NOT constrain what the atoms hanging off CA map to: FindMCS maximises
+# common-substructure SIZE, and _force_backbone only discards pairs that collide with
+# a forced index.  So the MCS is free to match from the TIP of a side chain and slide
+# the whole chain by a bond -- ATB(CB) pairs with HFL(CG) because that lines the two
+# CF3 groups up and buys more matched atoms than the chemically correct CB<->CB.
+_ANCHOR = "CA"
+
+
+def _graph_depth(res, root: str = _ANCHOR) -> Dict[int, int]:
+    """Bond-graph distance of every atom from *root*; ``{}`` if *root* is absent."""
+    idx = {}
+    for i, a in enumerate(res.atoms):
+        idx.setdefault(_canon_name(a.name), i)
+    if root not in idx:
+        return {}
+    adj: Dict[int, set] = {i: set() for i in range(len(res.atoms))}
+    for i, a in enumerate(res.atoms):
+        for nb in (getattr(a, "bonds", None) or []):
+            j = _index_of(res, nb)
+            if j is not None:
+                adj[i].add(j)
+                adj[j].add(i)
+    depth = {idx[root]: 0}
+    queue = [idx[root]]
+    while queue:
+        u = queue.pop(0)
+        for v in adj[u]:
+            if v not in depth:
+                depth[v] = depth[u] + 1
+                queue.append(v)
+    return depth
+
+
+def _enforce_anchor_depth(res1, res2, heavy_pairs, method):
+    """Drop mapped pairs whose atoms sit at different bond distances from CA.
+
+    A hybrid residue carries ONE bond list, and bond *existence* cannot be made
+    state-dependent (only bonded parameters morph).  So a pair at unequal depth is
+    un-representable: the atom would have to be bonded straight to CA in one state and
+    one bond further out in the other.  The bond-union then resolves the impossible
+    constraint differently depending on which residue is state A -- an extra bond on CA
+    (five substituents) when the shorter residue is A, or a side chain whose only path
+    to the backbone runs through a dummy when the longer one is.  Either way the TARGET
+    end state stops being the target residue, while the source state stays correct.
+
+    Dropping the pair is the safe override: both atoms simply become dummies on their
+    own side, which is a valid (if larger) alchemical path.
+    """
+    d1 = _graph_depth(res1)
+    d2 = _graph_depth(res2)
+    if not d1 or not d2:
+        return heavy_pairs
+
+    kept, dropped = [], []
+    for i, j in heavy_pairs:
+        if method.get(i) == "backbone":
+            kept.append((i, j))
+            continue
+        a, b = d1.get(i), d2.get(j)
+        if a is None or b is None or a == b:
+            kept.append((i, j))
+        else:
+            dropped.append((i, j, a, b))
+
+    if dropped:
+        logger.warning(
+            "map_residues: MCS anchor break detected, %s -> %s: %d of %d mapped "
+            "pairs sit at different bond distances from %s, so the MCS has matched "
+            "from the tip and slid the chain. Overriding: these pairs are dropped and "
+            "the atoms become dummies on their own side. Keeping them would leave the "
+            "target end state not equal to the target residue, because a hybrid has a "
+            "single bond list and bond existence is not state-dependent.",
+            getattr(res1, "resname", "?"), getattr(res2, "resname", "?"),
+            len(dropped), len(heavy_pairs), _ANCHOR)
+        for i, j, a, b in dropped:
+            logger.warning("map_residues:   override %s (d=%d) <-> %s (d=%d)",
+                           res1.atoms[i].name, a, res2.atoms[j].name, b)
+            method.pop(i, None)
+    return kept
+
+
 def _h_neighbors(res, i) -> List[int]:
     out = []
     for nb in getattr(res.atoms[i], "bonds", []):
@@ -347,6 +429,7 @@ def map_residues(res1, res2, method: str = "auto",
         for i, _ in heavy_pairs:
             method_used[i] = "mcs"
         heavy_pairs = _force_backbone(res1, res2, heavy_pairs, method_used)
+        heavy_pairs = _enforce_anchor_depth(res1, res2, heavy_pairs, method_used)
         h_pairs = _map_hydrogens(res1, res2, heavy_pairs, method_used)
         pairs = heavy_pairs + h_pairs
     else:
