@@ -96,3 +96,37 @@
 [ dihedraltypes ]
    CG321      CT1        C        N     9   180.000000    11.506000     2 ; from CT1 C N CP1, ALLOW PRO
    CG321      CT1        C        N     9     0.000000     1.255200     4 ; from CT1 C N CP1, ALLOW PRO
+
+; ---------------------------------------------------------------------------
+;   PART 3  CHARMM<->CGenFF junction at the GACE cap (CD=CT2 to CZ=CG314)
+; ---------------------------------------------------------------------------
+; Second through-bond crossing CHARMM(protein)/CGenFF: the glycine-acetyl cap
+; bonds CD (CT2, CHARMM36) to CZ (CG314, CGenFF). PART 1 covers only the
+; CT1-CG321 backbone junction, and ffbonded.itp carries CG314 bonds to every
+; CGenFF partner (CG2O1/CG2O3/CG311/CG321/CG331) but NOT to CT2 -- so every GSH
+; / GACE topology failed with "No default Bond types for interaction" against
+; the core tree. These are the terms the unversioned showcase ff/ lineage
+; carried inline; ported here so core is the single source of truth.
+; Bonded terms are NOT charge-scaled, so this block is identical in the plain
+; and ECC trees.
+
+[ bondtypes ]
+   CG314      CT2     1   0.15380000    186188.00
+
+[ angletypes ]
+     CT2    CG314     HGA1     5   110.100000   288.696000   0.21790000     18853.10
+     CT2    CG314    NG3P3     5   110.000000   566.513600   0.00000000         0.00
+   CG2O3    CG314      CT2     5   108.000000   435.136000   0.00000000         0.00
+   CG314      CT2      CT2     5   113.500000   488.272800   0.25610000      9338.69
+   CG314      CT2      HA2     5   110.100000   279.742240   0.21790000     18853.10
+
+[ dihedraltypes ]
+   CG2O3    CG314      CT2      CT2     9     0.000000     0.836800     3
+   CG2O3    CG314      CT2      HA2     9     0.000000     0.836800     3
+   CG314      CT2      CT2      HA2     9     0.000000     0.815880     3
+     CT2    CG314    NG3P3     HGP2     9     0.000000     0.418400     3
+    HGA1    CG314      CT2      CT2     9     0.000000     0.815880     3
+    HGA1    CG314      CT2      HA2     9     0.000000     0.815880     3
+   NG3P3    CG314      CT2      CT2     9     0.000000     0.836800     3
+   NG3P3    CG314      CT2      HA2     9     0.000000     0.836800     3
+   OG2D2    CG2O3    CG314      CT2     9   180.000000     0.209200     6
