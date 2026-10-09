@@ -1,4 +1,101 @@
 [ bondtypes ]
+; i    j   func      b0          kb
+ 2C   c3     1    0.15354   191540.0
+ SH       Zn2+_tip3p     1   0.232     16736.00
+ NB       Zn2+_tip3p     1   0.207     16736.00
+
+[ angletypes ]
+;  i    j    k   func      th0          cth
+ HC   2C   c3     1   109.680000   362.080000
+ hc   c3   2C     1   109.680000   362.080000
+ 2C   c3   c3     1   112.630000   500.990000
+ c3   2C    C     1   111.430000   505.090000
+ SH      Zn2+_tip3p       SH     1   111.770000   836.800000
+ CT     SH       Zn2+_tip3p     1    95.000000   167.360000
+ Zn2+_tip3p      SH       Zn2+_tip3p     1   103.800000   836.800000
+ CR      NB       Zn2+_tip3p     1   120.650000   167.360000
+ CV      NB       Zn2+_tip3p     1   125.980000   167.360000
+ CC      NB       Zn2+_tip3p     1   120.650000   167.360000
+ SH      Zn2+_tip3p       NB     1   108.110000   836.800000
+ NA      Zn2+_tip3p       NB     1   107.850000   836.800000
+
+[ dihedraltypes ]
+;   i    j    k    l   func     phi0        cp        mult
+ HC   2C   c3   hc     9      0.00     0.50208     3
+ HC   2C   c3   c3     9      0.00     0.54392     3
+ 2C  c3    c3   hx     9      0.00     0.65084     3
+ 2C  c3    c3   nz     9      0.00     3.34720     3
+ 2C  c3    c3    c     9      0.00     0.00000     0
+ 2C  c3    c3    c     9      0.00     0.16736     2
+ 2C  c3    c3    c     9    180.00     1.92464     1
+ c3   c3   2C    C     9      0.00     0.00000     0
+ c3   c3   2C    C     9      0.00     0.16736     2
+ c3   c3   2C    C     9    180.00     1.92464     1
+ hc   c3   2C    C     9      0.00     0.54392     3
+ c3   2C    C    O     9      0.00     0.00000     1 ; from protein
+ c3   2C    C    N     9       0.0     0.17573     4 ; from protein
+ c3   2C    C    N     9     180.0     0.35564     3 ; from protein
+ c3   2C    C    N     9     180.0     3.53548     2 ; from protein
+ c3   2C    C    N     9     180.0     2.54806     1 ; from protein
+ X    Zn2+_tip3p   SH    X     9       0           0       3 ;
+ X    Zn2+_tip3p   NB    X     9       0           0       3 ;
+
+[ bondtypes ]
+;  i    j   func      b0         kb
+   c3   hc    1    0.10962   288910.0
+   c3   c3    1    0.15354   191540.0
+   c3   hx    1    0.10911   295270.0
+   c3   nz    1    0.14843   199840.0
+   c3    c    1    0.15270   196520.0
+   nz   hn    1    0.10271   371820.0
+    c    o    1    0.12190   494210.0
+
+[ angletypes ]
+;   i    j    k   func      th0         cth
+   c3    c    o    1   122.900000   639.730000
+   c3   c3    c    1   111.430000   505.090000
+   c3   c3   c3    1   112.630000   500.990000
+   c3   c3   hc    1   109.680000   362.080000
+   c3   c3   hx    1   110.280000   361.250000
+   c3   c3   nz    1   111.840000   542.410000
+   c3   nz   hn    1   111.180000   460.830000
+   hc   c3   c3    1   109.680000   362.080000
+   hc   c3   hc    1   107.730000   299.570000
+   hn   nz   hn    1   108.540000   393.710000
+   hx   c3    c    1   108.590000   365.850000
+   hx   c3   nz    1   107.960000   399.490000
+   nz   c3    c    1   108.230000   553.040000
+    o    c    o    1   130.160000   878.140000
+
+[ dihedraltypes ]
+;    i    j    k    l   func     phi0        cp      mult
+   c3   c3    c    o     9      0.00     2.84512     1
+   c3   c3    c    o     9    180.00     0.83680     2
+   c3   c3    c    o     9    180.00     1.84096     3
+   c3   c3   c3    c     9      0.00     0.00000     0
+   c3   c3   c3    c     9      0.00     0.16736     2
+   c3   c3   c3    c     9    180.00     1.92464     1
+   c3   c3   c3   c3     9      0.00     2.17568     3
+   c3   c3   c3   hc     9      0.00     0.54392     3
+   c3   c3   c3   hx     9      0.00     0.65084     3
+   c3   c3   c3   nz     9      0.00     3.34720     3
+   c3   c3   nz   hn     9      0.00     0.65084     3
+   hc   c3   c3    c     9      0.00     0.65084     3
+   hc   c3   c3   c3     9      0.00     0.54392     3
+   hc   c3   c3   hc     9      0.00     0.50208     3
+   hc   c3   c3   hx     9      0.00     0.65084     3
+   hc   c3   c3   nz     9      0.00     0.65084     3
+   hn   nz   c3    c     9      0.00     0.65084     3
+   hx   c3    c    o     9    180.00     0.00000     2
+   hx   c3   nz   hn     9      0.00     0.45606     3
+   nz   c3    c    o     9    180.00     0.00000     2
+
+[ dihedraltypes ]
+; improper from source
+;    i    j    k    l   func     phi0        cp      mult
+   c3    o    c    o     4    180.00     4.60240     2
+
+[ bondtypes ]
        C        C      1    0.15250000    259408.000
        C       CA      1    0.14090000    392459.200
        C       CB      1    0.14190000    374049.600
@@ -1390,3 +1487,296 @@
        X       SH       2C        X      9     0.0000000     1.0460000      3
        X       2C       2C        X      9     0.0000000     0.6508444      3
        X       O2       CO       O2      4   180.0000000    43.9320000      2
+ ; phosphorylated amino acid bonded parameters
+ [ bondtypes ]
+   HO     OQ      1   0.09600   462750.4
+   OP     P       1   0.14800   439320.0
+   OQ     P       1   0.16100   192464.0
+   OR     P       1   0.16100   192464.0
+   C      OR      1   0.13230   376560.0
+   CT     OR      1   0.14100   267776.0
+   OT     P       1   0.14800   439320.0
+   OV     P       1   0.16100   192464.0
+   C      OV      1   0.13230   376560.0
+   CT     OV      1   0.14100   267776.0
+   OX     P       1   0.14800   439320.0
+   OZ     P       1   0.16100   192464.0
+   C      OZ      1   0.13230   376560.0
+   CT     OZ      1   0.14100   267776.0
+   CG     CT      1   0.15100   265265.6
+   CG     CA      1   0.14000   392459.2
+   3C     OZ      1   0.14100   267776.0
+   3C     OR      1   0.14100   267776.0
+   2C     OR      1   0.14100   267776.0
+   2C     OZ      1   0.14100   267776.0
+   NA     P       1   0.18400   209200.0
+
+ [ angletypes ]
+   OP     P      OP      1   119.900000   1171.520000
+   OP     P      OQ      1   108.230000   753.120000
+   OQ     P      OR      1   108.230000   753.120000
+   OQ     P      OQ      1   108.230000   753.120000
+   OR     P      OR      1   102.600000   753.120000
+   OR     P      OP      1   108.230000   836.800000
+   HO     OQ     P       1   113.280000   836.800000
+   C      OR     P       1   120.500000   836.800000
+   CA     C      OR      1   120.000000   585.760000
+   CT     OR     P       1   120.500000   836.800000
+   CT     CT     OR      1   109.500000   418.400000
+   H1     CT     OR      1   109.500000   418.400000
+   OT     P      OT      1   119.900000   1171.520000
+   OV     P      OV      1   102.600000   753.120000
+   OV     P      OT      1   108.230000   836.800000
+   C      OV     P       1   120.500000   836.800000
+   CA     C      OV      1   120.000000   585.760000
+   CT     OV     P       1   120.500000   836.800000
+   CT     CT     OV      1   109.500000   418.400000
+   H1     CT     OV      1   109.500000   418.400000
+   OX     P      OX      1   119.900000   1171.520000
+   OZ     P      OZ      1   102.600000   753.120000
+   OZ     P      OX      1   108.230000   836.800000
+   C      OZ     P       1   120.500000   836.800000
+   CA     C      OZ      1   120.000000   585.760000
+   CT     OZ     P       1   120.500000   836.800000
+   CT     CT     OZ      1   109.500000   418.400000
+   H1     CT     OZ      1   109.500000   418.400000
+   CA     CG     CT      1   120.000000   585.760000
+   CA     CA     CG      1   120.000000   527.184000
+   CA     CG     CA      1   120.000000   527.184000
+   CG     CA     HA      1   120.000000   418.400000
+   CG     CT     HC      1   109.500000   418.400000
+   CX     CT     CG      1   114.000000   527.184000
+   CW     NA     P       1   125.100000   641.825600
+   NA     P      OQ      1   102.380000   358.987200
+   CT     3C     OR      1   109.500000   418.400000
+   CT     3C     OZ      1   109.500000   418.400000
+   H1     3C     OR      1   109.500000   418.400000
+   H1     3C     OZ      1   109.500000   418.400000
+   H1     2C     OR      1   109.500000   418.400000
+   H1     2C     OZ      1   109.500000   418.400000
+   2C     OZ     P       1   120.500000   836.800000
+   2C     OR     P       1   120.500000   836.800000
+   3C     OR     P       1   120.500000   836.800000
+   3C     OZ     P       1   120.500000   836.800000
+   CX     3C     OZ      1   109.500000   418.400000
+   CX     3C     OR      1   109.500000   418.400000
+   CX     2C     OZ      1   109.500000   418.400000
+   CX     2C     OR      1   109.500000   418.400000
+   CW     NA     P       1   125.100000   641.825600
+   ; CR     NA     P       1   125.100000   641.825600
+   NA     P      O2      1   102.380000   358.987200
+   NA     P      OH      1   102.380000   358.987200
+   CX     CT     OR      1   109.500000   418.400000
+   CX     CT     OZ      1   109.500000   418.400000
+
+ [ dihedraltypes ]
+   N     CX    CT    CG     9       0.00        0.63636     1
+   N     CX    CT    CG     9     180.00        0.72294     2
+   N     CX    CT    CG     9       0.00        2.05159     3
+   N     CX    CT    CG     9     180.00        0.18891     4
+   N     CX    2C    OR     9       0.00        2.37906     1
+   N     CX    2C    OR     9       0.00        8.93597     2
+   N     CX    2C    OR     9       0.00        2.21229     3
+   N     CX    2C    OR     9     180.00        4.18950     4
+   N     CX    3C    OR     9       0.00        6.77027     1
+   N     CX    3C    OR     9       0.00       15.00892     2
+   N     CX    3C    OR     9     180.00        1.59915     3
+   N     CX    3C    OR     9     180.00        4.83665     4
+   CX    CT    CG    CA     9     180.00        6.74576     1
+   CX    CT    CG    CA     9       0.00        2.79708     2
+   CX    CT    CG    CA     9       0.00        3.39369     3
+   CX    CT    CG    CA     9       0.00        0.25109     4
+   OR    P     OQ    HO     9     180.00       12.06222     1
+   OR    P     OQ    HO     9       0.00       35.20526     2
+   OR    P     OQ    HO     9     180.00        5.38123     3
+   OR    P     OQ    HO     9       0.00       15.94578     4
+   CA    C     OV    P      9       0.00        8.27933     1
+   CA    C     OV    P      9     180.00        3.44243     2
+   CA    C     OV    P      9     180.00       17.27542     3
+   CA    C     OV    P      9       0.00        2.31161     4
+   CX    2C    OR    P      9     180.00        3.00609     1
+   CX    2C    OR    P      9       0.00        5.21295     2
+   CX    2C    OR    P      9       0.00        1.17680     3
+   CX    2C    OR    P      9     180.00        2.92440     4
+   CX    3C    OR    P      9     180.00        5.10304     1
+   CX    3C    OR    P      9       0.00        1.18759     2
+   CX    3C    OR    P      9       0.00        5.54944     3
+   CX    3C    OR    P      9       0.00        0.20089     4
+   CA    C     OR    P      9     180.00       75.20862     1
+   CA    C     OR    P      9     180.00        5.69583     2
+   CA    C     OR    P      9     180.00        5.67655     3
+   CA    C     OR    P      9       0.00        2.38213     4
+   C     OV    P     OT     9     180.00        2.00173     3
+   2C    OR    P     OP     9       0.00        1.29707     3
+   3C    OR    P     OP     9       0.00        0.71002     3
+   C     OR    P     OP     9       0.00        7.60965     3
+   N     CX    2C    OZ     9     180.00       19.89947     1
+   N     CX    2C    OZ     9       0.00       12.31996     2
+   N     CX    2C    OZ     9       0.00       17.51174     3
+   N     CX    2C    OZ     9       0.00        4.28257     4
+   CX    2C    OZ    P      9     180.00       40.83589     1
+   CX    2C    OZ    P      9     180.00       21.84067     2
+   CX    2C    OZ    P      9       0.00        3.76755     3
+   CX    2C    OZ    P      9     180.00        8.73878     4
+   2C    OZ    P     OX     9       0.00        5.77715     3
+   N     CX    3C    OZ     9     180.00       10.57207     1
+   N     CX    3C    OZ     9       0.00       11.97848     2
+   N     CX    3C    OZ     9       0.00        9.90740     3
+   N     CX    3C    OZ     9       0.00       13.77820     4
+   CX    3C    OZ    P      9     180.00       16.15077     1
+   CX    3C    OZ    P      9     180.00        8.00087     2
+   CX    3C    OZ    P      9       0.00       18.24650     3
+   CX    3C    OZ    P      9     180.00        0.84157     4
+   3C    OZ    P     OX     9     180.00        3.73454     3
+   ; CC    NA    P     OP     9     180.00        0.09003     3
+   CW    NA    P     OP     9       0.00        0.76049     3
+   NA    P     OQ    HO     9     180.00        4.10069     1
+   NA    P     OQ    HO     9       0.00        7.28030     2
+   NA    P     OQ    HO     9       0.00        1.66067     3
+   NA    P     OQ    HO     9       0.00        0.12575     4
+   H1    2C    OZ    P      9       0.00        0.00000     1
+   H1    2C    OZ    P      9       0.00        0.00000     2
+   H1    2C    OZ    P      9       0.00        0.00000     3
+   H1    2C    OZ    P      9       0.00        0.00000     4
+   H1    3C    OZ    P      9       0.00        0.00000     1
+   H1    3C    OZ    P      9       0.00        0.00000     2
+   H1    3C    OZ    P      9       0.00        0.00000     3
+   H1    3C    OZ    P      9       0.00        0.00000     4
+   H1    3C    OR    P      9       0.00        0.00000     1
+   H1    3C    OR    P      9       0.00        0.00000     2
+   H1    3C    OR    P      9       0.00        0.00000     3
+   H1    3C    OR    P      9       0.00        0.00000     4
+   CT    3C    OZ    P      9       0.00        0.00000     1
+   CT    3C    OZ    P      9       0.00        0.00000     2
+   CT    3C    OZ    P      9       0.00        0.00000     3
+   CT    3C    OZ    P      9       0.00        0.00000     4
+   CT    3C    OR    P      9       0.00        0.00000     1
+   CT    3C    OR    P      9       0.00        0.00000     2
+   CT    3C    OR    P      9       0.00        0.00000     3
+   CT    3C    OR    P      9       0.00        0.00000     4
+   HC    CT    3C    OZ     9       0.00        0.00000     1
+   HC    CT    3C    OZ     9       0.00        0.00000     2
+   HC    CT    3C    OZ     9       0.00        0.00000     3
+   HC    CT    3C    OZ     9       0.00        0.00000     4
+   HC    CT    3C    OR     9       0.00        0.00000     1
+   HC    CT    3C    OR     9       0.00        0.00000     2
+   HC    CT    3C    OR     9       0.00        0.00000     3
+   HC    CT    3C    OR     9       0.00        0.00000     4
+   H1    2C    OR    P      9       0.00        0.00000     1
+   H1    2C    OR    P      9       0.00        0.00000     2
+   H1    2C    OR    P      9       0.00        0.00000     3
+   H1    2C    OR    P      9       0.00        0.00000     4
+   2C    OR    P     OQ     9       0.00        0.00000     1
+   2C    OR    P     OQ     9       0.00        0.00000     2
+   2C    OR    P     OQ     9       0.00        0.00000     3
+   2C    OR    P     OQ     9       0.00        0.00000     4
+   3C    OR    P     OQ     9       0.00        0.00000     1
+   3C    OR    P     OQ     9       0.00        0.00000     2
+   3C    OR    P     OQ     9       0.00        0.00000     3
+   3C    OR    P     OQ     9       0.00        0.00000     4
+   C     OR    P     OQ     9       0.00        0.00000     1
+   C     OR    P     OQ     9       0.00        0.00000     2
+   C     OR    P     OQ     9       0.00        0.00000     3
+   C     OR    P     OQ     9       0.00        0.00000     4
+   OP    P     OQ    HO     9       0.00        0.00000     1
+   OP    P     OQ    HO     9       0.00        0.00000     2
+   OP    P     OQ    HO     9       0.00        0.00000     3
+   OP    P     OQ    HO     9       0.00        0.00000     4
+   CA    CA    CG    CA     9     180.00        0.00000     2
+   HA    CA    CG    CA     9     180.00        0.00000     2
+   CA    CG    CA    HA     9     180.00        0.00000     2
+   HC    CT    CG    CA     9     180.00        0.00000     2
+   CT    CG    CA    CA     9     180.00        0.00000     2
+   CT    CG    CA    HA     9     180.00        0.00000     2
+   CW    NA    P     OQ     9       0.00        0.00000     3
+   CC    NA    P     OQ     9       0.00        0.00000     3
+   CR    NA    P     OQ     9       0.00        0.00000     3
+   CW    NA    P     O2     9       0.00        1.00416     3
+   CR    NA    P     O2     9       0.00        0.00000     3
+   CC    NA    P     OH     9       0.00        6.06680     2
+   CR    NA    P     OH     9       0.00        0.00000     2
+   CC    NA    P     O2     9       0.00        1.00416     3
+   CW    NA    P     OH     9       0.00        6.06680     2
+   CR    NA    P     OH     9       0.00        0.00000     2
+
+ ; improper dihedrals
+ [ dihedraltypes ]
+   CA    CG    CA    HA     4     180.00        4.60240     2
+   CR    CW    NA    P      4     180.00        4.60240     2
+   CR    CC    NA    P      4     180.00        4.60240     2
+   CA       CA       CG       CT      4   180.0000000     4.6024000      2 ; new phos
+   CA       CA        C       OR      4   180.0000000     4.6024000      2 ; new phos
+   CA       CA        C       OV      4   180.0000000     4.6024000      2 ; new phos
+
+; xFP phenoxide deprotonated Tyr (TYM) -- amber14sb-q-mut (alpha-C = CX)
+; ring-internal: GAFF (frcmod.xFPchromophores.2022); junction: this FF's Tyr analog.
+
+[ bondtypes ]
+; i  j  func  b0(nm)   kb
+cc cd   1   0.13729   419153.1 ; frcmod cc-cd
+cd cd   1   0.14278   351288.6 ; frcmod cd-cd
+c  cc   1   0.14676   310452.8 ; frcmod cc-c
+cc ha   1   0.10837   292126.9 ; frcmod cc-ha
+cd ha   1   0.10837   292126.9 ; frcmod cd-ha
+CT cd   1   0.15015   280160.6 ; frcmod cd-CX analog (CB-CG junction)
+
+[ angletypes ]
+; i  j  k  func  th0      cth
+cd cd cc   1   114.190   570.698 ; frcmod cd-cd-cc
+cd cd ha   1   121.070   394.133 ; frcmod cd-cd-ha
+cd cc ha   1   121.760   405.848 ; frcmod cd-cc-ha
+cc cd ha   1   121.760   405.848 ; gaff sym cd-cc-ha
+c  cc cd   1   121.350   544.757 ; frcmod c-cc-cd
+c  cc ha   1   116.640   392.459 ; frcmod c-cc-ha
+cc c  cc   1   115.840   540.573 ; frcmod cc-c-cc
+cc c  o    1   123.930   578.229 ; frcmod cc-c-o
+cd cd cd   1   120.000   527.184 ; amber CA-CA-CA analog
+CX CT cd   1   114.000   527.184 ; amber CX-CT-CA analog (CA-CB-CG)
+HC CT cd   1   109.500   418.400 ; amber CA-CT-HC analog (HB-CB-CG)
+CT cd cd   1   120.000   585.760 ; amber CA-CA-CT analog (CB-CG-CD)
+
+[ dihedraltypes ] ; proper
+; i  j  k  l  func  phase   kd     pn
+X  cc cd X    9   180.00   16.73600   2 ; frcmod X-cc-cd-X
+X  cd cd X    9   180.00   16.73600   2 ; frcmod X-cd-cd-X
+X  cc c  X    9   180.00   12.02900   2 ; frcmod X-cc-c-X
+X  CT cd X    9     0.00    0.00000   2 ; CB-CG rotation (matches amber X-CA-CT-X=0)
+; --- chi1 + CB-CG specifics mirrored from this FF's Tyr (CA->cd) ---
+N  CX CT cd   9   180.00   0.0292880   4
+N  CX CT cd   9     0.00   0.8033280   3
+N  CX CT cd   9   180.00   1.2133600   2
+N  CX CT cd   9   180.00   0.0502080   1
+N3 CX CT cd   9   180.00   0.0292880   4
+N3 CX CT cd   9     0.00   0.8033280   3
+N3 CX CT cd   9   180.00   1.2133600   2
+N3 CX CT cd   9   180.00   0.0502080   1
+C  CX CT cd   9   180.00   0.0502080   4
+C  CX CT cd   9     0.00   0.8033280   3
+C  CX CT cd   9   180.00   1.9622960   2
+C  CX CT cd   9     0.00   0.2301200   1
+CX CT cd cd   9   180.00   0.2008320   4
+CX CT cd cd   9     0.00   0.0000000   3
+CX CT cd cd   9   180.00   0.2886960   2
+CX CT cd cd   9     0.00   0.0000000   1
+
+[ dihedraltypes ] ; improper
+; i  j  k  l  func  phase   kd      pn
+X  X  cd ha   4   180.00    4.60240   2 ; ring CH (frcmod X-X-cd-ha)
+X  X  cc ha   4   180.00    4.60240   2 ; ring CH (frcmod X-X-cc-ha)
+cd cd cd CT   4   180.00    4.60240   2 ; CG center (amber CA-CA-CA-CT analog)
+cc cc c  o    4   180.00   43.93200   2 ; CZ=O center (frcmod X-X-c-o)
+
+
+; ==== cq quinoid Cz for TYM (clones of c-terms; only cq-o=0.130) ====
+[ bondtypes ]
+  cq  cc  1  0.14676  310452.8 ; frcmod cc-c
+  cq  o  1  0.13000  494210.0
+[ angletypes ]
+  cq  cc  cd  1  121.350  544.757 ; frcmod c-cc-cd
+  cq  cc  ha  1  116.640  392.459 ; frcmod c-cc-ha
+  cc  cq  cc  1  115.840  540.573 ; frcmod cc-c-cc
+  cc  cq  o  1  123.930  578.229 ; frcmod cc-c-o
+[ dihedraltypes ]
+  X  cc  cq  X  9  180.00  12.02900  2 ; frcmod X-cc-c-X
+[ dihedraltypes ]
+  cc  cc  cq  o  4  180.00  43.93200  2 ; CZ=O center (frcmod X-X-c-o)

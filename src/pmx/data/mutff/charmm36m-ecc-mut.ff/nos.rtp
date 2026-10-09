@@ -1,0 +1,179 @@
+; nos.rtp -- bound-state endpoint residues for NOS / SONOS cross-links, charmm36m-mut.
+;
+; RECONSTRUCTED 2026-08-06.  These three residues were local additions to the
+; vendored merged.rtp and were lost when that file was reverted to its upstream
+; state (they are in neither upstream wilsonjcarter/pmx@5061936b nor any snapshot).
+; Without them `pmx mutate --react` fails with
+;     KeyError: Residue 'CN0' not found ...
+; because covalent/target.py:from_rtp resolves the *endpoint* residue, and a
+; hybrid library (nsaa.rtp/mutres.rtp) cannot supply it.  They live here, in a
+; topic file, so a future revert or regeneration of merged.rtp cannot take them
+; again -- ffparser.load_ff_rtp merges every non-hybrid *.rtp in the FF dir.
+;
+; PROVENANCE -- these are not re-derived, they are read back out of builds that ran:
+;   CN0, KN0  state-B columns of the working 2026-07-13 NOS topology
+;             ~/projects/2026_cnos/CNOS/fe_calcs/1e8i/nos_formation/pmxtop.top
+;             (hybrids C2CN "CSO -> CN0" and L2KN "LSN -> KN0")
+;   KS0       state-B columns of [ L2KS ] "LYS -> KS0" in the bundle
+;             ~/Desktop/pmx_covalent_showcases/ff/charmm36m-mut.ff/nsaa.mtp
+;   bonds/impropers/cmap  the same hybrids' [ bonds ]/[ impropers ]/[ cmap ],
+;             restricted to the state-B branch of each split atom and renamed
+;             (SG2 -> SG, CB2 -> CB, HB12 -> HB1, NZ2 -> NZ, CE2 -> CE, ...).
+;
+; CONSISTENCY -- CN0 sums to -0.154 and KN0 to +0.154, i.e. the bridged pair is
+; neutral and the charge transferred across the S-O...N bridge is +/-0.154.  That
+; the two independently-extracted halves cancel is the check that the extraction
+; is right.  KS0 (+0.286) is the SONOS N-S endpoint; its Cys partner carries the
+; balancing -0.286.
+;
+; TYPING -- these use the protein types CT2/HA2 for CB/HB, not the CGenFF
+; CG321/HGA2 that merged.rtp gives CSO.  That is deliberate and matches the
+; builds that ran: it is why the CT1-CT2-S bonded terms resolve for these
+; residues without the protein<->CGenFF link parameters.
+;
+; NOT ECC-SCALED.  Charges are the charmm36m-mut values.  Do not copy this file
+; into charmm36m-ecc-mut without deciding the ECC treatment first -- see
+; FF_LAYOUT_PROPOSAL.md section 8, where SEP/TPO/PTR/MLY/M3L are already carrying
+; unscaled charges in the ECC force field.
+
+[ bondedtypes ]
+; Col 1: Type of bond
+; Col 2: Type of angles
+; Col 3: Type of proper dihedrals
+; Col 4: Type of improper dihedrals
+; Col 5: Generate all dihedrals if 1, only heavy atoms of 0.
+; Col 6: Number of excluded neighbors for nonbonded interactions
+; Col 7: Generate 1,4 interactions between pairs of hydrogens if 1
+; Col 8: Remove propers over the same bond as an improper if it is 1
+; bonds  angles  dihedrals  impropers all_dihedrals nrexcl HH14 RemoveDih
+     1       5          9        2        1           3      1     0
+
+
+[ CN0 ] ; Cys bound state of the NOS bridge: SG-OD, OD bonds on to Lys NZ
+ [ atoms ]
+      N     NH1     -0.47000  1
+     HN     H        0.31000  2
+     CA     CT1      0.07000  3
+     HA     HB1      0.09000  4
+     CB     CT2     -0.11400  5
+    HB1     HA2      0.09000  6
+    HB2     HA2      0.09000  7
+     SG     SG301    0.00500  8
+     OD     OG301   -0.22500  9
+      C     C        0.51000  10
+      O     O       -0.51000  11
+ [ bonds ]
+      N      HN
+      N      CA
+     CA      HA
+     CA      CB
+     CA       C
+     CB     HB1
+     CB     HB2
+     CB      SG
+     SG      OD
+      C       O
+      C      +N
+ [ impropers ]
+      N      -C      CA      HN
+      C      CA      +N       O
+ [ cmap ]
+     -C       N      CA       C      +N
+
+
+[ KN0 ] ; Lys bound state of the NOS bridge: NZ keeps one H and bonds to Cys OD
+ [ atoms ]
+      N     NH1     -0.47000  1
+     HN     H        0.31000  2
+     CA     CT1      0.07000  3
+     HA     HB1      0.09000  4
+     CB     CT2     -0.18000  5
+    HB1     HA2      0.09000  6
+    HB2     HA2      0.09000  7
+     CG     CT2     -0.18000  8
+    HG1     HA2      0.09000  9
+    HG2     HA2      0.09000  10
+     CD     CT2     -0.18000  11
+    HD1     HA2      0.09000  12
+    HD2     HA2      0.09000  13
+     CE     CT2      0.05100  14
+    HE1     HA2      0.09000  15
+    HE2     HA2      0.09000  16
+     NZ     NG311   -0.36100  17
+    HZ1     HGP1     0.28400  18
+      C     C        0.51000  19
+      O     O       -0.51000  20
+ [ bonds ]
+      N      HN
+      N      CA
+     CA      HA
+     CA      CB
+     CA       C
+     CB     HB1
+     CB     HB2
+     CB      CG
+     CG     HG1
+     CG     HG2
+     CG      CD
+     CD     HD1
+     CD     HD2
+     CD      CE
+     CE     HE1
+     CE     HE2
+     CE      NZ
+     NZ     HZ1
+      C       O
+      C      +N
+ [ impropers ]
+      N      -C      CA      HN
+      C      CA      +N       O
+ [ cmap ]
+     -C       N      CA       C      +N
+
+
+[ KS0 ] ; Lys bound state of a SONOS N-S cross-link: NZ carries no H and bonds to S
+ [ atoms ]
+      N     NH1     -0.47000  1
+     HN     H        0.31000  2
+     CA     CT1      0.07000  3
+     HA     HB1      0.09000  4
+     CB     CT2     -0.18000  5
+    HB1     HA2      0.09000  6
+    HB2     HA2      0.09000  7
+     CG     CT2     -0.18000  8
+    HG1     HA2      0.09000  9
+    HG2     HA2      0.09000  10
+     CD     CT2     -0.18000  11
+    HD1     HA2      0.09000  12
+    HD2     HA2      0.09000  13
+     CE     CT2      0.31200  14
+    HE1     HA2      0.09000  15
+    HE2     HA2      0.09000  16
+     NZ     NG301   -0.20600  17
+      C     C        0.51000  18
+      O     O       -0.51000  19
+ [ bonds ]
+      N      HN
+      N      CA
+     CA      HA
+     CA      CB
+     CA       C
+     CB     HB1
+     CB     HB2
+     CB      CG
+     CG     HG1
+     CG     HG2
+     CG      CD
+     CD     HD1
+     CD     HD2
+     CD      CE
+     CE     HE1
+     CE     HE2
+     CE      NZ
+      C       O
+      C      +N
+ [ impropers ]
+      N      -C      CA      HN
+      C      CA      +N       O
+ [ cmap ]
+     -C       N      CA       C      +N

@@ -122,3 +122,41 @@ amber99_143       22.99000      ; NaS Smith parameters
 amber99_144       35.45000      ; ClS Smith parameters
 amber99_356       22.99000      ; Na+ Joung spce
 amber99_351       35.45000      ; Cl- Joung spce
+c            12.01 ; gaff c; sp2 carbonyl/phenoxide C-O carbon (TYM phenoxide)
+cc           12.01 ; gaff cc; sp2 aromatic C (TYM phenoxide)
+cd           12.01 ; gaff cd; sp2 aromatic C (TYM phenoxide)
+o            16.00 ; gaff o; sp2 phenoxide O (TYM phenoxide)
+ha           1.008 ; gaff ha; aromatic H (TYM phenoxide)
+
+; ---- pmx: phosaa (pSer/pThr) atom types [ported from amber99sb-star-ildn-mut]
+
+; ---- pmx: GACE (glutathionyl cap) GAFF atom types
+
+; ---- pmx: GACE (glutathionyl cap) GAFF atom types
+      c3     12.01
+      hc     1.008
+      hn     1.008
+      hx     1.008
+      nz     14.01
+DUM_P    30.970000
+
+; phosaa14SB phospho atom types
+ OQ       16.00
+ OR       16.00
+ OT       16.00
+ OV       16.00
+ OX       16.00
+ OZ       16.00
+ CG       12.01
+DUM_OQ   16.000000
+DUM_OP   16.000000
+DUM_OX   16.000000
+DUM_OT   16.000000
+DUM_c3   12.010000
+DUM_hc    1.008000
+DUM_hx    1.008000
+DUM_nz   14.010000
+DUM_hn    1.008000
+DUM_c    12.010000
+DUM_o    16.000000
+cq            12.01 ; gaff c; sp2 carbonyl/phenoxide C-O carbon (TYM phenoxide)

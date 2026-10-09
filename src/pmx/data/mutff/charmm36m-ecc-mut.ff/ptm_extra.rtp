@@ -1,0 +1,150 @@
+; ptm_extra.rtp -- ported from charmm36m-mut 2026-10-05.
+; ECC scales the charges of a CHARGED side chain by 0.75 and leaves the
+; backbone (N HN CA HA C O) alone; a neutral residue is copied verbatim,
+; which is exactly how the existing tree treats ALA/SER/ASN/... (they are
+; byte-identical between the two trees).
+; Net charge after scaling: a -1 side chain becomes -0.75, matching ASP/GLU.
+
+[ bondedtypes ]
+; Col 1: Type of bond
+; Col 2: Type of angles
+; Col 3: Type of proper dihedrals
+; Col 4: Type of improper dihedrals
+; Col 5: Generate all dihedrals if 1, only heavy atoms of 0.
+; Col 6: Number of excluded neighbors for nonbonded interactions
+; Col 7: Generate 1,4 interactions between pairs of hydrogens if 1
+; Col 8: Remove propers over the same bond as an improper if it is 1
+; bonds  angles  dihedrals  impropers all_dihedrals nrexcl HH14 RemoveDih
+     1       5          9        2        1           3      1     0
+
+
+[ CIR ]
+; citrulline
+  [ atoms ]
+        N      NH1 -0.4700   1
+       HN        H  0.3100   1
+       CA      CT1  0.0700   1
+       HA      HB1  0.0900   1
+       CB    CG321 -0.1800   2
+      HB1     HGA2  0.0900   2
+      HB2     HGA2  0.0900   2
+       CG    CG321 -0.1800   3
+      HG2     HGA2  0.0900   3
+      HG1     HGA2  0.0900   3
+       CD    CG321 -0.0370   4
+      HD1     HGA2  0.0900   4
+      HD2     HGA2  0.0900   4
+       NE    NG2S1 -0.3090   4
+       HE     HGP1  0.2670   4
+       CZ    CG2O6  0.2840   4
+       OH    OG2D1 -0.4500   4
+       NH    NG2S2 -0.5250   4
+      HH1     HGP1  0.2950   4
+      HH2     HGP1  0.2950   4
+        C        C  0.5100   5
+        O        O -0.5100   5
+  [ bonds ]
+        N    CA
+        C    CA
+        C    +N
+       CA    HA
+       CA    CB
+        N    HN
+       CB   HB1
+       CB   HB2
+       CB    CG
+       CG   HG2
+       CG   HG1
+       CG    CD
+       CD   HD1
+       CD   HD2
+       CD    NE
+       NE    HE
+       NE    CZ
+       CZ    NH
+       NH   HH1
+       NH   HH2
+        O     C
+       CZ    OH
+  [ impropers ]
+       CZ    NE    NH    OH
+        N    -C    CA    HN
+        C    CA    +N     O
+  [ cmap ]
+       -C     N    CA     C    +N
+
+[ HYP ]
+; hydroxyproline
+  [ atoms ]
+        N        N -0.2900   1
+       CD      CP3  0.0000   1
+      HD1      HA2  0.0900   1
+      HD2      HA2  0.0900   1
+       CA      CP1  0.0200   1
+       HA      HB1  0.0900   1
+       CB      CP2 -0.1800   2
+      HB1      HA2  0.0900   2
+      HB2      HA2  0.0900   2
+       CG      CP2  0.1400   3
+       HG      HA1  0.0900   3
+       OE      OH1 -0.6600   3
+       HE        H  0.4300   3
+        C        C  0.5100   4
+        O        O -0.5100   4
+  [ bonds ]
+        C    CA
+        C    +N
+        N    CA
+       CA    CB
+       CG    CB
+       CG    CD
+       CD     N
+       HA    CA
+       CG    HG
+       CG    OE
+       OE    HE
+       CD   HD1
+       CD   HD2
+       CB   HB1
+       CB   HB2
+        O     C
+  [ impropers ]
+        N    -C    CA    CD
+        C    CA    +N     O
+  [ cmap ]
+       -C     N    CA     C    +N
+
+[ SNC ]
+; S-nitroso-cysteine
+  [ atoms ]
+        N      NH1 -0.4700   1
+       HN        H  0.3100   1
+       CA      CT1  0.0700   1
+       HA      HB1  0.0900   1
+       CB    CG321  0.0500   2
+      HB1     HGA2  0.0900   2
+      HB2     HGA2  0.0900   2
+       SG    SG311 -0.0230   2
+       ND    NG2D1 -0.1060   2
+       OE    OG2D1 -0.1010   2
+        C        C  0.5100   3
+        O        O -0.5100   3
+  [ bonds ]
+        N    CA
+        C    CA
+        C    +N
+       CA    HA
+       CA    CB
+        N    HN
+       CB   HB1
+       CB   HB2
+       CB    SG
+       SG    ND
+        O     C
+       ND    OE
+  [ impropers ]
+        N    -C    CA    HN
+        C    CA    +N     O
+  [ cmap ]
+       -C     N    CA     C    +N
+

@@ -1,0 +1,6 @@
+C2CD     5
+1   1   H   N   -C  CA
+1   5   HA  CA  N   C   CB1
+2   6   HB1  CB1  SG1  CA
+2   6   HB2  CB2  SG2  CA
+1   2   HG1 SG1  CB1  CA

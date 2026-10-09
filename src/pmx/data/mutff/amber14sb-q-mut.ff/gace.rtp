@@ -1,0 +1,46 @@
+[ bondedtypes ]
+; bond angle dih imp all_dih nrexcl HH14 remove_dih
+   1 1 9 4 1 3 1 0 0
+
+; GACE (GSH gamma-glutamyl cap) -- amber14 typing CG=2C, from amber14sb-q-ecc-mut.ff (net-neutral, ecc n/a)
+[ GACE ]
+ [ atoms ]
+    CG    2C          -0.088800     1
+   HG1    HC           0.026700     2
+   HG2    HC           0.026700     3
+    CD    c3          -0.097400     4
+   HD1    hc           0.086200     5
+   HD2    hc           0.086200     6
+    CZ    c3          -0.099700     7
+    HZ    hx           0.088700     8
+    N1    nz          -0.974000     9
+  HN11    hn           0.498000    10
+  HN12    hn           0.498000    11
+  HN13    hn           0.498000    12
+    C1     c           0.725000    13
+   O11     o          -0.651500    14
+   O12     o          -0.651500    15
+     C     C           0.597300    16
+     O     O          -0.567900    17
+
+ [ bonds ]
+    CG   HG1
+    CG   HG2
+    CG    CD
+    CG     C
+    CD   HD1
+    CD   HD2
+    CD    CZ
+    CZ    HZ
+    CZ    N1
+    CZ    C1
+    N1  HN11
+    N1  HN12
+    N1  HN13
+    C1   O11
+    C1   O12
+     C     O
+     C    +N
+
+ [ impropers ]
+    CG    +N     C     O

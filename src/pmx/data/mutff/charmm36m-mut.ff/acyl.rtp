@@ -1,0 +1,519 @@
+; acyl.rtp -- acyl-lysine residues for charmm36m-mut.
+; Restored 2026-08-06 verbatim from upstream wilsonjcarter/pmx@5061936b merged.rtp,
+; where they were present; they had been lost from the local vendored copy (which is
+; why the golden guard's lys2aly cases fail).  Kept in a topic file so a future
+; regeneration or revert of merged.rtp cannot silently take them again.
+[ bondedtypes ]
+; Col 1: Type of bond
+; Col 2: Type of angles
+; Col 3: Type of proper dihedrals
+; Col 4: Type of improper dihedrals
+; Col 5: Generate all dihedrals if 1, only heavy atoms of 0.
+; Col 6: Number of excluded neighbors for nonbonded interactions
+; Col 7: Generate 1,4 interactions between pairs of hydrogens if 1
+; Col 8: Remove propers over the same bond as an improper if it is 1
+; bonds  angles  dihedrals  impropers all_dihedrals nrexcl HH14 RemoveDih
+     1       5          9        2        1           3      1     0
+
+
+
+ [ ALY ]
+   [ atoms ]
+ 	    N   NH1   -0.470  0
+ 	   HN     H    0.310  1
+ 	   CA   CT1    0.070  2
+ 	   HA   HB1    0.090  3
+ 	   CB   CT2   -0.180  4
+ 	  HB1   HA2    0.090  5
+ 	  HB2   HA2    0.090  6
+ 	   CG   CT2   -0.180  7
+ 	  HG1   HA2    0.090  8
+ 	  HG2   HA2    0.090  9
+ 	   CD   CT2   -0.180 10
+ 	  HD1   HA2    0.090 11
+ 	  HD2   HA2    0.090 12
+ 	   CE   CT2   -0.020 13
+ 	  HE1   HA2    0.090 14
+ 	  HE2   HA2    0.090 15
+ 	   NZ   NH1   -0.470 16
+ 	  HZ     H    0.310 17
+ 	   CH     C    0.510 18
+ 	   OH     O   -0.510 19
+ 	  CH3   CT3   -0.270 20
+ 	 HH31   HA3    0.090 21
+ 	 HH32   HA3    0.090 22
+ 	 HH33   HA3    0.090 23
+ 	    C     C    0.510 24
+ 	    O     O   -0.510 25
+   [ bonds ]
+ 	   CB    CA
+ 	   CG    CB
+ 	   CD    CG
+ 	   CE    CD
+ 	   NZ    CE
+ 	    N    HN
+ 	    N    CA
+ 	    C    CA
+ 	    C    +N
+ 	   CA    HA
+ 	   CB   HB1
+ 	   CB   HB2
+ 	   CG   HG1
+ 	   CG   HG2
+ 	   CD   HD1
+ 	   CD   HD2
+ 	   CE   HE1
+ 	   CE   HE2
+ 	   NZ   HZ
+ 	   NZ    CH
+ 	   CH    OH
+ 	   CH   CH3
+ 	  CH3  HH31
+ 	  CH3  HH32
+ 	  CH3  HH33
+ 	    O     C
+   [ impropers ]
+ 	    N    -C    CA    HN
+ 	    C    CA    +N     O
+ 	   NZ    CH    CE   HZ
+ 	   CH   CH3    NZ    OH
+   [ cmap ]
+ 	   -C     N    CA     C    +N
+
+ [ BLY ]
+   [ atoms ]
+ 	    N   NH1   -0.470  0
+ 	   HN     H    0.310  1
+ 	   CA   CT1    0.070  2
+ 	   HA   HB1    0.090  3
+ 	   CB CG321   -0.180  4
+ 	  HB1  HGA2    0.090  5
+ 	  HB2  HGA2    0.090  6
+ 	   CG CG321   -0.180  7
+ 	  HG1  HGA2    0.090  8
+ 	  HG2  HGA2    0.090  9
+ 	   CD CG321   -0.180 10
+ 	  HD1  HGA2    0.090 11
+ 	  HD2  HGA2    0.090 12
+ 	   CE CG321   -0.020 13
+ 	  HE1  HGA2    0.090 14
+ 	  HE2  HGA2    0.090 15
+ 	   NZ NG2S1   -0.470 16
+ 	   HZ  HGP1    0.310 17
+ 	   CH CG2O1    0.510 18
+ 	   OH OG2D1   -0.510 19
+ 	   C2 CG321   -0.180 20
+ 	  H21  HGA2    0.090 21
+ 	  H22  HGA2    0.090 22
+ 	   C3 CG321   -0.180 23
+ 	  H31  HGA2    0.090 24
+ 	  H32  HGA2    0.090 25
+ 	  CH3 CG331   -0.270 26
+ 	 HH31  HGA3    0.090 27
+ 	 HH32  HGA3    0.090 28
+ 	 HH33  HGA3    0.090 29
+ 	    C     C    0.510 30
+ 	    O     O   -0.510 31
+   [ bonds ]
+ 	   CB    CA
+ 	   CG    CB
+ 	   CD    CG
+ 	   CE    CD
+ 	   NZ    CE
+ 	    N    HN
+ 	    N    CA
+ 	    C    CA
+ 	    C    +N
+ 	   CA    HA
+ 	   CB   HB1
+ 	   CB   HB2
+ 	   CG   HG1
+ 	   CG   HG2
+ 	   CD   HD1
+ 	   CD   HD2
+ 	   CE   HE1
+ 	   CE   HE2
+ 	   NZ    HZ
+ 	   NZ    CH
+ 	   CH    OH
+ 	   CH    C2
+ 	   C2   H21
+ 	   C2   H22
+ 	   C2    C3
+ 	   C3   H31
+ 	   C3 	H32
+ 	   C3	CH3
+ 	  CH3  HH31
+ 	  CH3  HH32
+ 	  CH3  HH33
+ 	    O     C
+   [ impropers ]
+ 	    N    -C    CA    HN
+ 	    C    CA    +N     O
+ 	   NZ    CH    CE    HZ
+ 	   ;CH    C2    NZ    OH
+   [ cmap ]
+ 	   -C     N    CA     C    +N
+
+
+
+ ; succinyllysine
+
+ [ FLY ]
+   [ atoms ]
+ 	    N   NH1   -0.470  0
+ 	   HN     H    0.310  1
+ 	   CA   CT1    0.070  2
+ 	   HA   HB1    0.090  3
+ 	   CB CG321   -0.180  4
+ 	  HB1  HGA2    0.090  5
+ 	  HB2  HGA2    0.090  6
+ 	   CG CG321   -0.180  7
+ 	  HG1  HGA2    0.090  8
+ 	  HG2  HGA2    0.090  9
+ 	   CD CG321   -0.180 10
+ 	  HD1  HGA2    0.090 11
+ 	  HD2  HGA2    0.090 12
+ 	   CE CG321   -0.020 13
+ 	  HE1  HGA2    0.090 14
+ 	  HE2  HGA2    0.090 15
+ 	   NZ NG2S1   -0.470 16
+ 	  HZ1  HGP1    0.320 17
+ 	   CH CG2O1    0.420 18
+ 	   OH OG2D1   -0.510 19
+ 	   HZ HGR52    0.080 23
+ 	    C     C    0.510 24
+ 	    O     O   -0.510 25
+   [ bonds ]
+ 	   CB    CA
+ 	   CG    CB
+ 	   CD    CG
+ 	   CE    CD
+ 	   NZ    CE
+ 	    N    HN
+ 	    N    CA
+ 	    C    CA
+ 	    C    +N
+ 	   CA    HA
+ 	   CB   HB1
+ 	   CB   HB2
+ 	   CG   HG1
+ 	   CG   HG2
+ 	   CD   HD1
+ 	   CD   HD2
+ 	   CE   HE1
+ 	   CE   HE2
+ 	   NZ   HZ1
+ 	   NZ    CH
+ 	   CH    OH
+ 	   CH    HZ
+ 	    O     C
+   [ impropers ]
+ 	    N    -C    CA    HN
+ 	    C    CA    +N     O
+ 	   NZ    CH    CE   HZ1
+ 	   ;CH    HZ    NZ    OH
+   [ cmap ]
+ 	   -C     N    CA     C    +N
+
+ ; acetyllysine
+
+ [ HIB ]
+   [ atoms ]
+ 	    N   NH1   -0.470  0
+ 	   HN     H    0.310  1
+ 	   CA   CT1    0.070  2
+ 	   HA   HB1    0.090  3
+ 	   CB CG321   -0.180  4
+ 	  HB1  HGA2    0.090  5
+ 	  HB2  HGA2    0.090  6
+ 	   CG CG321   -0.180  7
+ 	  HG1  HGA2    0.090  8
+ 	  HG2  HGA2    0.090  9
+ 	   CD CG321   -0.180 10
+ 	  HD1  HGA2    0.090 11
+ 	  HD2  HGA2    0.090 12
+ 	   CE CG321   -0.020 13
+ 	  HE1  HGA2    0.090 14
+ 	  HE2  HGA2    0.090 15
+ 	   NZ NG2S1   -0.515 16 ; mod
+ 	   HZ  HGP1    0.310 17 ; mod
+ 	   CH CG2O1    0.600 18 ; mod
+ 	   OH OG2D1   -0.475 19 ; mod
+ 	   C2 CG301	   0.230 20 ; mod
+ 	  CH3 CG331   -0.270 26
+ 	 HH31  HGA3    0.090 27
+ 	 HH32  HGA3    0.090 28
+ 	 HH33  HGA3    0.090 28
+ 	  CH4 CG331   -0.270 26
+ 	 HH41  HGA3    0.090 27
+ 	 HH42  HGA3    0.090 28
+ 	 HH43  HGA3    0.090 28
+ 	   OG OG311   -0.650  6 ; mod
+ 	   HG  HGP1    0.340  7 ; mod
+ 	    C     C    0.510 30
+ 	    O     O   -0.510 31
+   [ bonds ]
+ 	   CB    CA
+ 	   CG    CB
+ 	   CD    CG
+ 	   CE    CD
+ 	   NZ    CE
+ 	    N    HN
+ 	    N    CA
+ 	    C    CA
+ 	    C    +N
+ 	   CA    HA
+ 	   CB   HB1
+ 	   CB   HB2
+ 	   CG   HG1
+ 	   CG   HG2
+ 	   CD   HD1
+ 	   CD   HD2
+ 	   CE   HE1
+ 	   CE   HE2
+ 	   NZ    HZ
+ 	   NZ    CH
+ 	   CH    OH
+ 	   CH    C2
+ 	   C2   CH3
+ 	   C2  	CH4
+ 	   C2	OG
+ 	  CH3  HH31
+ 	  CH3  HH32
+ 	  CH3  HH33
+ 	  CH4  HH41
+ 	  CH4  HH42
+ 	  CH4  HH43
+ 	   OG	 HG
+ 	    O     C
+   [ impropers ]
+ 	    N    -C    CA    HN
+ 	    C    CA    +N     O
+ 	   NZ    CH    CE    HZ
+ 	   CH    C2    NZ    OH
+   [ cmap ]
+ 	   -C     N    CA     C    +N
+
+ [ KCR ]
+   [ atoms ]
+ 	    N   NH1   -0.470  0
+ 	   HN     H    0.310  1
+ 	   CA   CT1    0.070  2
+ 	   HA   HB1    0.090  3
+ 	   CB CG321   -0.180  4
+ 	  HB1  HGA2    0.090  5
+ 	  HB2  HGA2    0.090  6
+ 	   CG CG321   -0.180  7
+ 	  HG1  HGA2    0.090  8
+ 	  HG2  HGA2    0.090  9
+ 	   CD CG321   -0.180 10
+ 	  HD1  HGA2    0.090 11
+ 	  HD2  HGA2    0.090 12
+ 	   CE CG321   -0.032 13
+ 	  HE1  HGA2    0.090 14
+ 	  HE2  HGA2    0.090 15
+ 	   NZ NG2S1   -0.402 16
+ 	   HZ  HGP1    0.257 17
+ 	   CH CG2O1    0.378 18
+ 	   OH OG2D1   -0.555 19
+ 	   CX CG2DC1   0.050 20
+ 	   HX  HGA4    0.144 21
+ 	   CY CG2DC1  -0.127 22
+ 	   HY  HGA4    0.107 23
+ 	  CH3 CG331   -0.270 24
+ 	 HH31  HGA3    0.090 25
+ 	 HH32  HGA3    0.090 26
+ 	 HH33  HGA3    0.090 27
+ 	    C     C    0.510 28
+ 	    O     O   -0.510 29
+   [ bonds ]
+ 	    N    CA
+ 	    C    CA
+ 	    C    +N
+ 	   CA    HA
+ 	   CA    CB
+ 	    N    HN
+ 	   CB   HB1
+ 	   CB   HB2
+ 	   CB    CG
+ 	   CG   HG1
+ 	   CG   HG2
+ 	   CG    CD
+ 	   CD   HD1
+ 	   CD   HD2
+ 	   CD    CE
+ 	   CE   HE1
+ 	   CE   HE2
+ 	   CE    NZ
+ 	   NZ    HZ
+ 	   NZ    CH
+ 	   CH    CX
+ 	   CX    HX
+ 	   CY    HY
+ 	   CY   CH3
+ 	  CH3  HH31
+ 	  CH3  HH32
+ 	  CH3  HH33
+ 	    O     C
+ 	   CH    OH
+ 	   CX   CY
+   [ impropers ]
+ 	   CH    CX    NZ    OH
+ 	    N    -C    CA    HN
+ 	    C    CA    +N     O
+   [ cmap ]
+ 	   -C     N    CA     C    +N
+
+
+
+
+ ; propionyllysine
+
+ [ PLY ]
+   [ atoms ]
+ 	    N   NH1   -0.470  0
+ 	   HN     H    0.310  1
+ 	   CA   CT1    0.070  2
+ 	   HA   HB1    0.090  3
+ 	   CB CG321   -0.180  4
+ 	  HB1  HGA2    0.090  5
+ 	  HB2  HGA2    0.090  6
+ 	   CG CG321   -0.180  7
+ 	  HG1  HGA2    0.090  8
+ 	  HG2  HGA2    0.090  9
+ 	   CD CG321   -0.180 10
+ 	  HD1  HGA2    0.090 11
+ 	  HD2  HGA2    0.090 12
+ 	   CE CG321   -0.020 13
+ 	  HE1  HGA2    0.090 14
+ 	  HE2  HGA2    0.090 15
+ 	   NZ NG2S1   -0.470 16
+ 	   HZ  HGP1    0.310 17
+ 	   CH CG2O1    0.510 18
+ 	   OH OG2D1   -0.510 19
+ 	   C2 CG321   -0.180 20
+ 	  H21  HGA2    0.090 21
+ 	  H22  HGA2    0.090 22
+ 	  CH3 CG331   -0.270 23
+ 	 HH31  HGA3    0.090 24
+ 	 HH32  HGA3    0.090 25
+ 	 HH33  HGA3    0.090 26
+ 	    C     C    0.510 27
+ 	    O     O   -0.510 28
+   [ bonds ]
+ 	   CB    CA
+ 	   CG    CB
+ 	   CD    CG
+ 	   CE    CD
+ 	   NZ    CE
+ 	    N    HN
+ 	    N    CA
+ 	    C    CA
+ 	    C    +N
+ 	   CA    HA
+ 	   CB   HB1
+ 	   CB   HB2
+ 	   CG   HG1
+ 	   CG   HG2
+ 	   CD   HD1
+ 	   CD   HD2
+ 	   CE   HE1
+ 	   CE   HE2
+ 	   NZ   HZ
+ 	   NZ    CH
+ 	   CH    OH
+ 	   CH    C2
+ 	   C2   H21
+ 	   C2   H22
+ 	   C2   CH3
+ 	  CH3  HH31
+ 	  CH3  HH32
+ 	  CH3  HH33
+ 	    O     C
+   [ impropers ]
+ 	    N    -C    CA    HN
+ 	    C    CA    +N     O
+ 	   NZ    CH    CE   HZ
+ 	   ;CH   CH3    NZ    OH
+   [ cmap ]
+ 	   -C     N    CA     C    +N
+
+ ; butyryllysine
+
+ [ SLY ]
+   [ atoms ]
+ 	    N   NH1   -0.470  0
+ 	   HN     H    0.310  1
+ 	   CA   CT1    0.070  2
+ 	   HA   HB1    0.090  3
+ 	   CB CG321   -0.180  4
+ 	  HB1  HGA2    0.090  5
+ 	  HB2  HGA2    0.090  6
+ 	   CG CG321   -0.180  7
+ 	  HG1  HGA2    0.090  8
+ 	  HG2  HGA2    0.090  9
+ 	   CD CG321   -0.180 10
+ 	  HD1  HGA2    0.090 11
+ 	  HD2  HGA2    0.090 12
+ 	   CE CG321   -0.020 13
+ 	  HE1  HGA2    0.090 14
+ 	  HE2  HGA2    0.090 15
+ 	   NZ NG2S1   -0.470 16
+ 	   HZ  HGP1    0.310 17
+ 	   CH CG2O1    0.510 18
+ 	   OH OG2D1   -0.510 19
+ 	   C2 CG321   -0.180 20
+ 	  H21  HGA2    0.090 21
+ 	  H22  HGA2    0.090 22
+ 	   C3 CG321   -0.280 23
+ 	  H31  HGA2    0.090 24
+ 	  H32  HGA2    0.090 25
+ 	   CZ CG2O3    0.620 26
+ 	  OZ1 OG2D2   -0.760 27
+ 	  OZ2 OG2D2   -0.760 28
+ 	    C     C    0.510 30
+ 	    O     O   -0.510 31
+   [ bonds ]
+ 	   CB    CA
+ 	   CG    CB
+ 	   CD    CG
+ 	   CE    CD
+ 	   NZ    CE
+ 	    N    HN
+ 	    N    CA
+ 	    C    CA
+ 	    C    +N
+ 	   CA    HA
+ 	   CB   HB1
+ 	   CB   HB2
+ 	   CG   HG1
+ 	   CG   HG2
+ 	   CD   HD1
+ 	   CD   HD2
+ 	   CE   HE1
+ 	   CE   HE2
+ 	   NZ    HZ
+ 	   NZ    CH
+ 	   CH    OH
+ 	   CH    C2
+ 	   C2   H21
+ 	   C2   H22
+ 	   C2    C3
+ 	   C3   H31
+ 	   C3 	H32
+ 	   C3	 CZ
+ 	   CZ   OZ1
+ 	   CZ   OZ2
+ 	    O     C
+   [ impropers ]
+ 	    N    -C    CA    HN
+ 	    C    CA    +N     O
+ 	   NZ    CH    CE    HZ
+ 	   ;CH    C2    NZ    OH
+ 	   CZ    C3   OZ2   OZ1
+   [ cmap ]
+ 	   -C     N    CA     C    +N
+
+ ; formylated lysine
+

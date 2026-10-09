@@ -1,0 +1,14 @@
+
+; atom renaming specification
+; residue gromacs    forcefield
+MLY        HN          H
+MLZ        HN          H
+M3L        HN          H
+; ACE/NME cap H naming (H1/HA1 -> HH31) -- standardized across amber FFs
+  ACE        H1              HH31
+  ACE        H2              HH32
+  ACE        H3              HH33
+  NME        CA              CH3
+  NME        HA1             HH31
+  NME        HA2             HH32
+  NME        HA3             HH33

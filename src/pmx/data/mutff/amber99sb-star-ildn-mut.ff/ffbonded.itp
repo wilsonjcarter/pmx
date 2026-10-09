@@ -581,3 +581,137 @@ X   X   CA  H5       4      180.00     4.60240     2	; bsd.on C6H6 nmodes
 #define torsion_ASN_CA_CB_CG_ND2_mult5         0.0         0.543920        5  ; Proteins 78, 1950 (2010)
 #define torsion_ASN_CA_CB_CG_ND2_mult6         0.0        -0.443504        6  ; Proteins 78, 1950 (2010)
 
+
+; === phospho-tyrosine (pTyr) aromatic ring--phosphate linkage =================
+; The pTyr bridging oxygen is an aromatic-carbon ester: CA(ring)-OS-P.  pSer/pThr
+; use CT-OS (sp3) which amber already defines; these CA-* terms are unique to
+; pTyr and are absent from the amber protein ffbonded.  Ported verbatim from the
+; canonical amber phospho set (amber99sb-star-ildnp-q-mut.ff, Homeyer phosaa).
+[ bondtypes ]
+; i    j   func      b0          kb
+  CA     OS      1   0.13570   328527.7
+[ angletypes ]
+; i    j    k   func      th0          cth
+  CA     OS     P       1   120.500000   836.800000
+  CA     CA     OS      1   121.890000   594.462720
+[ dihedraltypes ]
+; i    j    k    l   func     phi0        cp        mult
+  CA    CA    OS    P      9     180.00        4.39320     2
+  CA    OS    P     O2     9     179.94        0.64978     1
+  CA    OS    P     O2     9     121.39        0.42374     2
+  CA    OS    P     O2     9     -18.00        0.96985     3
+  CA    OS    P     O2     9     -32.40        0.21422     4
+
+; === GACE/TYM GAFF bonded (ported inline from amber14sb-q-mut.ff, per the amber14sb guide) ===
+[ bondtypes ]
+ CT   c3     1    0.15354   191540.0
+   c3   hc    1    0.10962   288910.0
+   c3   c3    1    0.15354   191540.0
+   c3   hx    1    0.10911   295270.0
+   c3   nz    1    0.14843   199840.0
+   c3    c    1    0.15270   196520.0
+   nz   hn    1    0.10271   371820.0
+    c    o    1    0.12190   494210.0
+cc cd   1   0.13729   419153.1 ; frcmod cc-cd
+cd cd   1   0.14278   351288.6 ; frcmod cd-cd
+c  cc   1   0.14676   310452.8 ; frcmod cc-c
+cc ha   1   0.10837   292126.9 ; frcmod cc-ha
+cd ha   1   0.10837   292126.9 ; frcmod cd-ha
+CT cd   1   0.15015   280160.6 ; frcmod cd-CX analog (CB-CG junction)
+[ angletypes ]
+ HC   CT   c3     1   109.680000   362.080000
+ hc   c3   CT     1   109.680000   362.080000
+ CT   c3   c3     1   112.630000   500.990000
+ c3   CT    C     1   111.430000   505.090000
+   c3    c    o    1   122.900000   639.730000
+   c3   c3    c    1   111.430000   505.090000
+   c3   c3   c3    1   112.630000   500.990000
+   c3   c3   hc    1   109.680000   362.080000
+   c3   c3   hx    1   110.280000   361.250000
+   c3   c3   nz    1   111.840000   542.410000
+   c3   nz   hn    1   111.180000   460.830000
+   hc   c3   c3    1   109.680000   362.080000
+   hc   c3   hc    1   107.730000   299.570000
+   hn   nz   hn    1   108.540000   393.710000
+   hx   c3    c    1   108.590000   365.850000
+   hx   c3   nz    1   107.960000   399.490000
+   nz   c3    c    1   108.230000   553.040000
+    o    c    o    1   130.160000   878.140000
+cd cd cc   1   114.190   570.698 ; frcmod cd-cd-cc
+cd cd ha   1   121.070   394.133 ; frcmod cd-cd-ha
+cd cc ha   1   121.760   405.848 ; frcmod cd-cc-ha
+cc cd ha   1   121.760   405.848 ; gaff sym cd-cc-ha
+c  cc cd   1   121.350   544.757 ; frcmod c-cc-cd
+c  cc ha   1   116.640   392.459 ; frcmod c-cc-ha
+cc c  cc   1   115.840   540.573 ; frcmod cc-c-cc
+cc c  o    1   123.930   578.229 ; frcmod cc-c-o
+cd cd cd   1   120.000   527.184 ; amber CA-CA-CA analog
+CT CT cd   1   114.000   527.184 ; amber CT-CT-CA analog (CA-CB-CG)
+HC CT cd   1   109.500   418.400 ; amber CA-CT-HC analog (HB-CB-CG)
+CT cd cd   1   120.000   585.760 ; amber CA-CA-CT analog (CB-CG-CD)
+[ dihedraltypes ]
+ HC   CT   c3   hc     9      0.00     0.50208     3
+ HC   CT   c3   c3     9      0.00     0.54392     3
+ CT  c3    c3   hx     9      0.00     0.65084     3
+ CT  c3    c3   nz     9      0.00     3.34720     3
+ CT  c3    c3    c     9      0.00     0.00000     0
+ CT  c3    c3    c     9      0.00     0.16736     2
+ CT  c3    c3    c     9    180.00     1.92464     1
+ c3   c3   CT    C     9      0.00     0.00000     0
+ c3   c3   CT    C     9      0.00     0.16736     2
+ c3   c3   CT    C     9    180.00     1.92464     1
+ hc   c3   CT    C     9      0.00     0.54392     3
+   c3   c3    c    o     9      0.00     2.84512     1
+   c3   c3    c    o     9    180.00     0.83680     2
+   c3   c3    c    o     9    180.00     1.84096     3
+   c3   c3   c3    c     9      0.00     0.00000     0
+   c3   c3   c3    c     9      0.00     0.16736     2
+   c3   c3   c3    c     9    180.00     1.92464     1
+   c3   c3   c3   c3     9      0.00     2.17568     3
+   c3   c3   c3   hc     9      0.00     0.54392     3
+   c3   c3   c3   hx     9      0.00     0.65084     3
+   c3   c3   c3   nz     9      0.00     3.34720     3
+   c3   c3   nz   hn     9      0.00     0.65084     3
+   hc   c3   c3    c     9      0.00     0.65084     3
+   hc   c3   c3   c3     9      0.00     0.54392     3
+   hc   c3   c3   hc     9      0.00     0.50208     3
+   hc   c3   c3   hx     9      0.00     0.65084     3
+   hc   c3   c3   nz     9      0.00     0.65084     3
+   hn   nz   c3    c     9      0.00     0.65084     3
+   hx   c3    c    o     9    180.00     0.00000     2
+   hx   c3   nz   hn     9      0.00     0.45606     3
+   nz   c3    c    o     9    180.00     0.00000     2
+   c3    o    c    o     4    180.00     4.60240     2
+#define torsion_ASP_N_CA_CB_CG_mult1           0.0       -12.055           1  ; Proteins 78, 1950 (2010)
+#define torsion_ASP_N_CA_CB_CG_mult2           0.0        -5.066           2  ; Proteins 78, 1950 (2010)
+#define torsion_ASP_N_CA_CB_CG_mult3           0.0         0.259           3  ; Proteins 78, 1950 (2010)
+#define torsion_ASP_N_CA_CB_CG_mult4           0.0         1.026           4  ; Proteins 78, 1950 (2010)
+#define torsion_ASP_N_CA_CB_CG_mult5           0.0         0.547           5  ; Proteins 78, 1950 (2010)
+#define torsion_ASP_N_CA_CB_CG_mult6           0.0        -0.595           6  ; Proteins 78, 1950 (2010)
+#define torsion_ASP_CA_CB_CG_OD_mult2          0.0        -3.651           2  ; Proteins 78, 1950 (2010)
+#define torsion_ASP_CA_CB_CG_OD_mult4          0.0        -0.779           4  ; Proteins 78, 1950 (2010)
+#define torsion_ASP_CA_CB_CG_OD_mult6          0.0        -0.354           6  ; Proteins 78, 1950 (2010)
+#define torsion_PRO_CA_CB_CG_CD_mult3          0.0        4.3474000        3  ; Proteins 82, 195 (2014)
+#define torsion_HYP_N_CD_CG_O_mult3           30.0         5.5138          3  ; Proteins 82, 195 (2014)
+X  cc cd X    9   180.00   16.73600   2 ; frcmod X-cc-cd-X
+X  cd cd X    9   180.00   16.73600   2 ; frcmod X-cd-cd-X
+X  cc c  X    9   180.00   12.02900   2 ; frcmod X-cc-c-X
+X  CT cd X    9     0.00    0.00000   2 ; CB-CG rotation (matches amber X-CA-CT-X=0)
+X  X  cd ha   4   180.00    4.60240   2 ; ring CH (frcmod X-X-cd-ha)
+X  X  cc ha   4   180.00    4.60240   2 ; ring CH (frcmod X-X-cc-ha)
+cd cd cd CT   4   180.00    4.60240   2 ; CG center (amber CA-CA-CA-CT analog)
+cc cc c  o    4   180.00   43.93200   2 ; CZ=O center (frcmod X-X-c-o)
+
+; ==== cq quinoid Cz for TYM (clones of c-terms; only cq-o=0.130) ====
+[ bondtypes ]
+  cq  cc  1  0.14676  310452.8 ; frcmod cc-c
+  cq  o  1  0.13000  494210.0
+[ angletypes ]
+  cq  cc  cd  1  121.350  544.757 ; frcmod c-cc-cd
+  cq  cc  ha  1  116.640  392.459 ; frcmod c-cc-ha
+  cc  cq  cc  1  115.840  540.573 ; frcmod cc-c-cc
+  cc  cq  o  1  123.930  578.229 ; frcmod cc-c-o
+[ dihedraltypes ]
+  X  cc  cq  X  9  180.00  12.02900  2 ; frcmod X-cc-c-X
+[ dihedraltypes ]
+  cc  cc  cq  o  4  180.00  43.93200  2 ; CZ=O center (frcmod X-X-c-o)

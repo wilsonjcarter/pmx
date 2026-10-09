@@ -1,0 +1,239 @@
+[ bondedtypes ]
+; Col 1: Type of bond
+; Col 2: Type of angles
+; Col 3: Type of proper dihedrals
+; Col 4: Type of improper dihedrals
+; Col 5: Generate all dihedrals if 1, only heavy atoms of 0.
+; Col 6: Number of excluded neighbors for nonbonded interactions
+; Col 7: Generate 1,4 interactions between pairs of hydrogens if 1
+; Col 8: Remove propers over the same bond as an improper if it is 1
+; bonds  angles  dihedrals  impropers all_dihedrals nrexcl HH14 RemoveDih
+     1       5          9        2        1           3      1     0
+
+[ SEP ]
+  [ atoms ]
+	    N   NH1   -0.470  0
+	   HN     H    0.310  1
+	   CA   CT1    0.070  2
+	   HA   HB1    0.090  3
+	   CB   CT2   -0.080  4
+	  HB1   HA2    0.090  5
+	  HB2   HA2    0.090  6
+	   OG   ON2   -0.620  7
+	    P     P    1.500  8
+	  O1P   ON3   -0.820  9
+	  O2P   ON3   -0.820 10
+	  O3P   ON4   -0.680 11
+	  H3T   HN4    0.340 12
+	    C     C    0.510 13
+	    O     O   -0.510 14
+  [ bonds ]
+	   CB    CA
+	   OG    CB
+	    N    HN
+	    N    CA
+	    C    CA
+	    C    +N
+	   CA    HA
+	   CB   HB1
+	   CB   HB2
+	   OG     P
+	    P   O3P
+	  O3P   H3T
+	    P   O1P
+	    P   O2P
+	    O     C
+  [ impropers ]
+	    N    -C    CA    HN
+	    C    CA    +N     O
+  [ cmap ]
+	   -C     N    CA     C    +N
+
+
+
+; monoanionic phosphoserine
+
+[ PTR ]
+  [ atoms ]
+	    N   NH1   -0.470  0
+	   HN     H    0.310  1
+	   CA   CT1    0.070  2
+	   HA   HB1    0.090  3
+	   CB   CT2   -0.180  4
+	  HB1   HA2    0.090  5
+	  HB2   HA2    0.090  6
+	   CG    CA    0.000  7
+	  CD1    CA   -0.115  8
+	  HD1    HP    0.115  9
+	  CE1    CA   -0.210 10
+	  HE1    HP    0.210 11
+	   CZ    CA   -0.160 12
+	   OH  ON2B   -0.360 13
+	    P     P    1.400 14
+	  O3P   ON4   -0.760 15
+	  H3T   HN4    0.400 16
+	  O1P   ON3   -0.760 17
+	  O2P   ON3   -0.760 18
+	  CD2    CA   -0.115 19
+	  HD2    HP    0.115 20
+	  CE2    CA   -0.210 21
+	  HE2    HP    0.210 22
+	    C     C    0.510 23
+	    O     O   -0.510 24
+  [ bonds ]
+	   CB    CA
+	   CG    CB
+	  CD2    CG
+	  CE1   CD1
+	   CZ   CE2
+	   OH    CZ
+	    N    HN
+	    N    CA
+	    C    CA
+	    C    +N
+	   CA    HA
+	   CB   HB1
+	   CB   HB2
+	  CD1   HD1
+	  CD2   HD2
+	  CE1   HE1
+	  CE2   HE2
+	    P    OH
+	    P   O1P
+	    P   O2P
+	    P   O3P
+	  O3P   H3T
+	    O     C
+	  CD1    CG
+	  CE1    CZ
+	  CE2   CD2
+  [ impropers ]
+	    N    -C    CA    HN
+	    C    CA    +N     O
+  [ cmap ]
+	   -C     N    CA     C    +N
+
+[ YP1 ]
+  [ atoms ]
+        N   NH1   -0.470  0
+       HN     H    0.310  1
+       CA   CT1    0.070  2
+       HA   HB1    0.090  3
+       CB   CT2   -0.180  4
+      HB1   HA2    0.090  5
+      HB2   HA2    0.090  6
+       CG    CA    0.000  7
+      CD1    CA   -0.115  8
+      HD1    HP    0.115  9
+      CE1    CA   -0.115 10
+      HE1    HP    0.115 11
+       CZ    CA   -0.160 12
+       OH  ON2B   -0.360 13
+       P1     P    1.400 14
+       O2   ON4   -0.760 15
+       H2   HN4    0.400 16
+       O3   ON3   -0.760 17
+       O4   ON3   -0.760 18
+      CD2    CA   -0.115 19
+      HD2    HP    0.115 20
+      CE2    CA   -0.115 21
+      HE2    HP    0.115 22
+        C     C    0.510 23
+        O     O   -0.510 24
+  [ bonds ]
+       CB    CA
+       CG    CB
+      CD2    CG
+      CE1   CD1
+       CZ   CE2
+       OH    CZ
+        N    HN
+        N    CA
+        C    CA
+        C    +N
+       CA    HA
+       CB   HB1
+       CB   HB2
+      CD1   HD1
+      CD2   HD2
+      CE1   HE1
+      CE2   HE2
+       OH    P1
+       P1    O2
+       P1    O3
+       P1    O4
+       O2    H2
+        O     C
+      CD1    CG
+      CE1    CZ
+      CE2   CD2
+  [ impropers ]
+        N    -C    CA    HN
+        C    CA    +N     O
+  [ cmap ]
+       -C     N    CA     C    +N
+
+
+
+; dianionic phosphotyrosine
+
+[ YP2 ]
+  [ atoms ]
+        N   NH1   -0.470  0
+       HN     H    0.310  1
+       CA   CT1    0.070  2
+       HA   HB1    0.090  3
+       CB   CT2   -0.180  4
+      HB1   HA2    0.090  5
+      HB2   HA2    0.090  6
+       CG    CA    0.000  7
+      CD1    CA   -0.115  8
+      HD1    HP    0.115  9
+      CE1    CA   -0.210 10
+      HE1    HP    0.210 11
+       CZ    CA   -0.280 12
+       OH  ON2B   -0.280 13
+       P1     P    1.440 14
+       O2   ON3   -0.960 15
+       O3   ON3   -0.960 16
+       O4   ON3   -0.960 17
+      CD2    CA   -0.115 18
+      HD2    HP    0.115 19
+      CE2    CA   -0.210 20
+      HE2    HP    0.210 21
+        C     C    0.510 22
+        O     O   -0.510 23
+  [ bonds ]
+       CB    CA
+       CG    CB
+      CD2    CG
+      CE1   CD1
+       CZ   CE2
+       OH    CZ
+        N    HN
+        N    CA
+        C    CA
+        C    +N
+       CA    HA
+       CB   HB1
+       CB   HB2
+      CD1   HD1
+      CD2   HD2
+      CE1   HE1
+      CE2   HE2
+       OH    P1
+       P1    O2
+       P1    O3
+       P1    O4
+        O     C
+      CD1    CG
+      CE1    CZ
+      CE2   CD2
+  [ impropers ]
+        N    -C    CA    HN
+        C    CA    +N     O
+  [ cmap ]
+       -C     N    CA     C    +N
+
+
+
