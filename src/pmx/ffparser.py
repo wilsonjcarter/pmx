@@ -33,51 +33,96 @@
 """docs to be added
 """
 
+import os
 import sys
 from .library import _aliases, pmx_data_file
-from .parser import parseList, kickOutComments, readSection
+from .parser import parseList, kickOutComments, readSection, readSectionAll
+
+
+# Recognised sub-sections inside an RTP residue block.  Any other '[ ... ]'
+# header is a residue name, except the file-level directives in _RTP_SKIP.
+# This is the full set of GROMACS RTP residue sub-sections: pmx only builds
+# entries from atoms/bonds/dihedrals/impropers/cmap, but 'angles' and
+# 'exclusions' must still be recognised so they neither leak in as spurious
+# residues nor prematurely terminate a residue block (dropping the dihedrals
+# and impropers that follow them, as happened for phosphorylated residues).
+_RTP_SUBSECTIONS = ('atoms', 'bonds', 'exclusions', 'angles', 'dihedrals',
+                    'impropers', 'cmap')
+_RTP_SKIP = ('bondedtypes',)
+
+
+def _apply_alias(resname, name):
+    """Map an RTP atom name through the residue's alias table, if any.
+
+    Lone '+'/'-' bond continuation markers are passed through untouched.
+    """
+    if name in ('+', '-'):
+        return name
+    aliases = _aliases.get(resname)
+    if aliases and name in aliases:
+        return aliases[name]
+    return name
 
 
 class RTPParser:
 
-    def __init__(self, filename=None):
+    def __init__(self, filename=None, resolve_aliases=False):
         self.keys = []
         self.entries = {}
         self.lines = []
         self.filename = ''
         self.__cur_id = 0
+        # When True, atom names are mapped through library._aliases to the
+        # PDB-style form (e.g. HB1 -> 1HB).  Off by default: entries then carry
+        # the RTP-native names, which is what every modern consumer wants.  Only
+        # the legacy structure-matching paths that look up atoms renamed via
+        # atom.make_long_name (forcefield.assign_ffamber99sb_params and the
+        # generate_hybrid_residue script) need resolve_aliases=True.
+        self.resolve_aliases = resolve_aliases
         if filename is not None:
             self.parse(filename)
 
     def parse(self, filename):
         filename = pmx_data_file(filename)
         self.filename = filename
-        l = open(filename).readlines()
-        self.lines = kickOutComments(l, ';')
-        self.__get_residue_names()
-        for key in self.keys:
-            rtp_lines = self.__read_residue_entry(key)
-            # read atoms
-            al = readSection(rtp_lines, '[ atoms ]', '[')
-            atoms = self.__read_rtp_atoms(key, al)
-            # read bonds
-            bl = readSection(rtp_lines, '[ bonds ]', '[')
-            bonds = self.__read_rtp_bonds(key, bl)
-            # read dihedrals
-            dl = readSection(rtp_lines, '[ dihedrals ]', '[')
-            diheds = self.__read_rtp_dihedrals(key, dl)
-            # read impropers
-            il = readSection(rtp_lines, '[ impropers ]', '[')
-            improps = self.__read_rtp_impropers(key, il)
-            # read cmap (only for charmm)
-            cmap = readSection(rtp_lines, '[ cmap ]', '[')
+        with open(filename) as fp:
+            self.lines = kickOutComments(fp.readlines(), ';')
+        self.keys = []
+        self.entries = {}
 
-            self.entries[key] = {
-                'atoms': atoms,
-                'bonds': bonds,
-                'diheds': diheds,
-                'improps': improps,
-                'cmap': cmap
+        # Single linear pass: walk the (comment-stripped) lines once, tracking
+        # the current residue and sub-section.  Data lines are dropped straight
+        # into the matching bucket.  This replaces the old O(n_lines * n_keys)
+        # scheme that re-scanned the whole file (plus an O(n) list.index) for
+        # every residue -- ~11 s on the merged CHARMM RTP, now sub-second.
+        resname = None      # residue we are currently inside (None outside one)
+        section = None      # sub-section we are currently inside
+        raw = None          # {sub-section: [raw data lines]} for that residue
+        collected = []      # (resname, raw) in file order
+
+        for line in self.lines:
+            if line.startswith('['):
+                name = line[1:-1].strip()
+                if name in _RTP_SUBSECTIONS:
+                    section = name
+                elif name in _RTP_SKIP:
+                    resname, section = None, None
+                else:
+                    resname, section = name, None
+                    raw = {s: [] for s in _RTP_SUBSECTIONS}
+                    collected.append((name, raw))
+            elif resname is not None and section is not None:
+                raw[section].append(line)
+
+        for name, raw in collected:
+            if name not in self.entries:
+                self.keys.append(name)
+            self.entries[name] = {
+                'atoms': self.__read_rtp_atoms(name, raw['atoms']),
+                'bonds': self.__read_rtp_bonds(name, raw['bonds']),
+                'diheds': self.__read_rtp_torsion(name, raw['dihedrals']),
+                'improps': self.__read_rtp_torsion(name, raw['impropers']),
+                'cmap': raw['cmap'],
                 }
 
     def __str__(self):
@@ -114,6 +159,8 @@ class RTPParser:
         entr = self.entries[self.keys[self.__cur_id]]
         self.__cur_id += 1
         return name, entr
+
+    __next__ = next  # Python 3 iterator protocol
 
     def write(self, out_file):
         if not hasattr(out_file, "write"):
@@ -291,38 +338,13 @@ class RTPParser:
                 assert len(atoms) == 4
                 model.improper_list.append(atoms + [imp[4]])
 
-    def __get_residue_names(self):
-        self.keys = []
-        for line in self.lines:
-            if line.strip().startswith('['):
-                if line.strip()[1:-1].strip() not in \
-                       ['atoms', 'bonds', 'dihedrals', 'impropers',
-                        'bondedtypes']:
-                    self.keys.append(line.strip()[1:-1].strip())
-
-    def __read_residue_entry(self, key):
-        r = []
-        for line in self.lines:
-            if line.strip()[1:-1].strip() == key:
-                idx = self.lines.index(line)
-        for line in self.lines[idx+1:]:
-            if line.strip().startswith('['):
-                if line.strip()[1:-1].strip() not in \
-                       ['atoms', 'bonds', 'dihedrals', 'impropers', 'cmap']:
-                    break
-                else:
-                    r.append(line)
-            else:
-                r.append(line)
-        return r
-
     def __read_rtp_atoms(self, resname, lines):
         atoms = []
+        alias = self.resolve_aliases
         for line in lines:
             entr = line.split()
-            if resname in _aliases:
-                if entr[0] in _aliases[resname]:
-                    entr[0] = _aliases[resname][entr[0]]
+            if alias:
+                entr[0] = _apply_alias(resname, entr[0])
             entr[2] = float(entr[2])
             entr[3] = int(entr[3])
             atoms.append(entr)
@@ -330,70 +352,31 @@ class RTPParser:
 
     def __read_rtp_bonds(self, resname, lines):
         bonds = []
+        alias = self.resolve_aliases
         for line in lines:
             entr = line.split()
-            if entr[0] not in ['+', '-']:
-                if resname in _aliases:
-                    if entr[0] in _aliases[resname]:
-                        entr[0] = _aliases[resname][entr[0]]
-            if entr[1] not in ['+', '-']:
-                if resname in _aliases:
-                    if entr[1] in _aliases[resname]:
-                        entr[1] = _aliases[resname][entr[1]]
+            if alias:
+                entr[0] = _apply_alias(resname, entr[0])
+                entr[1] = _apply_alias(resname, entr[1])
             bonds.append(entr)
         return bonds
 
-    def __read_rtp_dihedrals(self, resname, lines):
-        diheds = []
+    def __read_rtp_torsion(self, resname, lines):
+        # Shared reader for dihedrals and impropers: four atom names (alias-
+        # mapped only when resolve_aliases is set) plus an optional trailing
+        # parameter/directive column, padded to '' so every entry has length 5.
+        torsions = []
+        alias = self.resolve_aliases
         for line in lines:
             entr = line.split()
-            if entr[0] not in ['+', '-']:
-                if resname in _aliases:
-                    if entr[0] in _aliases[resname]:
-                        entr[0] = _aliases[resname][entr[0]]
-            if entr[1] not in ['+', '-']:
-                if resname in _aliases:
-                    if entr[1] in _aliases[resname]:
-                        entr[1] = _aliases[resname][entr[1]]
-            if entr[2] not in ['+', '-']:
-                if resname in _aliases:
-                    if entr[2] in _aliases[resname]:
-                        entr[2] = _aliases[resname][entr[2]]
-            if entr[3] not in ['+', '-']:
-                if resname in _aliases:
-                    if entr[3] in _aliases[resname]:
-                        entr[3] = _aliases[resname][entr[3]]
+            if alias:
+                for i in range(4):
+                    entr[i] = _apply_alias(resname, entr[i])
             if len(entr) == 5:
-                diheds.append(entr)
+                torsions.append(entr)
             else:
-                diheds.append(entr+[''])
-        return diheds
-
-    def __read_rtp_impropers(self, resname, lines):
-        improps = []
-        for line in lines:
-            entr = line.split()
-            if entr[0] not in ['+', '-']:
-                if resname in _aliases:
-                    if entr[0] in _aliases[resname]:
-                        entr[0] = _aliases[resname][entr[0]]
-            if entr[1] not in ['+', '-']:
-                if resname in _aliases:
-                    if entr[1] in _aliases[resname]:
-                        entr[1] = _aliases[resname][entr[1]]
-            if entr[2] not in ['+', '-']:
-                if resname in _aliases:
-                    if entr[2] in _aliases[resname]:
-                        entr[2] = _aliases[resname][entr[2]]
-            if entr[3] not in ['+', '-']:
-                if resname in _aliases:
-                    if entr[3] in _aliases[resname]:
-                        entr[3] = _aliases[resname][entr[3]]
-            if len(entr) == 5:
-                improps.append(entr)
-            else:
-                improps.append(entr+[''])
-        return improps
+                torsions.append(entr + [''])
+        return torsions
 
     def __find_rtp_dihedral(self, key, name1, name2, name3, name4):
         rtp_d = self.entries[key]['diheds']
@@ -414,6 +397,84 @@ class RTPParser:
                  d[2] == name2 and d[3] == name1):
                 return d
         return None
+
+
+# ── force-field RTP discovery ────────────────────────────────────────────────
+#
+# GROMACS pdb2gmx globs every ``*.rtp`` in a force-field directory.  pmx used to
+# read exactly one file (``merged.rtp``, falling back to ``aminoacids.rtp``),
+# hardcoded in five places.  That meant a residue split out of the vendored file
+# into a topic file (``nos.rtp``, ``caps.rtp``, ...) was visible to pdb2gmx and
+# invisible to the generative engine -- which is how ``CYS2`` ends up
+# unresolvable on the Amber force fields even though ``disulfide.rtp`` ships
+# there.  ``load_ff_rtp`` brings pmx in line with pdb2gmx.
+
+#: Files whose entries are alchemical HYBRIDS (state A -> state B), not target
+#: residues.  Excluded from the residue database: pmx generates hybrids on the
+#: fly into ``nsaa.rtp`` now, and ``mutres*.rtp`` is kept for the legacy path
+#: only.  A topic file holding *endpoint* residues must not be named like one of
+#: these, nor match the ``?2??.rtp`` single-hybrid pattern.
+_HYBRID_RTP_FILES = ('mutres.rtp', 'mutres_dna.rtp', 'mutres_term.rtp',
+                     'nsaa.rtp', 'disulfide.rtp')
+
+
+def _is_hybrid_rtp(basename):
+    """True for hybrid libraries and single-hybrid files (``S2P1.rtp``)."""
+    if basename in _HYBRID_RTP_FILES:
+        return True
+    stem = basename[:-len('.rtp')]
+    return len(stem) == 4 and stem[1] == '2'
+
+
+def base_rtp_path(ffpath):
+    """Path to the force field's base residue database."""
+    p = os.path.join(ffpath, 'merged.rtp')
+    return p if os.path.isfile(p) else os.path.join(ffpath, 'aminoacids.rtp')
+
+
+def load_ff_rtp(ff, resolve_aliases=False):
+    """Load a force field's *target-residue* database.
+
+    Parses the base RTP and merges every additional non-hybrid ``*.rtp`` in the
+    force-field directory.  The base file wins on a name clash; clashes are
+    recorded on the returned parser as ``.conflicts`` rather than raising, so a
+    force field that has not been split yet behaves exactly as before.
+
+    Parameters
+    ----------
+    ff : str
+        Force-field name, resolved via ``GMXLIB``/``get_ff_path``.
+    resolve_aliases : bool
+        Passed through to :class:`RTPParser`.
+
+    Returns
+    -------
+    RTPParser
+        With two extra attributes: ``sources`` (files merged, base first) and
+        ``conflicts`` (``[(resname, file)]`` shadowed by the base file).
+    """
+    from .utils import get_ff_path      # local import: utils imports ffparser
+
+    ffpath = get_ff_path(ff)
+    base = base_rtp_path(ffpath)
+    rtp = RTPParser(base, resolve_aliases=resolve_aliases)
+    rtp.sources = [base]
+    rtp.conflicts = []
+
+    for name in sorted(os.listdir(ffpath)):
+        if not name.endswith('.rtp') or _is_hybrid_rtp(name):
+            continue
+        path = os.path.join(ffpath, name)
+        if os.path.samefile(path, base):
+            continue
+        extra = RTPParser(path, resolve_aliases=resolve_aliases)
+        for resname in extra.keys:
+            if resname in rtp:
+                rtp.conflicts.append((resname, path))
+                continue
+            rtp.add_entry(resname, extra[resname])
+        rtp.sources.append(path)
+    return rtp
 
 
 class BondedParser:
@@ -646,6 +707,12 @@ class BondedParser:
                 starts.append(i)
         for s in starts:
             lst = readSection(self.lines[s:], '[ dihedraltypes ]', '[')
+            # drop blank lines -- a #include'd supplemental block can leave a
+            # trailing empty line before the next section, which otherwise makes
+            # parseList fall through to the wrong (2-atom) dihedral format.
+            lst = [x for x in lst if x.strip()]
+            if not lst:
+                continue
             try:
                 lst = parseList('ssssiffffff', lst)
             except:
@@ -688,7 +755,15 @@ class NBParser:
     def __parse_atomtypes(self, version):
 
         self.atomtypes = {}
-        lst = readSection(self.lines, '[ atomtypes ]', '[')
+        # read EVERY [ atomtypes ] block (the force field's plus any supplied by
+        # #include'd ligand ITPs), so ligand parameters can be supplied as ITPs
+        # instead of being injected into the force-field files.
+        lst = readSectionAll(self.lines, '[ atomtypes ]', '[')
+        # keep only data rows: an atom-type name starts with a letter or digit
+        # (amber has 2C/3C), so drop blanks and stray banner/decoration lines
+        # (e.g. a ``****`` header from a force-field .itp) that a multi-block read
+        # can otherwise capture.
+        lst = [x for x in lst if x.strip() and x.strip()[0].isalnum()]
         ffnamelower = self.ff.lower()
         if version == 'old':
             if ffnamelower.startswith('amber'):

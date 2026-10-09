@@ -92,7 +92,8 @@ def _check_residue_name(res):
         if res.has_atom('HE2'):
             res.set_resname('GLH')
     elif res.resname == 'CYS':
-        if not res.has_atom('HG'):
+        # thiol H is 'HG' (AMBER) or 'HG1' (CHARMM); absent only if SS-bonded
+        if not (res.has_atom('HG') or res.has_atom('HG1')):
             print(' Cannot mutate SS-bonded Cys %d' % res.id, file=sys.stderr)
 
 
@@ -105,6 +106,29 @@ def _ask_next():
         return False
     else:
         return _ask_next()
+
+
+def _ask_reactive_atom(residue):
+    """Interactively choose a reacting atom for a cross-link endpoint mutation.
+
+    Lists the residue's atoms by their plain names (the dual-topology split is
+    internal) and returns the chosen name, or None for a plain mutation.
+    """
+    names = [a.name for a in residue.atoms]
+    sys.stdout.write('\nCross-link this residue (clawback a reacting atom)? '
+                     'Atoms in %s%s:\n' % (residue.resname, residue.id))
+    for i, n in enumerate(names):
+        sys.stdout.write('  %2d) %s\n' % (i, n))
+    while True:
+        ans = input('  reacting atom (name or index, blank = plain mutation): '
+                    ).strip()
+        if ans == '':
+            return None
+        if ans in names:
+            return ans
+        if ans.isdigit() and 0 <= int(ans) < len(names):
+            return names[int(ans)]
+        sys.stdout.write('  invalid selection; try again.\n')
 
 
 def _match_mutation(m, ref_m, ref_chain, ref_resid):
@@ -397,6 +421,19 @@ different protonation states. Use the --resinfo flag to print the dictionary.
                         type=str,
                         help='Text file with list of mutations (optional).',
                         default=None)
+    parser.add_argument('--hybrid_name',
+                        metavar='name',
+                        dest='hybrid_name',
+                        type=str,
+                        help='Override the generated 4-character hybrid\n'
+                        'residue name. The default is built from the source\n'
+                        'one-letter code plus the first and last letters of\n'
+                        'the target, which is not collision-free: a\n'
+                        'non-canonical source falls back to its first letter,\n'
+                        'so KCR->ALY and LYS->ALY both want K2AY. The engine\n'
+                        'refuses to reuse a name for a different morph and\n'
+                        'asks for this flag.',
+                        default=None)
     exclus.add_argument('--keep_resid',
                         dest='renumber',
                         help='Whether to renumber all residues or to keep the\n'
@@ -423,6 +460,57 @@ different protonation states. Use the --resinfo flag to print the dictionary.
                         help='Show the list of 3-letter -> 1-letter residues',
                         default=False,
                         action='store_true')
+    parser.add_argument('--itp',
+                        dest='itp',
+                        help='ITP fragment (CH3-capped at CA) parameterizing a '
+                             'target residue that is not in the force-field RTP '
+                             '(a novel NSAA/PTM). The hybrid is generated on the '
+                             'fly; geometry is embedded from the ITP bond graph, '
+                             'so no structure is needed.',
+                        default=None)
+    parser.add_argument('--structure',
+                        dest='structure',
+                        help='Optional PDB/GRO with the target residue geometry, '
+                             'to override the default embedded geometry for a '
+                             'generative (--itp or RTP) target.',
+                        default=None)
+    parser.add_argument('--generative',
+                        dest='generative',
+                        help='Force the generative engine even for standard '
+                             'mutations that ship as pre-built hybrids (build '
+                             'the hybrid on the fly instead of using mutres.mtp).',
+                        default=False,
+                        action='store_true')
+    parser.add_argument('--reverse',
+                        dest='reverse',
+                        help='Build the hybrid in the REVERSE alchemical '
+                             'direction: the target residue becomes state A and '
+                             'the wild-type state B (product -> reactant). Use '
+                             'for the charge-neutralising reference leg of a '
+                             'double-system-single-box: e.g. a peptide whose '
+                             'phosphoSer morphs back to Ser, opposite a protein '
+                             'whose Ser morphs to phosphoSer. Implies the '
+                             'generative engine.',
+                        default=False,
+                        action='store_true')
+    parser.add_argument('--react',
+                        dest='react',
+                        nargs='*',
+                        default=None,
+                        metavar='atom',
+                        help='Cross-link mode: clawback the reacting atom of an '
+                             'endpoint mutation (split into dual-topology '
+                             'branches so a bond formed at gentop has harmless '
+                             '1-4 exclusions).  Interactive: pass a bare --react '
+                             'to be prompted, after each residue selection, for '
+                             'the reacting atom from the residue\'s atom list.  '
+                             'Scripted: give the reacting atoms as one list, in '
+                             'the same order as --script (e.g. --react NZ SG SG; '
+                             'commas also accepted, --react NZ,SG,SG).  Use "-" '
+                             'or "." to leave a mutation plain.  Plain atom names '
+                             '("SG", "NZ") -- the split branches are internal.  '
+                             'The bond itself is declared at gentop (pmx gentop '
+                             '--bond "r1:atom-r2:atom").')
 
     args, unknown = parser.parse_known_args()
     check_unknown_cmd(unknown)
@@ -525,16 +613,38 @@ def main(args):
         # not allowed because we want to make sure there are unique indices for
         # each residue
 
-        for mut in mutations_to_make:
-            _check_residue_name(m.fetch_residue(idx=mut[1], chain=mut[0]))
-            mutate(m=m,
-                   mut_chain=mut[0],
-                   mut_resid=mut[1],
-                   mut_resname=mut[2],
-                   ff=ff,
-                   refB=infileB,
-                   inplace=True,
-                   verbose=True)
+        # --react atoms pair with the mutations in order; a mutation with a
+        # reacting atom is a cross-link endpoint -> clawed back (decouple_mutate).
+        react_atoms = []
+        for v in (args.react or []):
+            react_atoms.extend(v.split(','))          # accept "NZ SG" and "NZ,SG"
+        for i, mut in enumerate(mutations_to_make):
+            react = react_atoms[i] if i < len(react_atoms) else None
+            if react in ('-', '.', ''):               # explicit "leave plain"
+                react = None
+            if react:
+                # cross-link endpoint: decouple_mutate walks the canonical WT
+                # residue itself, so skip the classic protonation renaming
+                # (e.g. LYS->LYP) which would break the RTP lookup.
+                from pmx.covalent import decouple_mutate
+                decouple_mutate(m, resid=mut[1], target=mut[2], ff=ff,
+                                react_atom=react, chain=mut[0],
+                                inplace=True, verbose=True)
+            else:
+                _check_residue_name(m.fetch_residue(idx=mut[1], chain=mut[0]))
+                mutate(m=m,
+                       mut_chain=mut[0],
+                       mut_resid=mut[1],
+                       mut_resname=mut[2],
+                       ff=ff,
+                       refB=infileB,
+                       inplace=True,
+                       verbose=True,
+                       itp=args.itp,
+                       structure=args.structure,
+                       generative=args.generative,
+                       reverse=args.reverse,
+                       hybrid_name=args.hybrid_name)
 
     # if script not provided, interactive selection
     # ---------------------------------------------
@@ -553,15 +663,34 @@ def main(args):
                                                  ref_resid=sele.mut_resid)
                 sele.mut_chain = None
 
-            # we have the needed info ==> carry out the mutation
-            mutate(m=m,
-                   mut_chain=sele.mut_chain,
-                   mut_resid=sele.mut_resid,
-                   mut_resname=sele.mut_resname,
-                   ff=ff,
-                   refB=infileB,
-                   inplace=True,
-                   verbose=True)
+            # in cross-link mode (--react given), pick a reacting atom from the
+            # residue's atom list; blank leaves it a plain mutation.  Without
+            # --react, plain mutations are never prompted.
+            react = None
+            if args.react is not None:
+                residue = m.fetch_residue(idx=sele.mut_resid,
+                                          chain=sele.mut_chain)
+                react = _ask_reactive_atom(residue)
+            if react:
+                from pmx.covalent import decouple_mutate
+                decouple_mutate(m, resid=sele.mut_resid,
+                                target=sele.mut_resname, ff=ff,
+                                react_atom=react, chain=sele.mut_chain,
+                                inplace=True, verbose=True)
+            else:
+                mutate(m=m,
+                       mut_chain=sele.mut_chain,
+                       mut_resid=sele.mut_resid,
+                       mut_resname=sele.mut_resname,
+                       ff=ff,
+                       refB=infileB,
+                       inplace=True,
+                       verbose=True,
+                       itp=args.itp,
+                       structure=args.structure,
+                       generative=args.generative,
+                       reverse=args.reverse,
+                       hybrid_name=args.hybrid_name)
 
             # ask whether to do more mutations or stop
             if not _ask_next():

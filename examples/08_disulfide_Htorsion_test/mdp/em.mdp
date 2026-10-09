@@ -1,0 +1,10 @@
+integrator=steep
+nsteps=2000
+emtol=50
+cutoff-scheme=Verlet
+coulombtype=cutoff
+rcoulomb=1.2
+rvdw=1.2
+pbc=xyz
+free-energy=yes
+init-lambda=1

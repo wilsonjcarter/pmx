@@ -1,0 +1,25 @@
+; reverse non-equilibrium switch: lambda 1 -> 0 (state B -> A), bond turns off
+integrator=md
+dt=0.0005
+nsteps=NSTEPS_SW
+constraints=none
+cutoff-scheme=Verlet
+coulombtype=cutoff
+rcoulomb=1.2
+rvdw=1.2
+pbc=xyz
+tcoupl=v-rescale
+tc-grps=System
+tau-t=0.5
+ref-t=300
+gen-vel=yes
+gen-temp=300
+gen-seed=SEED
+free-energy=yes
+init-lambda=1
+delta-lambda=DLAMBDA
+dhdl-derivatives=yes
+nstdhdl=20
+sc-alpha=0
+nstenergy=1000
+nstlog=5000

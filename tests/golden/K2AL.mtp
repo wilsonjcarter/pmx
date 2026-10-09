@@ -1,0 +1,104 @@
+
+[ K2AL ] ; LYS -> ALY
+
+
+[ morphes ]
+   N          NH1        -> N          NH1       
+   HN         H          -> HN         H         
+   CA         CT1        -> CA         CT1       
+   HA         HB1        -> HA         HB1       
+   CB         CT2        -> CB         CT2       
+   HB1        HA2        -> HB1        HA2       
+   HB2        HA2        -> HB2        HA2       
+   CG         CT2        -> CG         CT2       
+   HG1        HA2        -> HG1        HA2       
+   HG2        HA2        -> HG2        HA2       
+   CD         CT2        -> CD         CT2       
+   HD1        HA2        -> HD1        HA2       
+   HD2        HA2        -> HD2        HA2       
+   CE         CT2        -> CE         CT2       
+   HE1        HA2        -> HE1        HA2       
+   HE2        HA2        -> HE2        HA2       
+   NZ         NH3        -> NZ         NH1       
+   HZ1        HC         -> HZ1.gone   DUM_HC    
+   HZ2        HC         -> HZ2.gone   DUM_HC    
+   HZ3        HC         -> HZ3.gone   DUM_HC    
+   C          C          -> C          C         
+   O          O          -> O          O         
+   HV1        DUM_H      -> HZ         H         
+   DCH        DUM_C      -> CH         C         
+   DOH        DUM_O      -> OH         O         
+   DCH3       DUM_CT3    -> CH3        CT3       
+   HV2        DUM_HA3    -> HH31       HA3       
+   HV3        DUM_HA3    -> HH32       HA3       
+   HV4        DUM_HA3    -> HH33       HA3       
+
+[ atoms ]
+   N        NH1         -0.470000      1  14.007000 NH1         -0.470000  14.007000   ; types == | charge ==
+   HN       H            0.310000      2   1.008000 H            0.310000   1.008000   ; types == | charge ==
+   CA       CT1          0.070000      3  12.011000 CT1          0.070000  12.011000   ; types == | charge ==
+   HA       HB1          0.090000      4   1.008000 HB1          0.090000   1.008000   ; types == | charge ==
+   CB       CT2         -0.180000      5  12.011000 CT2         -0.180000  12.011000   ; types == | charge ==
+   HB1      HA2          0.090000      6   1.008000 HA2          0.090000   1.008000   ; types == | charge ==
+   HB2      HA2          0.090000      7   1.008000 HA2          0.090000   1.008000   ; types == | charge ==
+   CG       CT2         -0.180000      8  12.011000 CT2         -0.180000  12.011000   ; types == | charge ==
+   HG1      HA2          0.090000      9   1.008000 HA2          0.090000   1.008000   ; types == | charge ==
+   HG2      HA2          0.090000     10   1.008000 HA2          0.090000   1.008000   ; types == | charge ==
+   CD       CT2         -0.180000     11  12.011000 CT2         -0.180000  12.011000   ; types == | charge ==
+   HD1      HA2          0.090000     12   1.008000 HA2          0.090000   1.008000   ; types == | charge ==
+   HD2      HA2          0.090000     13   1.008000 HA2          0.090000   1.008000   ; types == | charge ==
+   CE       CT2          0.210000     14  12.011000 CT2         -0.020000  12.011000   ; types != | charge !=
+   HE1      HA2          0.050000     15   1.008000 HA2          0.090000   1.008000   ; types != | charge !=
+   HE2      HA2          0.050000     16   1.008000 HA2          0.090000   1.008000   ; types != | charge !=
+   NZ       NH3         -0.300000     17  14.007000 NH1         -0.470000  14.007000   ; types != | charge !=
+   HZ1      HC           0.330000     18   1.008000 DUM_HC       0.000000   1.008000   ; types != | charge !=
+   HZ2      HC           0.330000     19   1.008000 DUM_HC       0.000000   1.008000   ; types != | charge !=
+   HZ3      HC           0.330000     20   1.008000 DUM_HC       0.000000   1.008000   ; types != | charge !=
+   C        C            0.510000     21  12.011000 C            0.510000  12.011000   ; types == | charge ==
+   O        O           -0.510000     22  15.999000 O           -0.510000  15.999000   ; types == | charge ==
+   HV1      DUM_H        0.000000     23   1.008000 H            0.310000   1.008000   ; types != | charge !=
+   DCH      DUM_C        0.000000     24  12.011000 C            0.510000  12.011000   ; types != | charge !=
+   DOH      DUM_O        0.000000     25  15.999000 O           -0.510000  15.999000   ; types != | charge !=
+   DCH3     DUM_CT3      0.000000     26  12.011000 CT3         -0.270000  12.011000   ; types != | charge !=
+   HV2      DUM_HA3      0.000000     27   1.008000 HA3          0.090000   1.008000   ; types != | charge !=
+   HV3      DUM_HA3      0.000000     28   1.008000 HA3          0.090000   1.008000   ; types != | charge !=
+   HV4      DUM_HA3      0.000000     29   1.008000 HA3          0.090000   1.008000   ; types != | charge !=
+
+[ coords ]
+     12.218    7.138   15.196
+     12.282    7.647   14.338
+     13.373    7.071   16.096
+     13.024    6.822   17.000
+     14.370    5.974   15.639
+     13.872    5.111   15.551
+     14.743    6.236   14.749
+     15.549    5.751   16.605
+     16.043    6.614   16.708
+     15.185    5.467   17.492
+     16.539    4.685   16.130
+     16.080    3.797   16.110
+     16.854    4.918   15.210
+     17.747    4.610   17.076
+     18.247    5.476   17.056
+     17.436    4.426   18.008
+     18.679    3.538   16.687
+     19.450    3.520   17.323
+     18.204    2.658   16.713
+     19.015    3.708   15.761
+     14.038    8.463   16.139
+     14.221    9.077   15.091
+     17.994    2.641   16.202
+     19.655    3.187   17.360
+     20.555    2.402   16.684
+     19.420    2.806   18.781
+     18.431    3.080   19.142
+     19.648    1.746   19.017
+     20.152    3.389   19.399
+
+[ impropers ]
+ N      -C     CA     HN         default-A                 default-B                
+ C      CA     +N     O          default-A                 default-B                
+ NZ     DCH    CE     HV1        default-B                 default-B                
+ DCH    DCH3   NZ     DOH        default-B                 default-B                
+
+[ dihedrals ]

@@ -6,7 +6,7 @@
 
 ## TLDR
 
-This example computes the free energy cost of truncating a C-terminal residue (Asp5) from the HSP90 MEEVD peptide, making it the only pmx workflow that uses the `DEL` mutation code and the specially generated `XdeC`/`XdeN` hybrid types. The neighbouring Val4 is renamed to `VdeC` and grows a dummy C-terminal oxygen (`DOT2`) that becomes real in state B, while Asp5 is fully dummified — a physically distinct treatment from a standard residue swap.
+This example computes the free energy cost of truncating a C-terminal residue (Asp5) from the HSP90 MEEVD peptide, the one pmx workflow that uses the `DEL` mutation code and the `XdeC`/`XdeN` deletion-neighbour hybrids. Those hybrids are built on the fly by the generative covalent engine — a terminal deletion is just an internal→terminus residue morph — so no per-force-field pre-generation step is needed. The neighbouring Val4 becomes `VdeC` and grows a dummy C-terminal oxygen (`DOT2`) that becomes real in state B, while Asp5 is fully dummified — a physically distinct treatment from a standard residue swap.
 
 | | |
 |---|---|
@@ -14,7 +14,7 @@ This example computes the free energy cost of truncating a C-terminal residue (A
 | **State A** | Val4 + Asp5 (fully interacting); charge −3 |
 | **State B** | Val4 as new C-terminus; Asp5 dummified; charge −2 |
 | **Charge shift** | −3 → −2 (+1) — **doublebox required** (see below) |
-| **Special steps** | Run `generate_term_deletion` first; copy `mutres_term.rtp/.mtp` to FF dir |
+| **Special steps** | None — the `VdeC` hybrid is generated on the fly by `pmx mutate` |
 
 ```bash
 # Unique mutation step — see run.sh for the full pipeline
@@ -46,25 +46,9 @@ gmx pdb2gmx \
 
 ---
 
-## Step 2 — Generate terminal-deletion parameters
+## Step 2 — Build the hybrid structure
 
-The `XdeN`/`XdeC` hybrid entries are not part of the standard mutres files and must be generated once per force field. `run.sh` copies the output into the FF directory automatically.
-
-```bash
-eval "$(python3 -c 'from pmx.gmx import set_gmxlib; import os; set_gmxlib(); print("export GMXLIB="+os.environ["GMXLIB"])')"
-FFDIR=$(python3 -c "import os; from pmx.gmx import set_gmxlib; set_gmxlib(); \
-    print(os.environ['GMXLIB']+'/charmm36m-mut.ff')")
-
-python3 -m pmx.scripts.generate_term_deletion \
-    --ffdir "$FFDIR" \
-    --outdir .
-```
-
----
-
-## Step 3 — Build the hybrid structure
-
-Target the residue to be **deleted** with the code `DEL`. `pmx` detects that Asp5 is the C-terminus and automatically renames Val4 → `VdeC` and adds the dummy oxygen `DOT2`; Asp5 stays physically in the structure and is dummified later.
+Target the residue to be **deleted** with the code `DEL`. `pmx` detects that Asp5 is the C-terminus and, through the generative covalent engine (`covalent.delete_terminal`), builds the deletion on the fly: the neighbour Val4 morphs internal → C-terminus (emitted as the `VdeC` hybrid into the force field's `nsaa.rtp`/`nsaa.mtp`, exactly like any other mutation), a dummy oxygen `DOT2` is placed on Val4, and Asp5 stays physically in the structure to be dummified later. No pre-generated `mutres_term` files are needed.
 
 ```bash
 printf "5 DEL\n" | pmx mutate \
@@ -75,17 +59,11 @@ printf "5 DEL\n" | pmx mutate \
 
 ---
 
-## Step 4 — Build the hybrid topology
+## Step 3 — Build the hybrid topology
 
-Copy the generated hybrid parameters into the FF directory so `pdb2gmx` can resolve `VdeC`, then process the mutant. Do **not** pass `-ignh` — the dummy atom `DOT2` placed by `pmx mutate` must be preserved.
+`pmx mutate` already wrote the `VdeC` hybrid into the force field's `nsaa.rtp`, so `pdb2gmx` resolves it directly. Do **not** pass `-ignh` — the dummy atom `DOT2` placed by `pmx mutate` must be preserved.
 
 ```bash
-# Copy hybrid RTP/MTP into the FF directory so pdb2gmx can find VdeC
-FFDIR=$(python3 -c "import os; from pmx.gmx import set_gmxlib; set_gmxlib(); \
-    print(os.environ['GMXLIB']+'/charmm36m-mut.ff')")
-cp mutres_term.rtp "$FFDIR/"
-cp mutres_term.mtp "$FFDIR/"
-
 gmx pdb2gmx \
     -f      mutant.pdb \
     -o      processed.gro \
@@ -96,16 +74,15 @@ gmx pdb2gmx \
 
 ---
 
-## Step 5 — Fill B-state bonded terms
+## Step 4 — Fill B-state bonded terms
 
-`pmx gentop` locates the `VdeC` hybrid, dummifies Asp5 in state B, applies the C-terminal patch to Val4, and zeroes B-state force constants on dihedrals crossing the Val4–Asp5 boundary. The charge change (−3 → −2, Δq = +1) requires the doublebox approach described in Step 6.
+`pmx gentop` locates the `VdeC` hybrid (auto-discovered in the FF's `nsaa.mtp`), dummifies Asp5 in state B, and zeroes B-state force constants on dihedrals crossing the Val4–Asp5 boundary. The charge change (−3 → −2, Δq = +1) requires the doublebox approach described in the next step.
 
 ```bash
 pmx gentop \
-    -p          topol.top \
-    -o          pmxtop.top \
-    -ff         charmm36m-mut \
-    --extra_mtp mutres_term.mtp
+    -p  topol.top \
+    -o  pmxtop.top \
+    -ff charmm36m-mut
 ```
 
 Expected output:
@@ -124,7 +101,7 @@ log_> Zeroed B-state for 13 dihedrals
 
 ---
 
-## Step 6 — Charge-neutral setup with pmx doublebox
+## Step 5 — Charge-neutral setup with pmx doublebox
 
 Deleting Asp5 shifts the system charge from −3 to −2 (Δq = +1, net loss of the two C-terminal
 carboxylates of Asp minus the one gained by Val becoming the new C-terminus). In a periodic
@@ -145,7 +122,7 @@ MEEVD peptide from 1ELR). The combined ΔΔG directly gives the binding free ene
 between MEEV and MEEVD for the co-chaperone: how much does losing the C-terminal Asp cost in
 binding affinity?
 
-#### 6a — Prepare the reference leg (MEEVD peptide free in water)
+#### 5a — Prepare the reference leg (MEEVD peptide free in water)
 
 ```bash
 # The reference is the same MEEVD peptide, free in solution
@@ -171,13 +148,12 @@ gmx pdb2gmx \
     -water  tip3p
 
 pmx gentop \
-    -p          ref_topol.top \
-    -o          ref_pmxtop.top \
-    -ff         charmm36m-mut \
-    --extra_mtp mutres_term.mtp
+    -p  ref_topol.top \
+    -o  ref_pmxtop.top \
+    -ff charmm36m-mut
 ```
 
-#### 6b — Combine into one box
+#### 5b — Combine into one box
 
 ```bash
 pmx doublebox \
@@ -188,7 +164,7 @@ pmx doublebox \
     -d  1.5
 ```
 
-#### 6c — Merge topologies, solvate, and add ions
+#### 5c — Merge topologies, solvate, and add ions
 
 ```bash
 gmx solvate -cp doublebox.gro -cs spc216.gro \
@@ -202,7 +178,7 @@ printf '13\n' | gmx genion -s ions.tpr -pname K -nname CL \
 
 ---
 
-## Step 7 — Energy minimise
+## Step 6 — Energy minimise
 
 ```bash
 gmx grompp -f mdp/em.mdp -c ions.gro -r ions.gro \
@@ -212,7 +188,7 @@ gmx mdrun -v -deffnm em -ntmpi 1
 
 ---
 
-## Step 8 — Equilibrate and run endpoint simulations
+## Step 7 — Equilibrate and run endpoint simulations
 
 ```bash
 mkdir -p stateA
@@ -228,7 +204,7 @@ gmx mdrun -v -deffnm stateB/md
 
 ---
 
-## Step 9 — Non-equilibrium transition simulations
+## Step 8 — Non-equilibrium transition simulations
 
 ```bash
 mkdir -p transitionA
@@ -262,7 +238,7 @@ done
 
 ---
 
-## Step 10 — Analyse
+## Step 9 — Analyse
 
 Because both legs (co-chaperone complex and free MEEVD peptide) run simultaneously in the
 same box, `pmx analyze` operates on the combined work values and directly yields ΔΔG:

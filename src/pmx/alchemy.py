@@ -19,12 +19,35 @@ from .utils import get_mtp_file
 
 __all__ = ['mutate', 'gen_hybrid_top', 'write_split_top', 'AbsRestraints']
 
+_NOS_CYS_HYBRIDS = {'CNOS', 'U2UO'}   # NOS-Cys (carries SG2 + bridging OD2)
+_NOS_LYS_HYBRIDS = {'KNOS', 'K2KN'}   # NOS-Lys (carries NZ2)
 
 # ==============
 # Main Functions
 # ==============
+# Cross-link and Cys/Tyr special codes that stay on the pre-built library path.
+# NOTE: CD/DC (disulfide) and CN/KN (NOS) are cross-links -- they need the
+# decouple+bond composition (disulfide_edit/nos_edit), not the single-residue
+# `mutate` that covalent.mutate performs.  That generative cross-link path exists
+# in pmx.covalent but is not wired to the CLI yet, so these still use the shipped
+# split-atom hybrids (C2CD/C2CN/K2KN).  This is temporary: once the cross-link
+# recipes are wired to `pmx mutate`, these become generative too and the entries
+# retire -- the split here is "what's wired", not a classic-vs-generative divide.
+_CLASSIC_SPECIAL = {'CM', 'CD', 'DC', 'YM', 'CN', 'KN'}
+
+
+def _is_classic_mutation(mut_resname):
+    """True if *mut_resname* is a standard AA / protonation / cross-link code the
+    pre-built library path handles; False for PTMs and arbitrary NSAA targets,
+    which the generative engine (covalent.mutate) builds on the fly."""
+    aa = mut_resname.upper()
+    return (aa in _CLASSIC_SPECIAL or len(aa) == 1
+            or aa in library._ext_one_letter)
+
+
 def mutate(m, mut_resid, mut_resname, ff, mut_chain=None,
-           refB=None, inplace=False, verbose=False):
+           refB=None, inplace=False, verbose=False, itp=None, structure=None,
+           generative=False, reverse=False, hybrid_name=None):
     """Creates an hybrid structure file.
 
     Parameters
@@ -68,29 +91,86 @@ def mutate(m, mut_resid, mut_resname, ff, mut_chain=None,
         m2.nm2a()
         if verbose:
             print('Model units have been converted from nm to A.')
-
     # get the residue based on the index
     # fetch_residue also checks the selection is valid and unique
     residue = m2.fetch_residue(idx=mut_resid, chain=mut_chain)
+
     # get the correct mtp file
     mtp_file = get_mtp_file(residue, ff)
 
-    # Terminal residue deletion
+    # Molecule.moltype comes from the hardcoded name sets in pmx.library, so a
+    # residue the generative engine built is 'unknown' there.  Ask the force field
+    # instead -- exactly as get_mtp_file does -- or the dispatch below matches no
+    # branch at all.  That used to fall straight through and return None having
+    # changed nothing: ABA53->ATB "succeeded" and wrote back a pure ABA residue,
+    # so twelve GB1 all-to-all edges were silent zero-dG no-ops.
+    moltype = residue.moltype
+    if moltype == 'unknown':
+        from .utils import residuetype_from_ff, get_ff_path
+        moltype = residuetype_from_ff(residue.resname, get_ff_path(ff=ff)) or moltype
+
+    # Terminal residue deletion -- a residue morph through the generative core:
+    # the neighbour morphs internal->terminus (an ordinary build_hybrid_residue
+    # graph map, emitted into nsaa.{rtp,mtp}), the target is dummified at
+    # gen_hybrid_top.  No pre-built XdeC/XdeN library, no bespoke structure prep.
     if mut_resname.upper() == 'DEL':
-        if residue.moltype != 'protein':
+        if moltype != 'protein':
             raise RuntimeError("Terminal deletion is only supported for "
                                "protein residues")
-        apply_terminal_deletion(m=m2, residue=residue, ff=ff, verbose=verbose)
+        from .covalent import delete_terminal
+        delete_terminal(m2, del_resid=mut_resid, ff=ff, del_chain=mut_chain,
+                        inplace=True, verbose=verbose)
     # Mutation if Protein
-    elif residue.moltype == 'protein':
-        new_aa_name = _convert_aa_name(mut_resname)
-        apply_aa_mutation(m=m2, residue=residue, new_aa_name=new_aa_name,
-                          mtp_file=mtp_file, refB=refB, verbose=verbose)
+    elif moltype == 'protein':
+        # PTM aliases (P1/P2, me1/2/3), a direct PTM/NSAA target name, or an
+        # --itp fragment go through the generative engine (covalent.mutate),
+        # which builds the hybrid on the fly and accumulates it into nsaa.{rtp,
+        # mtp}.  Standard mutations, protonation changes and cross-links (CD/CN/
+        # KN) keep the pre-built library path.
+        from .covalent import ptm
+        # A residue at a terminus also goes through the generative engine: it
+        # patches both states with the terminus (from_rtp(term=...)) and maps by
+        # graph, whereas the pre-built internal X2Y hybrids assume the internal
+        # backbone (HN, O) and fail on the terminal H1/H2/H3 / OT1/OT2.
+        chain = residue.chain
+        is_terminal = (residue == chain.cterminus()
+                       or residue == chain.nterminus())
+        # Detection funnel: a PTM alias, an --itp fragment, a target not shipped
+        # as a pre-built 20x20 hybrid, a terminal residue, or an explicit
+        # --generative override all go through the generative engine; otherwise
+        # use the shipped hybrid.
+        target = ptm.target_for(residue.resname, mut_resname)
+        # The shipped 20x20 library is indexed by the SOURCE's one-letter code, so
+        # it cannot serve a non-canonical source however ordinary the target is:
+        # ABA->LEU used to reach _convert_aa_name('ABA') and die on KeyError.
+        source_is_classic = library._canonical_code(residue.resname) is not None
+        if target is None and (itp is not None or generative or reverse
+                               or is_terminal
+                               or not source_is_classic
+                               or not _is_classic_mutation(mut_resname)):
+            target = mut_resname
+        if target is not None:
+            from .covalent import mutate as _generative_mutate
+            _generative_mutate(m2, mut_resid=mut_resid, target=target, ff=ff,
+                               structure=structure, itp=itp, refB=refB,
+                               mut_chain=mut_chain, inplace=True, verbose=verbose,
+                               reverse=reverse, hybrid_name=hybrid_name)
+        else:
+            new_aa_name = _convert_aa_name(mut_resname)
+            apply_aa_mutation(m=m2, residue=residue, new_aa_name=new_aa_name,
+                              mtp_file=mtp_file, refB=refB, verbose=verbose)
     # Mutation if DNA or RNA
-    elif residue.moltype in ['dna', 'rna']:
+    elif moltype in ['dna', 'rna']:
         new_nuc_name = mut_resname.upper()
         apply_nuc_mutation(m=m2, residue=residue, new_nuc_name=new_nuc_name,
                            mtp_file=mtp_file, verbose=verbose)
+    else:
+        # Never fall through silently.  Doing nothing and returning the model
+        # unchanged is indistinguishable from success to every caller.
+        raise ValueError(
+            "Cannot mutate residue %s%s: pmx classifies it as moltype %r and the "
+            "force field does not identify it as protein, DNA or RNA either."
+            % (residue.resname, residue.id, residue.moltype))
 
     if inplace is False:
         return m2
@@ -147,148 +227,6 @@ def apply_aa_mutation(m, residue, new_aa_name, mtp_file, refB=None,
               (hybrid_res.resname, str(hybrid_res.id), hybrid_res.chain_id))
 
 
-def _build_dummy_ot2_coords(residue):
-    """Place a dummy OT2 in the sp2 plane of the carboxylate, symmetric to O."""
-    C = np.array(residue['C'].x)
-    O = np.array(residue['O'].x)
-    CA = np.array(residue['CA'].x)
-    ca_c = C - CA
-    ca_c = ca_c / np.linalg.norm(ca_c)
-    c_o = O - C
-    proj = np.dot(c_o, ca_c) * ca_c
-    perp = c_o - proj
-    return list(C + proj - perp)
-
-
-def _build_dummy_nh3_coords(residue, n_protons=2):
-    """Build coordinates for dummy NH3+ protons on the N atom."""
-    import math
-    N = np.array(residue['N'].x)
-    CA = np.array(residue['CA'].x)
-    n_ca = CA - N
-    n_ca = n_ca / np.linalg.norm(n_ca)
-    bond_len = 1.02  # Angstrom
-
-    has_hn = residue.has_atom('HN') or residue.has_atom('H')
-    if has_hn:
-        try:
-            H = np.array(residue['HN'].x)
-        except Exception:
-            H = np.array(residue['H'].x)
-        n_h = H - N
-        n_h = n_h / np.linalg.norm(n_h)
-        rot120 = Rotation(N, N - n_ca)
-        rot240 = Rotation(N, N - n_ca)
-        h1_pos = N + n_h * bond_len
-        h2_pos = rot120.apply(list(h1_pos), 120.0)
-        h3_pos = rot240.apply(list(h1_pos), 240.0)
-        return [h2_pos, h3_pos]
-    else:
-        CD = np.array(residue['CD'].x)
-        n_cd = CD - N
-        n_cd = n_cd / np.linalg.norm(n_cd)
-        base = (n_ca + n_cd)
-        base = base / np.linalg.norm(base)
-        perp = np.cross(n_ca, n_cd)
-        perp = perp / np.linalg.norm(perp)
-        tet_angle = math.radians(109.5 / 2)
-        h1_dir = -base * math.cos(tet_angle) + perp * math.sin(tet_angle)
-        h2_dir = -base * math.cos(tet_angle) - perp * math.sin(tet_angle)
-        return [list(N + h1_dir * bond_len), list(N + h2_dir * bond_len)]
-
-
-def apply_terminal_deletion(m, residue, ff, verbose=False):
-    """Prepare structure for terminal residue deletion via alchemical FEP.
-
-    Modifies the neighbor residue (n-1 for C-terminal, n+1 for N-terminal)
-    by adding dummy atoms and renaming to the hybrid residue name. The
-    terminal residue itself is left unchanged; it will be fully dummified
-    later by gen_hybrid_top.
-    """
-    chain = residue.chain
-    chain_residues = chain.residues
-
-    res_idx = None
-    for i, r in enumerate(chain_residues):
-        if r == residue:
-            res_idx = i
-            break
-    if res_idx is None:
-        raise RuntimeError("Could not find residue in its chain")
-
-    is_cterm = (residue == chain.cterminus())
-    is_nterm = (residue == chain.nterminus())
-
-    if not is_cterm and not is_nterm:
-        raise RuntimeError("Terminal deletion requested but residue %d (%s) "
-                           "is not at a terminus" % (residue.id, residue.resname))
-
-    if is_cterm:
-        if res_idx == 0:
-            raise RuntimeError("Cannot delete C-terminal residue: it is the "
-                               "only residue in the chain")
-        neighbor = chain_residues[res_idx - 1]
-        neighbor_key = _convert_aa_name(neighbor.resname)
-        hybrid_name = neighbor_key + 'deC'
-
-        if verbose:
-            print('log_> C-terminal deletion: residue %d (%s)' %
-                  (residue.id, residue.resname))
-            print('log_> Neighbor residue %d (%s) -> %s' %
-                  (neighbor.id, neighbor.resname, hybrid_name))
-
-        dot2 = Atom(name='DOT2')
-        dot2.x = _build_dummy_ot2_coords(neighbor)
-        dot2.resname = hybrid_name
-        dot2.chain_id = neighbor.chain_id
-        dot2.occ = 1.0
-        dot2.bfac = 0.0
-        neighbor.append(dot2)
-
-        for atom in neighbor.atoms:
-            atom.resname = hybrid_name
-        neighbor.resname = hybrid_name
-
-        if verbose:
-            print('log_> Added dummy OT2 atom to residue %d, renamed to %s' %
-                  (neighbor.id, hybrid_name))
-
-    elif is_nterm:
-        if res_idx >= len(chain_residues) - 1:
-            raise RuntimeError("Cannot delete N-terminal residue: it is the "
-                               "only residue in the chain")
-        neighbor = chain_residues[res_idx + 1]
-        neighbor_key = _convert_aa_name(neighbor.resname)
-        hybrid_name = neighbor_key + 'deN'
-
-        if verbose:
-            print('log_> N-terminal deletion: residue %d (%s)' %
-                  (residue.id, residue.resname))
-            print('log_> Neighbor residue %d (%s) -> %s' %
-                  (neighbor.id, neighbor.resname, hybrid_name))
-
-        is_pro = (neighbor.resname == 'PRO')
-        dummy_coords = _build_dummy_nh3_coords(neighbor, n_protons=2)
-        dummy_names = ['DHN1', 'DHN2'] if is_pro else ['DH2', 'DH3']
-
-        for dname, dcoords in zip(dummy_names, dummy_coords):
-            datom = Atom(name=dname)
-            datom.x = dcoords
-            datom.resname = hybrid_name
-            datom.chain_id = neighbor.chain_id
-            datom.occ = 1.0
-            datom.bfac = 0.0
-            neighbor.append(datom)
-
-        for atom in neighbor.atoms:
-            atom.resname = hybrid_name
-        neighbor.resname = hybrid_name
-
-        if verbose:
-            print('log_> Added dummy protons to residue %d, renamed to %s' %
-                  (neighbor.id, hybrid_name))
-
-
 def apply_nuc_mutation(m, residue, new_nuc_name, mtp_file, verbose=False):
 
     hybrid_residue_name, resname1, resname2 = get_nuc_hybrid_resname(residue, new_nuc_name)
@@ -343,7 +281,8 @@ def get_nuc_hybrid_resname(residue, new_nuc_name):
 
 
 def gen_hybrid_top(topol, recursive=True, verbose=False, scaleDih=1.0,
-                   extra_mtp_files=None, supplement_bonded_files=None):
+                   extra_mtp_files=None, supplement_bonded_files=None,
+                   inter_bonds=None, decouple_dummies=False):
     """Fills the bstate of a topology file containing pmx hybrid residues. This
     can be either a top or itp file. If the file contains other itp files via
     include statements, the function can iterate through them if the recursive
@@ -374,6 +313,13 @@ def gen_hybrid_top(topol, recursive=True, verbose=False, scaleDih=1.0,
 
             pmxtop, itps = gen_hybrid_top(top, extra_mtp_files=["A2SEP.mtp"])
 
+    decouple_dummies : bool, optional
+        Opt-in Boresch dummy-atom decoupling corrections (default False).  When
+        True, removes factorization-breaking bonded terms at physical/dummy
+        junctions that the default "naive" symmetric dummy treatment leaves in
+        place (see :func:`_decouple_dummies`).  Off by default so existing
+        behaviour is byte-identical.
+
     Returns
     -------
     top, itps : obj, list of obj
@@ -388,7 +334,8 @@ def gen_hybrid_top(topol, recursive=True, verbose=False, scaleDih=1.0,
 
     # main function that returns the Topology with filled B states
     def process_topol(topol, ff, ffbonded_file, verbose=False, scaleDih=1.0,
-                      extra_mtp_files=None, supplement_bonded_files=None):
+                      extra_mtp_files=None, supplement_bonded_files=None,
+                      decouple_dummies=False):
         pmxtop = deepcopy(topol)
         # create model with residue list
         m = Model(atoms=pmxtop.atoms, renumber_residues=False)
@@ -495,8 +442,20 @@ def gen_hybrid_top(topol, recursive=True, verbose=False, scaleDih=1.0,
         # also decouple all dihedrals with [CD and N] and [CB and Calpha] for proline
         _proline_dihedral_decouplings(pmxtop, rlist, rdic)
 
-        _add_disulfide_bonded_terms(pmxtop, rlist, rdic, ff)
+        # Inter-residue cross-link bonds (disulfide, NOS, SONOS, ...) are formed
+        # from the user's gentop --bond declarations through the one graph
+        # consumer below -- no resname auto-detection.  Terminal deletion is a
+        # structural decoupling (depends on the runtime chain, not a named-atom
+        # bond), so it keeps its own detector, which already delegates to the
+        # unified apply_bond_morph(mode='decouple').
         _terminal_deletion_decouplings(pmxtop, rlist, verbose=verbose)
+        _apply_inter_bonds(pmxtop, rlist, inter_bonds, verbose=verbose)
+
+        # Opt-in Boresch dummy-atom decoupling (off by default).  Removes
+        # factorization-breaking bonded terms at physical/dummy junctions that
+        # the default "naive" symmetric treatment leaves in place.
+        if decouple_dummies:
+            _decouple_dummies(pmxtop, verbose=verbose)
         return pmxtop
 
     # -------------
@@ -508,7 +467,8 @@ def gen_hybrid_top(topol, recursive=True, verbose=False, scaleDih=1.0,
     pmx_top = process_topol(topol=topol, ff=ff, ffbonded_file=ffbonded_file,
                             verbose=verbose, scaleDih=scaleDih,
                             extra_mtp_files=extra_mtp_files,
-                            supplement_bonded_files=supplement_bonded_files)
+                            supplement_bonded_files=supplement_bonded_files,
+                            decouple_dummies=decouple_dummies)
 
     # ------------------------------------
     # itps too if asked for and if present
@@ -527,8 +487,20 @@ def gen_hybrid_top(topol, recursive=True, verbose=False, scaleDih=1.0,
                                     ffbonded_file=ffbonded_file,
                                     verbose=verbose,
                                     extra_mtp_files=extra_mtp_files,
-                                    supplement_bonded_files=supplement_bonded_files)
+                                    supplement_bonded_files=supplement_bonded_files,
+                                    decouple_dummies=decouple_dummies)
             pmx_itps.append(pmx_itp)
+
+    # A --bond declaration is applied by whichever molecule owns both endpoints
+    # (see _apply_inter_bonds); flag any that no molecule/chain resolved (a typo
+    # or a wrong resid/chain), which per-molecule skipping would otherwise hide.
+    unresolved = [eb for eb in (inter_bonds or []) if not eb.get('_applied')]
+    if unresolved:
+        raise RuntimeError(
+            "gentop --bond: no molecule/chain contains both atoms of: "
+            + "; ".join("%s:%s-%s:%s" % (eb['resid_a'], eb['atom_a'],
+                                         eb['resid_b'], eb['atom_b'])
+                        for eb in unresolved))
 
     return pmx_top, pmx_itps
 
@@ -702,7 +674,8 @@ def _convert_aa_name(aa):
     # DC : reverse disulfide target for D2DC hybrid (alchemical SS breaking)
     # P1 : monoanionic phospho-amino acid target for S2P1 (SER), T2P1 (THR), or Y2P1 (TYR)
     # P2 : dianionic phospho-amino acid target for S2P2 (SER), T2P2 (THR), or Y2P2 (TYR)
-    _special = {'CM', 'CD', 'DC', 'P1', 'P2'}
+    # YM: deprotonated tyrosine
+    _special = {'CM', 'CD', 'DC', 'P1', 'P2', 'YM', 'CN', 'KN'}
     if aa.upper() in _special:
         return aa.upper()
     elif len(aa) == 1:
@@ -758,11 +731,14 @@ def _rename_back(res, name_hash):
 _SPLIT_ATOM_NAME_MAP = {
     'CB1': 'CB',  'HB11': 'HB1', 'HB12': 'HB2',
     'CB2': 'CB',  'HB21': 'HB1', 'HB22': 'HB2',
+    'CE1': 'CE',  'HE11': 'HE1', 'HE12': 'HE2',
+    'NZ1': 'NZ',  'HZ11': 'HZ1', 'HZ12': 'HZ2', 'HZ13': 'HZ3',
     'SG1': 'SG',  'SG2':  'SG',
 }
 
 
 def _set_conformation(old_res, new_res, rotdic):
+    #print(new_res.name)
     old_res.get_real_resname()
     dihedrals = library._aa_dihedrals[old_res.real_resname]
     for key, lst in rotdic.items():
@@ -794,22 +770,71 @@ def _set_conformation(old_res, new_res, rotdic):
         # Skip atoms already placed by the rotation algorithm (D/HV prefix)
         if (atom.name[0] == 'D') or atom.name.startswith('HV'):
             continue
-        # Copy position from old_res; handle split-atom name mapping
-        src_name = _SPLIT_ATOM_NAME_MAP.get(atom.name, atom.name)
+        # Copy position from old_res; handle split-atom name mapping.
+        # C2CD/D2DC (disulfide) and the NOS hybrids all split CB/SG (and CE/NZ)
+        # into duplicated branches whose coordinates come from the single WT atom.
+        if new_res.resname in ["C2CD", "D2DC",
+                               "O2CN", "CN2O", "C2CN", "CN2C",
+                               "O2KN", "KN2O", "K2KN", "KN2K"]:
+            src_name = _SPLIT_ATOM_NAME_MAP.get(atom.name, atom.name)
+        else:
+            src_name = atom.name
         try:
             atom.x = old_res[src_name].x
-        except (KeyError, AttributeError):
+        except (KeyError, AttributeError, IndexError):
             pass  # keep MTP/bb_super position if source atom not found
+
+
+def _proline_ring_state(r, topol):
+    """Return which state ('A'/'B') has a proline ring at residue *r*, else None.
+
+    Proline is identified by its ring-closure bond N-Cdelta (the side chain closes
+    a 5-membered ring back onto the backbone N) -- unique to proline, so detection
+    is independent of the hybrid *name*.  This fires for the classic hybrid ('X2P'),
+    the generative hybrid ('X2PR'), and terminal proline alike, and -- unlike the
+    old ``'P' in resname and len==3`` gate -- never mis-fires on phospho hybrids
+    (``S2P1`` etc.).  'A' = real proline ring in state A; 'B' = appearing (dummy)
+    proline ring in state B.
+    """
+    byname = {}
+    for a in r.atoms:
+        byname.setdefault(a.name, a)
+    n = byname.get('N')
+    if n is None:
+        return None
+
+    def ring_cd(cd_name):
+        cd = byname.get(cd_name)
+        if cd is None:
+            return None
+        for b in topol.bonds:
+            if {b[0].id, b[1].id} == {n.id, cd.id}:
+                return cd
+        return None
+
+    def _morphs(atom):
+        # The ring decoupling (break CD-CG + ring angles/dihedrals in one state) is only
+        # valid when the ring APPEARS or DISAPPEARS -- i.e. its atoms are dummy in exactly
+        # one state.  A Pro->Pro morph (N-terminal-proline terminal patch, XdeN deletion
+        # neighbour) keeps the ring REAL in BOTH states; decoupling it there spuriously
+        # opens an intact ring and destabilises the switch.  So require a real<->dummy morph.
+        ta = (getattr(atom, 'atomtype', '') or '')
+        tb = (getattr(atom, 'atomtypeB', '') or ta)
+        return ta.upper().startswith('DUM') != tb.upper().startswith('DUM')
+
+    cd = ring_cd('CD')       # real proline ring present in state A
+    if cd is not None:
+        return 'A' if _morphs(cd) else None
+    dcd = ring_cd('DCD')     # appearing (dummy) proline ring in state B
+    if dcd is not None:
+        return 'B' if _morphs(dcd) else None
+    return None
 
 
 def _proline_dihedral_decouplings(topol, rlist, rdic):
     for r in rlist:
-        if 'P' in r.resname and len(r.resname) == 3:
-            # identify in which state proline sits
-            prolineState = 'A'
-            if '2P' in r.resname:
-                prolineState = 'B'
-
+        prolineState = _proline_ring_state(r, topol)
+        if prolineState is not None:
             # find the atoms for which the bond needs to be broken
             prolineCDatom = ''
             prolineCBatom = ''
@@ -908,12 +933,8 @@ def _proline_dihedral_decouplings(topol, rlist, rdic):
 
 def _proline_decouplings(topol, rlist, rdic):
     for r in rlist:
-        if 'P' in r.resname and len(r.resname) == 3:
-            # identify in which state proline sits
-            prolineState = 'A'
-            if '2P' in r.resname:
-                prolineState = 'B'
-
+        prolineState = _proline_ring_state(r, topol)
+        if prolineState is not None:
             # find the atoms for which the bond needs to be broken
             prolineCDatom = ''
             prolineCGatom = ''
@@ -1001,6 +1022,280 @@ def _proline_decouplings(topol, rlist, rdic):
                             dih[5] = [func, dih[6][1], 0.0, dih[6][-1]]
 
 
+def _dummy_in_state(atom, state):
+    """True if *atom* is a dummy (DUM_ atomtype) in end state 'A' or 'B'.
+
+    Mirrors :func:`_check_case`: state A reads ``atomtype``, state B reads
+    ``atomtypeB`` (falling back to ``atomtype`` when it is unset).
+    """
+    if state == 'A':
+        t = atom.atomtype
+    else:
+        t = atom.atomtypeB if atom.atomtypeB is not None else atom.atomtype
+    return t is not None and t.startswith('DUM')
+
+
+def _decouple_dummies(topol, verbose=False):
+    """Boresch dummy-atom decoupling corrections (opt-in: ``gentop --decouple-dummies``).
+
+    pmx's default ("naive") dummy treatment keeps *every* bonded term of an
+    appearing/disappearing atom in BOTH the physical and the dummy end state.
+    Some of those terms couple a physical degree of freedom to a dummy one at
+    the physical/dummy junction, which breaks the factorization of the dummy
+    contribution to the partition function -- the condition that makes the dummy
+    free energy a state-independent constant that cancels in a thermodynamic
+    cycle (Fleck, Wieder, Boresch, *J. Chem. Theory Comput.* 2021, 17, 4403).
+    This pass removes the offending coupling terms *in the state where the atom
+    is a dummy*, keeping enough of the real bonded terms that no under-restraint
+    ("flapping") is introduced (validated by gas-phase MD; see the sub-functions).
+
+    Off by default; wired through :func:`gen_hybrid_top` and the
+    ``gentop --decouple-dummies`` flag.  Two corrections are applied:
+
+    * **Case #4** -- Urey-Bradley junction terms (:func:`_dc_urey_bradley`).
+    * **Cases #2/#3** -- redundant terminal-junction dihedrals
+      (:func:`_dc_terminal_dihedrals`).
+
+    All modifications are per-state and touch only the state where the atom is a
+    dummy; the physical end state is left byte-identical.
+    """
+    n_ub = _dc_urey_bradley(topol, verbose=verbose)
+    n_del, n_anchor = _dc_terminal_dihedrals(topol, verbose=verbose)
+    if verbose:
+        print('log_> decouple-dummies: %d UB removed, %d redundant junction '
+              'dihedrals deleted, %d anchor dihedral(s) kept'
+              % (n_ub, n_del, n_anchor))
+    return n_ub, n_del, n_anchor
+
+
+def _dc_urey_bradley(topol, verbose=False):
+    """Case #4 -- delete Urey-Bradley junction terms (CHARMM func-5 angles).
+
+    A Urey-Bradley term is a harmonic term in the 1-3 distance of a bond angle,
+    i.e. an effective virtual bond between the two *outer* atoms of the angle.
+    Boresch: "the additional Urey-Bradley term of a bond angle needs to be
+    deleted whenever the angle is made up from two physical and one dummy atom"
+    (p. 4406); the paper deletes these even in its "naive" baseline.  A
+    2-physical/1-dummy angle necessarily has the dummy as an *outer* atom (the
+    central atom is physical), so its UB 1-3 pair straddles the junction.  We
+    zero the UB sub-term (S0, kUB) in the offending state while keeping the
+    harmonic angle (theta0, ktheta) -- the harmonic angle remains as the anchor,
+    so no flapping is introduced (case #4 needs no re-anchoring).
+
+    Note on aliasing: for a junction angle (physical in one state, dummy in the
+    other) :func:`_find_angle_entries` stores the *same* list object in both the
+    A-slot ``ang[4]`` and B-slot ``ang[5]``.  We therefore **reassign** the
+    dummy-state slot with a fresh list rather than mutating it in place, so the
+    physical state's parameters are left untouched.
+    """
+    n_ub = 0
+    for ang in topol.angles:
+        if len(ang) < 6:           # no B-state params filled -> nothing to do
+            continue
+        if ang[3] != 5:            # only CHARMM Urey-Bradley (func-5) angles
+            continue
+        a1, a2, a3 = ang[0], ang[1], ang[2]
+        for state, slot in (('A', 4), ('B', 5)):
+            params = ang[slot]
+            if not isinstance(params, list) or len(params) < 5:
+                continue
+            d1 = _dummy_in_state(a1, state)
+            d2 = _dummy_in_state(a2, state)
+            d3 = _dummy_in_state(a3, state)
+            # Case #4: exactly one dummy, on an OUTER position (central atom
+            # physical) -> 2 physical + 1 dummy, UB 1-3 pair straddles junction.
+            if (not d2) and (d1 != d3):
+                if params[3] != 0.0 or params[4] != 0.0:
+                    # reassign (do not mutate: A/B slots may be the same object)
+                    ang[slot] = [params[0], params[1], params[2], 0.0, 0.0]
+                    n_ub += 1
+                    if verbose:
+                        print('log_> decouple-dummies: removed UB (state %s) '
+                              '%s-%s-%s' % (state, a1.name, a2.name, a3.name))
+    return n_ub
+
+
+def _dc_connected_components(idset, adj):
+    """Connected components of the atom-ids in *idset* under adjacency *adj*."""
+    seen = set()
+    comps = []
+    for s in idset:
+        if s in seen:
+            continue
+        comp = set()
+        stack = [s]
+        while stack:
+            x = stack.pop()
+            if x in comp:
+                continue
+            comp.add(x)
+            seen.add(x)
+            stack.extend(y for y in adj.get(x, ()) if y in idset and y not in comp)
+        comps.append(comp)
+    return comps
+
+
+def _dc_terminal_dihedrals(topol, verbose=False):
+    """Cases #2/#3 -- prune redundant dihedrals at *terminal* dummy junctions.
+
+    A *terminal junction* is a dummy group (a connected set of dummy atoms in a
+    given end state) attached to the physical system through exactly ONE physical
+    bridge atom, with no atom of the group bonded to a second physical atom (no
+    ring back into the physical system).  For such junctions Boresch (p. 4409)
+    shows one can keep *all bond angle terms* -- only the dihedrals are redundant.
+    pmx's naive treatment keeps every junction dihedral in both states, giving
+    the single-/dual-anchored redundant-dihedral constraints (cases #2/#3) that
+    break factorization.
+
+    Rule (p. 4409): keep the dihedrals reaching into the dummy group from ONE
+    physical anchor atom; delete (zero, in the dummy state) every other junction
+    dihedral into the group.  The kept anchor dihedrals are left *unchanged* --
+    their real periodic terms already anchor the group's rotation with a
+    torsional profile identical to the physical atom's, so the group's pose is
+    well defined (no flapping) and the physical subsystem is untouched.
+
+    Boresch (Table 3 fn b) additionally *replaces* the kept dihedral with a stiff
+    single-minimum term to guarantee no flapping.  We deliberately do NOT do that
+    here: the gentop stage has no coordinates, so a hard anchor can only be placed
+    at a fixed phase, and empirically (anchor force-constant sweep in scratchpad/)
+    a phase that does not match the built geometry couples the physical bridge to
+    the dummy and displaces the physical heavy atoms by tens of pm -- a larger
+    error than the redundancy it removes.  Keeping the real dihedral avoids that
+    while still deleting the factorization-breaking redundant terms.
+
+    Only strictly terminal, single-branch junctions are handled here; dual/triple/
+    ring junctions (more than one physical bridge, a group atom bonded to two
+    physical atoms, or a bridge carrying a second dummy group) are left as-is
+    (they need the fuller Boresch section-2.3 treatment and are over-anchored but
+    flapping-free under the naive scheme).
+    """
+    # bond adjacency over atom ids
+    adj = {}
+    for b in topol.bonds:
+        adj.setdefault(b[0].id, set()).add(b[1].id)
+        adj.setdefault(b[1].id, set()).add(b[0].id)
+    id2atom = {a.id: a for a in topol.atoms}
+
+    n_del = 0
+    n_anchor = 0
+    for state, slot in (('A', 5), ('B', 6)):
+        dumids = set(a.id for a in topol.atoms if _dummy_in_state(a, state))
+        if not dumids:
+            continue
+        for group in _dc_connected_components(dumids, adj):
+            # physical bridge atom(s): physical atoms bonded to the group
+            bridges = set()
+            for did in group:
+                for nb in adj.get(did, ()):
+                    if nb not in group and not _dummy_in_state(id2atom[nb], state):
+                        bridges.add(nb)
+            # terminal junction only: exactly one physical bridge, no ring back
+            if len(bridges) != 1:
+                continue
+            ring = any(
+                len([nb for nb in adj.get(did, ())
+                     if nb not in group and not _dummy_in_state(id2atom[nb], state)]) > 1
+                for did in group)
+            if ring:
+                continue
+            # single dummy branch only: the bridge must not carry a second dummy
+            # group (that is a two-branch dual junction -- needs the fuller
+            # section-2.3 inter-group treatment, out of scope here).
+            X = next(iter(bridges))
+            if any(nb not in group for nb in adj.get(X, ())
+                   if _dummy_in_state(id2atom[nb], state)):
+                continue
+
+            # junction dihedrals reaching into this group in this state
+            jdih = []
+            for d in topol.dihedrals:
+                if len(d) < 7:
+                    continue
+                params = d[slot]
+                if not isinstance(params, list):   # 'NULL' / fake dihedral
+                    continue
+                ids = [d[0].id, d[1].id, d[2].id, d[3].id]
+                in_grp = [i for i in ids if i in group]
+                phys = [i for i in ids if not _dummy_in_state(id2atom[i], state)]
+                if in_grp and phys:                # spans the junction
+                    jdih.append(d)
+            if not jdih:
+                continue
+
+            # physical "anchor" candidates: the physical END atom (position 0 or
+            # 3) of each junction dihedral -- the atom farthest from the dummy.
+            def phys_end(d):
+                ids = [d[0].id, d[1].id, d[2].id, d[3].id]
+                if ids[0] not in group and not _dummy_in_state(id2atom[ids[0]], state):
+                    if ids[3] in group or _dummy_in_state(id2atom[ids[3]], state):
+                        return ids[0]
+                if ids[3] not in group and not _dummy_in_state(id2atom[ids[3]], state):
+                    if ids[0] in group or _dummy_in_state(id2atom[ids[0]], state):
+                        return ids[3]
+                # both ends physical (dummy in the middle) -> use the heavier end
+                return None
+
+            # choose the anchor: prefer a heavy (non-H) physical atom that anchors
+            # the most junction dihedrals; deterministic tie-break by atom id.
+            from collections import Counter
+            counts = Counter()
+            for d in jdih:
+                e = phys_end(d)
+                if e is not None:
+                    counts[e] += 1
+            if not counts:
+                continue
+
+            def anchor_key(aid):
+                a = id2atom[aid]
+                heavy = 0 if (a.atomtype or '').upper().startswith('H') \
+                    or (a.name or '').upper().startswith('H') else 1
+                return (heavy, counts[aid], -aid)   # heavy > frequent > low-id
+            anchor = max(counts, key=anchor_key)
+
+            # Keep the dihedrals reaching into the group from the ONE anchor atom
+            # *unchanged* (their real, geometry-consistent periodic terms already
+            # anchor the group's rotation without coupling it to a second physical
+            # atom); delete every other junction dihedral in the dummy state.
+            #
+            # We deliberately do NOT replace the kept dihedral with an artificial
+            # stiff single-minimum term.  Empirically (anchor force-constant sweep,
+            # scratchpad/), a hard anchor at a phase that does not match the built
+            # geometry -- which is unavoidable here, since the gentop stage has no
+            # coordinates -- couples the physical bridge to the dummy and displaces
+            # the physical heavy atoms by tens of pm (worse than the redundancy it
+            # removes).  Keeping the real dihedral leaves the group's torsional
+            # profile identical to the physical atom's, which is well-defined (no
+            # flapping) and does not perturb the physical subsystem.
+            anchor_tuples = set()
+            for d in jdih:
+                func = d[4]
+                tup = (d[0].id, d[1].id, d[2].id, d[3].id)
+                if phys_end(d) == anchor and func in (1, 4, 9):
+                    anchor_tuples.add(tup)                       # keep as-is
+                    continue
+                d[slot] = _dc_zero_dih(func, d[slot])
+                n_del += 1
+                if verbose:
+                    print('log_> decouple-dummies: deleted junction dihedral '
+                          '(state %s) %s-%s-%s-%s' % (state, d[0].name,
+                          d[1].name, d[2].name, d[3].name))
+            n_anchor += len(anchor_tuples)
+    return n_del, n_anchor
+
+
+def _dc_zero_dih(func, params):
+    """Return a zeroed dihedral parameter list for *func* (deletes the term)."""
+    if func == 3:                                  # Ryckaert-Bellemans
+        return [func, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+    if func == 2:                                  # improper (harmonic)
+        phi = params[1] if isinstance(params, list) and len(params) > 1 else 0.0
+        return [func, phi, 0.0]
+    phi = params[1] if isinstance(params, list) and len(params) > 1 else 0.0
+    mult = params[-1] if isinstance(params, list) and len(params) > 3 else 1
+    return [func, phi, 0.0, mult]                  # proper: zero the force constant
+
+
 def extract_atoms(residue):
     """Return a name→atom dict for a dual-branch Cys residue (C2CD/D2DC).
 
@@ -1023,6 +1318,34 @@ def extract_atoms(residue):
     return atoms
 
 
+def extract_nos_atoms(cys_res, lys_res):
+    """Return (cys, lys) name->atom dicts for a NOS hybrid pair.
+
+    Cys side (C2CO, split-atom): CB2/SG2 = B-state branch, OD2 = bridging O.
+    Lys side (K2KO, split-atom): CE2/NZ2 = B-state (NOS) branch, HZ21 its proton;
+                                 CD (common) for the CD-CE2-NZ2-OD dihedral.
+    """
+    cwant = ('CA', 'CB2', 'SG2', 'OD2')
+    lwant = ('CD', 'CE2', 'NZ2', 'HZ21', 'HE21', 'HE22')
+    cys = {k: None for k in cwant}
+    lys = {k: None for k in lwant}
+    for a in cys_res.atoms:
+        if a.name in cys:
+            cys[a.name] = a
+    for a in lys_res.atoms:
+        if a.name in lys:
+            lys[a.name] = a
+    cmiss = [k for k in ('CB2', 'SG2', 'OD2') if cys[k] is None]
+    lmiss = [k for k in ('CE2', 'NZ2') if lys[k] is None]
+    if cmiss:
+        raise ValueError(f"O2CN residue {cys_res.resname}:{cys_res.id} "
+                         f"missing atoms: {cmiss}")
+    if lmiss:
+        raise ValueError(f"O2KN residue {lys_res.resname}:{lys_res.id} "
+                         f"missing atoms: {lmiss}")
+    return cys, lys
+
+
 def _zero_B_if_has_dummy_angle(entry):
     """Zero B-state force constants when any angle atom carries a DUM type."""
     if any('DUM' in a.typeB for a in entry[:3]):
@@ -1037,73 +1360,13 @@ def _zero_B_if_has_dummy_dihedral(entry):
         entry[6] = [B[0], B[1], 0.0] + B[3:]
 
 
-def _add_ss_bonded_terms(topol, r1_atoms, r2_atoms, mode='form'):
-    """Append SG2-SG2' bond, CB2-SG2-SG2' angles, and SS dihedrals to topol.
+# The bespoke disulfide/NOS bonded-term detectors (_add_ss_bonded_terms /
+# _add_nos_terms and their _add_*_bonded_terms drivers) were retired: all
+# bond-forming cross-links now flow through _apply_inter_bonds + the graph rule
+# induced_bond_morph, driven by the [ inter_bonds ] MTP section or the
+# _LEGACY_INTER_BONDS recipe table.  The declarative equivalents disulfide_morph
+# / nos_morph live in pmx.covalent.edit.
 
-    mode : 'form'  - A-state off (k=0), B-state on.
-           'break' - A-state on, B-state off (k=0).
-           'perma' - both states on.
-    """
-    get_t = (lambda a: a.typeB) if mode == 'form' else (lambda a: a.type)
-
-    sg1, sg2 = r1_atoms['SG2'], r2_atoms['SG2']
-    func, x0, k = topol.BondedParams.get_bond_param(get_t(sg1), get_t(sg2))
-    k_A = 0.0 if mode == 'form'  else k
-    k_B = 0.0 if mode == 'break' else k
-    topol.bonds.append([sg1, sg2, func, [func, x0, k_A], [func, x0, k_B]])
-
-    for t in ([r1_atoms['CB2'], r1_atoms['SG2'], r2_atoms['SG2']],
-              [r2_atoms['CB2'], r2_atoms['SG2'], r1_atoms['SG2']]):
-        parm = topol.BondedParams.get_angle_param(*[get_t(a) for a in t])
-        if len(parm) != 5:
-            parm += [0, 0]
-        func, th0, kth, r0_ub, kub = parm
-        k_ang_A = 0.0 if mode == 'form'  else kth
-        k_ang_B = 0.0 if mode == 'break' else kth
-        k_ub_A  = 0.0 if mode == 'form'  else kub
-        k_ub_B  = 0.0 if mode == 'break' else kub
-        topol.angles.append(t + [
-            func,
-            [func, th0, k_ang_A, r0_ub, k_ub_A],
-            [func, th0, k_ang_B, r0_ub, k_ub_B],
-        ])
-        _zero_B_if_has_dummy_angle(topol.angles[-1])
-
-    dih_quartets = [
-        [r1_atoms['CB2'], r1_atoms['SG2'], r2_atoms['SG2'], r2_atoms['CB2']],
-        [r1_atoms['CA'],  r1_atoms['CB2'], r1_atoms['SG2'], r2_atoms['SG2']],
-        [r2_atoms['CA'],  r2_atoms['CB2'], r2_atoms['SG2'], r1_atoms['SG2']],
-    ]
-    for q in dih_quartets:
-        terms = topol.BondedParams.get_dihedral_param(*[get_t(a) for a in q], 9)
-        for func, phi0, kphi, mult in terms:
-            k_dih_A = 0.0 if mode == 'form'  else kphi
-            k_dih_B = 0.0 if mode == 'break' else kphi
-            topol.dihedrals.append(q + [
-                func,
-                [func, phi0, k_dih_A, mult],
-                [func, phi0, k_dih_B, mult],
-            ])
-            _zero_B_if_has_dummy_dihedral(topol.dihedrals[-1])
-
-
-def _add_disulfide_bonded_terms(topol, rlist, rdic, ff):
-    """Add cross-residue SG2-SG2' bonded terms for alchemical disulfide pairs.
-
-    Expects exactly 0 or 2 disulfide hybrid residues (C2CD / D2DC) in rlist.
-    With 0, this is a no-op. With 2, adds A-state-off / B-state-on SS terms.
-    """
-    disulfide_pair = [r for r in rlist if r.resname in library._disulfide_hybrids]
-    n = len(disulfide_pair)
-    if n == 0:
-        return
-    if n != 2:
-        raise RuntimeError(
-            f"Need exactly 2 disulfide partner residues in rlist, got {n}.")
-    _add_ss_bonded_terms(topol,
-                         extract_atoms(disulfide_pair[0]),
-                         extract_atoms(disulfide_pair[1]),
-                         mode='form')
 
 
 def _terminal_deletion_decouplings(topol, rlist, verbose=False):
@@ -1127,31 +1390,124 @@ def _terminal_deletion_decouplings(topol, rlist, verbose=False):
         else:
             continue
 
+        from .covalent.edit import (apply_bond_morph, InterResidueBondMorph,
+                                     Interaction)
         neighbor_ids = set(a.id for a in r.atoms)
         del_ids = set(a.id for a in del_res.atoms)
 
+        # collect the dihedrals spanning the deletion boundary, then hand them
+        # to the unified applier in 'decouple' mode (zeros their B-state) -- the
+        # same zeroing logic as the disulfide/NOS path, one implementation.
+        interactions = [
+            Interaction('dihedral', [dih[0], dih[1], dih[2], dih[3]])
+            for dih in topol.dihedrals
+            if ({dih[0].id, dih[1].id, dih[2].id, dih[3].id} & neighbor_ids
+                and {dih[0].id, dih[1].id, dih[2].id, dih[3].id} & del_ids)
+        ]
         if verbose:
             print('log_> Decoupling cross-residue dihedrals: '
-                  '%s (res %d) -- %s (res %d)'
-                  % (r.resname, r.id, del_res.resname, del_res.id))
+                  '%s (res %d) -- %s (res %d): %d dihedrals'
+                  % (r.resname, r.id, del_res.resname, del_res.id,
+                     len(interactions)))
+        apply_bond_morph(topol, InterResidueBondMorph('decouple', interactions))
 
-        dih_count = 0
-        for dih in topol.dihedrals:
-            ids = {dih[0].id, dih[1].id, dih[2].id, dih[3].id}
-            if ids & neighbor_ids and ids & del_ids:
-                if dih[5] == 'NULL' or dih[6] == 'NULL':
-                    continue
-                func = dih[4]
-                if func == 3:
-                    dih[6] = [func, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
-                elif func == 2:
-                    dih[6] = [func, dih[6][1], 0.0]
-                else:
-                    dih[6] = [func, dih[6][1], 0.0, dih[6][-1]]
-                dih_count += 1
 
+def _find_topol_atom(rlist, resid, chain, atom_name):
+    """Locate an atom by (resid, chain, name) in the parsed topology residues.
+
+    Prefers the bound-branch split name (``NZ`` -> ``NZ2``) so a user can name the
+    plain reacting atom in ``gentop --bond`` without knowing the split naming.
+    """
+    for r in rlist:
+        if r.id != resid:
+            continue
+        if chain and getattr(r, 'chain_id', '') not in ('', None, chain):
+            continue
+        by = {a.name: a for a in r.atoms}
+        # Try the exact name first (a ligand/partner atom named e.g. "C1"), then
+        # the bound-branch split name ("SG" -> "SG2").  Split hybrid residues have
+        # no plain reacting-atom name (only X1/X2), so a disulfide/NOS "SG"/"NZ"
+        # still falls through to SG2/NZ2; but a covalent-inhibitor ligand atom
+        # "C1" resolves to itself instead of grabbing an aromatic "C12".
+        for cand in (atom_name, atom_name + '2'):
+            if cand in by:
+                return by[cand]
+    return None
+
+
+def _apply_inter_bonds(topol, rlist, explicit_bonds, verbose=False):
+    """Form the user-declared inter-residue cross-link bonds (``gentop --bond``).
+
+    Each bond is a pair of atoms named by ``(resid, chain, atom)``.  The reacting
+    residues must already be clawed back into their dual-topology split (via
+    ``pmx mutate --react`` or a shipped split hybrid) so the bond lands on a
+    state-A dummy branch and its 1-4 exclusions are harmless.  The induced angles
+    and dihedrals follow from the union bond graph -- the same rule GROMACS uses
+    to generate bonded terms from bonds -- emitted in dual (A/B) state form
+    (:func:`pmx.covalent.edit.induced_bond_morph`).
+
+    This is the single, chemistry-agnostic way an inter-residue bond is added:
+    the user names the atom pair, nothing is auto-detected by residue name.
+    (A resname->default-bond recognition layer could sit on top of this later.)
+    """
+    if not explicit_bonds:
+        return
+    from .covalent.edit import induced_bond_morph, apply_bond_morph
+
+    # union bond graph over the parsed topology (Atom-object adjacency)
+    adjacency = {}
+    for b in topol.bonds:
+        a1, a2 = b[0], b[1]
+        adjacency.setdefault(a1, set()).add(a2)
+        adjacency.setdefault(a2, set()).add(a1)
+
+    # resolve each --bond pair to its two topology atoms (plain name -> *2 branch).
+    # Search ALL residues of this molecule, not just the clawed-back hybrids: a
+    # targeted-covalent-inhibitor bond joins a hybrid Cys to a NON-hybrid ligand
+    # residue, which is absent from the hybrid-only rlist.  A bond belonging to
+    # another chain still has neither endpoint here and is skipped below.
+    all_res = getattr(topol, 'residues', None) or rlist
+    applied, forming = set(), []
+    for eb in explicit_bonds:
+        a = _find_topol_atom(all_res, eb['resid_a'], eb.get('chain_a'), eb['atom_a'])
+        b = _find_topol_atom(all_res, eb['resid_b'], eb.get('chain_b'), eb['atom_b'])
+        if a is None and b is None:
+            # Neither endpoint is in this molecule -- the bond belongs to another
+            # chain (e.g. the protein in a doublebox; this rlist is the reference
+            # peptide).  process_topol runs per-molecule, so skip here; the bond
+            # is applied when the molecule that owns both atoms is processed.  A
+            # bond never resolved by ANY molecule is caught by gen_hybrid_top's
+            # post-processing unresolved-bond check (eb['_applied']).
+            continue
+        if a is None or b is None:
+            raise RuntimeError(
+                "gentop --bond: could not resolve %s:%s or %s:%s in the topology "
+                "(one endpoint found, the other not -- an inter-residue bond must "
+                "lie within a single molecule/chain)"
+                % (eb['resid_a'], eb['atom_a'], eb['resid_b'], eb['atom_b']))
+        eb['_applied'] = True
+        key = frozenset((a.id, b.id))
+        if key in applied:
+            continue
+        applied.add(key)
+        forming.append((a, b, eb.get('mode', 'form')))
+
+    # add all forming edges to the graph *before* enumerating, so terms shared
+    # between bonds (a SONOS ODa-NZ-ODb cross-angle, both bonds meeting at NZ)
+    # are generated.
+    for a, b, _ in forming:
+        adjacency.setdefault(a, set()).add(b)
+        adjacency.setdefault(b, set()).add(a)
+
+    by_mode = {}
+    for a, b, mode in forming:
+        by_mode.setdefault(mode, []).append((a, b))
+    for mode, bonds in by_mode.items():
+        morph = induced_bond_morph(bonds, adjacency, mode=mode)
         if verbose:
-            print('log_> Zeroed B-state for %d dihedrals' % dih_count)
+            print('log_> gentop --bond: %d bond(s) mode=%s -> %d terms'
+                  % (len(bonds), mode, len(morph.interactions)))
+        apply_bond_morph(topol, morph)
 
 
 def _find_bonded_entries(topol, verbose=False):
@@ -1999,6 +2355,16 @@ def _get_hybrid_residues(m, ff, version='new', verbose=False,
                 if name not in extra_name_map:
                     extra_name_map[name] = mtp_path
 
+    # Auto-discover the force field's nsaa.mtp: the generative engine
+    # (covalent.mutate) accumulates every runtime-built hybrid there, so
+    # gen_hybrid_top resolves them with no --extra_mtp.  Explicit extra_mtp_files
+    # still win (added first, first-hit-wins).
+    from .utils import get_ff_path
+    nsaa_mtp = os.path.join(get_ff_path(ff), 'nsaa.mtp')
+    if os.path.isfile(nsaa_mtp):
+        for name in _read_mtp_names(nsaa_mtp):
+            extra_name_map.setdefault(name, nsaa_mtp)
+
     rdic = {}
     rlist = []
     for res in m.residues:
@@ -2016,12 +2382,24 @@ def _get_hybrid_residues(m, ff, version='new', verbose=False,
                                   verbose=verbose)
         rdic[res.resname] = mtp
         hybrid_res = mtp[0]
-        atom_names = list(map(lambda a: a.name, hybrid_res.atoms))
-        atoms = res.fetchm(atom_names)
-        for i, atom in enumerate(hybrid_res.atoms):
-            atoms[i].atomtypeB = atom.atomtypeB
-            atoms[i].qB = atom.qB
-            atoms[i].mB = atom.mB
+        # Match each mtp atom to the structure atom BY NAME.  fetchm() silently
+        # skips names it cannot find, which used to misalign a positional index
+        # (atoms[i]) and raise an opaque IndexError.  Matching by name instead
+        # gives a clear, actionable error when a required atom is genuinely absent
+        # (e.g. the hybrid was built from a template missing that atom).
+        by_name = {a.name: a for a in res.atoms}
+        for atom in hybrid_res.atoms:
+            target = by_name.get(atom.name)
+            if target is None:
+                raise mtpError(
+                    "hybrid residue %s%s: atom '%s' listed in the mtp is missing "
+                    "from the structure topology. The hybrid was likely built from "
+                    "a template that lacks this atom (e.g. a crystal template with "
+                    "no hydrogens). Rebuild the target residue with a complete-atom "
+                    "template." % (res.resname, res.id, atom.name))
+            target.atomtypeB = atom.atomtypeB
+            target.qB = atom.qB
+            target.mB = atom.mB
     return rlist, rdic
 
 

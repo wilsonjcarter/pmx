@@ -44,12 +44,11 @@ from .parser import kickOutComments
 from .utils import get_ff_path, list2file
 from .library import pmx_data_file
 
-# RDKit is an optional dependency — only needed for domapping()
+# RDKit is an optional dependency.  nsaa.py itself no longer uses it directly, but
+# mutate_nsaa delegates to the covalent generative engine, which does -- so probe
+# availability here to fail early with a clear message.
 try:
-    from rdkit import Chem
-    from rdkit.Chem import AllChem, rdmolops
-    from rdkit.Chem.AllChem import AlignMol, EmbedMultipleConfs
-    from .ligand_alchemy import LigandAtomMapping
+    import rdkit  # noqa: F401
     _RDKIT_AVAILABLE = True
 except ImportError:
     _RDKIT_AVAILABLE = False
@@ -57,12 +56,6 @@ except ImportError:
 logger = logging.getLogger(__name__)
 
 # ── Module-level constants ────────────────────────────────────────────────────
-
-# Inverted alias table: RTP atom name → PDB atom name (per residue)
-_inverted_aliases: Dict[str, Dict[str, str]] = {}
-for _k in library._aliases:
-    _inverted_aliases[_k] = {v: k for k, v in library._aliases[_k].items()}
-_inverted_aliases.setdefault("ILE", {})["CD1"] = "CD1"
 
 # Standard atomic masses for element-symbol fallback
 _ELEM_MASS = {
@@ -557,18 +550,46 @@ def _assign_itp_entries(residue, itp_file: str, rtp, backbone_resname=None):
     return missing
 
 
-def _assign_rtp_entries(mol, rtp, term=None):
+# pmx's _check_residue_name renames a protonated residue to a protonation-state
+# name (charged lysine w/ HZ3 -> 'LYP').  The generative RTP stores the charged
+# lysine under the force field's canonical name instead ('LYS' in amber/charmm),
+# so map the pmx name back when the RTP lacks it.  Applied only as a fallback
+# (see _assign_rtp_entries), so genuinely distinct entries are never touched.
+_RTP_PROTON_ALIAS = library.proton_state_alias   # single home: pmx.library
+
+
+def _assign_rtp_entries(mol, rtp, term=None, ff=None):
     """Assign RTP parameters (atomtype, charge, bonds) to *mol*.
 
     Returns a list of inter-residue bond pairs (e.g. ``['+N', 'C']``).
+
+    Pass *ff* when *term* is set to take the terminal patch from that force
+    field's ``.n/.c.tdb`` instead of the hardcoded CHARMM36 fallback -- required
+    on AMBER/OPLS, whose termini retype the backbone differently (amber's
+    N-terminal CA is ``CX``, not CHARMM's ``CT1``).
     """
     resname = mol.resname
     if resname not in rtp:
-        raise ValueError(
-            f"Residue '{resname}' not found in RTP. "
-            "Check your RTP definitions.")
+        # pmx renames a protonated residue to a protonation-state name for the
+        # classic library (e.g. the charged lysine carrying HZ3 -> 'LYP'), but
+        # the generative RTP stores it under the force field's canonical name
+        # ('LYS' is amber's charged lysine).  Resolve so a mutation/PTM on a
+        # protonated residue still finds its parameters.  Only used when the
+        # given name is genuinely absent, so distinct RTP entries (HID/HIE/HIP,
+        # ASH, GLH ... which amber *does* define) are never remapped.
+        alias = _RTP_PROTON_ALIAS.get(resname)
+        if alias and alias in rtp:
+            mol.set_resname(alias)
+            resname = alias
+        else:
+            raise ValueError(
+                f"Residue '{resname}' not found in RTP. "
+                "Check your RTP definitions.")
 
-    entr = _rtp_terminal(rtp[resname], term) if term else rtp[resname]
+    # _rtp_terminal resolves BOTH terminus conventions (tdb patch first, explicit
+    # N*/C* entry as fallback), so there is nothing to special-case here.
+    entr = (_rtp_terminal(rtp[resname], term, ff=ff, resname=resname)
+            if term else rtp[resname])
     logger.debug("RTP entry for %s: %d atoms", resname, len(entr['atoms']))
 
     neigh = []
@@ -576,15 +597,8 @@ def _assign_rtp_entries(mol, rtp, term=None):
     #print(entr)
     for atom_entry in entr['atoms']:
         atom_name, atom_type, atom_q = atom_entry[0], atom_entry[1], atom_entry[2]
-        #print(atom_name,atom_type,atom_q)
-        # Apply CHARMM alias inversion
-        if resname in _inverted_aliases and atom_name in _inverted_aliases[resname]:
-            atom_name = _inverted_aliases[resname][atom_name]
-        elif atom_name[0].isnumeric():
-            # Numeric-prefix to suffix (e.g. "1HB" → "HB1")
-            atom_name = atom_name[1:] + atom_name[0]
-        #print(atom_name,atom_type,atom_q)
-
+        # RTPParser returns RTP-native names (HB1), which already match the
+        # model's atom names -- no alias inversion needed.
         try:
             atom = mol.fetchm([atom_name], permissive=True)[0]
         except IndexError:
@@ -597,9 +611,6 @@ def _assign_rtp_entries(mol, rtp, term=None):
     for a1, a2 in entr['bonds']:
         within = '-' not in a1 and '+' not in a1 and '-' not in a2 and '+' not in a2
         if within:
-            if resname in _inverted_aliases:
-                a1 = _inverted_aliases[resname].get(a1, a1)
-                a2 = _inverted_aliases[resname].get(a2, a2)
             try:
                 at1, at2 = mol.fetchm([a1, a2], permissive=True)
                 at1.bonds.append(at2)
@@ -613,14 +624,34 @@ def _assign_rtp_entries(mol, rtp, term=None):
     return neigh
 
 
-def _validate_atom_parameters(residue, context: str = '') -> List[str]:
-    """Warn about atoms that lack an atomtype; return their names."""
+def _validate_atom_parameters(residue, context: str = '',
+                              strict: bool = False) -> List[str]:
+    """Report atoms that lack an atomtype; return their names.
+
+    With *strict* the situation is an error instead of a warning.  An untyped
+    atom means the model carries an atom the (possibly terminal-patched) RTP
+    entry does not define, so :func:`_assign_rtp_entries` never assigned it a
+    type.  It then reaches the generated ``nsaa.rtp`` as a three-field row and
+    pdb2gmx dies far from the cause with e.g.::
+
+        in .rtp file in residue G2LU at line:  OC1   0.00000  7
+
+    Callers that have just applied a terminal patch pass ``strict=True`` so the
+    failure is reported here, naming the atoms, rather than downstream.
+    """
     missing = [a.name for a in residue.atoms if not getattr(a, 'atomtype', None)]
+    if missing and strict:
+        raise ValueError(
+            f"residue {residue.resname} ({context}) has atoms with no atomtype: "
+            f"{missing}.  The RTP entry used does not define them -- typically a "
+            f"residue that needs BOTH terminal patches (a chain of one residue "
+            f"after the deletion, so the survivor is N- AND C-terminal) or a "
+            f"terminus whose atom names differ from the patch applied.  pmx will "
+            f"not emit a partially typed residue.")
     if missing:
         logger.warning("Atoms in %s (%s) have no atomtype: %s",
                        residue.resname, context, missing)
     return missing
-
 
 def _assign_mass_atp(r1, r2, ffatomtypes: str, itp_file: str = None):
     """Assign masses to all atoms in *r1* and *r2*.
@@ -721,230 +752,208 @@ def ren_atom(entr: dict, old: str, new: str = None,
     return entr
 
 
-def _rtp_terminal(entr: dict, term: str) -> dict:
-    """Apply CHARMM-style terminal patches to a copy of an RTP entry dict.
+# ── FF-agnostic terminal patches from the GROMACS .n/.c.tdb ───────────────────
+# GROMACS ships each force field's terminal chemistry as data in aminoacids.n.tdb
+# / .c.tdb (named variants: NH3+, GLY-NH3+, PRO-NH2+, COO-, CT2, per-residue
+# <RES>-NH3+ in the amber -q ports, …).  Reading those and applying the chosen
+# variant is FF-agnostic *and* consistent with pdb2gmx by construction (it builds
+# termini from the same files).  This supersedes the hardcoded CHARMM patches
+# below, which are kept as the fallback for FFs whose tdb is empty.
+
+_TDB_SUBSEC = {'replace', 'add', 'delete', 'bonds', 'angles', 'dihedrals',
+               'impropers', 'cmap'}
+_TDB_CACHE: Dict[str, dict] = {}
+
+
+def _tdb_path(ff: str, side: str) -> Optional[str]:
+    """Locate the FF's ``.n.tdb``/``.c.tdb`` (merged.* preferred)."""
+    ffp = get_ff_path(ff)
+    suffix = 'n.tdb' if side == 'N' else 'c.tdb'
+    for base in (f'merged.{suffix}', f'aminoacids.{suffix}'):
+        p = os.path.join(ffp, base)
+        if os.path.isfile(p):
+            return p
+    return None
+
+
+def _parse_tdb(path: Optional[str]) -> dict:
+    """Parse a terminus database into ``{variant: [(section, [token_lists]), …]}``
+    (ordered ops).  Returns {} for a missing or empty tdb."""
+    if path is None:
+        return {}
+    if path in _TDB_CACHE:
+        return _TDB_CACHE[path]
+    variants: Dict[str, list] = {}
+    ops = None
+    for raw in open(path):
+        line = raw.split(';')[0].rstrip()
+        if not line.strip():
+            continue
+        m = re.match(r'\s*\[\s*(.+?)\s*\]\s*$', line)
+        if m:
+            key = m.group(1)
+            if key.lower() in _TDB_SUBSEC:
+                if ops is not None:
+                    ops.append((key.lower(), []))
+            else:
+                ops = variants.setdefault(key, [])
+            continue
+        if ops:
+            ops[-1][1].append(line.split())
+    _TDB_CACHE[path] = variants
+    return variants
+
+
+def _tdb_variant_name(variants: dict, term: str, resname: str) -> Optional[str]:
+    """Pick the terminus variant for (term, residue): a residue-specific charged
+    variant (``GLY-NH3+``/``PRO-NH2+``/amber ``ALA-NH3+``) if present, else the
+    generic charged default (``NH3+``/``COO-``/``CT2``)."""
+    if term == 'C_amide':
+        return 'CT2' if 'CT2' in variants else None
+    if term == 'N':
+        charged = lambda v: ('NH3+' in v or 'NH2+' in v)
+        base = 'NH3+'
+    else:                                    # 'C'
+        charged = lambda v: 'COO-' in v
+        base = 'COO-'
+    for v in variants:
+        if v.startswith(resname + '-') and charged(v):
+            return v
+    return base if base in variants else None
+
+
+def _apply_tdb_variant(entr: dict, ops: list, side: str) -> dict:
+    """Apply ordered tdb ops (replace/add/delete/impropers) to a copy of an RTP
+    entry.  Geometry is left to the RDKit embed downstream, so only the atom/
+    type/charge/bond/improper deltas are applied."""
+    entr = deepcopy(entr)
+    for k in ('atoms', 'bonds', 'diheds', 'improps', 'cmap'):
+        entr.setdefault(k, [])
+    del_atoms(entr, '-C' if side == 'N' else '+N')   # terminus drops the inter-res bond
+    have = lambda nm: any(a[0] == nm for a in entr['atoms'])
+    for sec, rows in ops:
+        if sec == 'replace':
+            # Two GROMACS .tdb replace forms, BOTH five tokens wide, told apart
+            # only by whether the third token is numeric:
+            #   old NEW type mass q [cgnr]   (a rename; amber COO-: O OC1 O2 16.00 -0.79)
+            #   old type mass q [cgnr]       (no rename; amber CT2:  C C 12.011 0.5973 1)
+            # Assuming the rename form unconditionally set atype to a MASS
+            # string ('12.011'), which downstream turned into element '1' and
+            # crashed the RDKit embed.
+            def _num(x):
+                try:
+                    float(x)
+                    return True
+                except ValueError:
+                    return False
+            for r in rows:
+                if len(r) >= 4 and _num(r[2]):          # old type mass q [cgnr]
+                    old, new, atype, q = r[0], r[0], r[1], r[3]
+                elif len(r) >= 5 and _num(r[3]):        # old new type mass q [cgnr]
+                    old, new, atype, q = r[0], r[1], r[2], r[4]
+                else:
+                    continue
+                if not have(old):    continue        # replace only present atoms
+                ren_atom(entr, old, new=(new if new != old else None),
+                         atype=atype, q=float(q))
+        elif sec == 'delete':
+            for r in rows:
+                if have(r[0]):
+                    del_atoms(entr, r[0])
+        elif sec == 'add':
+            for i in range(0, len(rows) - 1, 2):     # header line + spec line
+                hdr, spec = rows[i], rows[i + 1]
+                nadd = int(hdr[0]); newname = hdr[2]; ctrls = hdr[3:]
+                atype, q = spec[0], float(spec[2])
+                bonded_to = ctrls[0]
+                names = ([newname] if nadd == 1
+                         else [f"{newname}{k}" for k in range(1, nadd + 1)])
+                after = bonded_to
+                for nm in names:
+                    if have(nm):
+                        after = nm; continue
+                    add_atom(entr, nm, atype, q, after=after)
+                    entr['bonds'].append([bonded_to, nm])
+                    after = nm
+        elif sec == 'impropers':
+            for r in rows:
+                entr['improps'].append(list(r[:4]) + [''])
+    return entr
+
+
+def _rtp_terminal(entr: dict, term: str, ff: str = None,
+                  resname: str = None) -> dict:
+    """Apply a terminal patch to a copy of an RTP entry dict, taken from the
+    force field's OWN terminus database.
+
+    Force-field agnostic by construction: the patch is read from *ff*'s
+    ``.n/.c.tdb`` (``merged.*`` preferred) -- the same file pdb2gmx reads -- so
+    the generated hybrid matches what pdb2gmx builds for a real terminus.
+
+    There is deliberately **no fallback**.  Substituting one force field's
+    terminal parameters into another silently yields a chimeric topology; that is
+    the bug class behind ``Atomtype DUM_CX not found`` (amber's N-terminal CA is
+    ``CX``, never CHARMM's ``CT1``) and behind blank-typed ``OC1``/``OC2`` (amber
+    names the carboxylate oxygens ``OC1``/``OC2``, CHARMM ``OT1``/``OT2``).  A
+    force field that does not define the requested variant raises.
+
+    The variant is resolved by the conventional GROMACS names -- ``NH3+`` /
+    ``NH2+`` for N, ``COO-`` for C, ``CT2`` for a C-terminal amide, optionally
+    residue-prefixed (``GLY-NH3+``, ``PRO-NH2+``, amber's ``ALA-NH3+``).  A port
+    is required to use those names; see :func:`_tdb_variant_name`.
 
     Parameters
     ----------
     entr : dict
-        RTP entry dict with keys ``atoms``, ``bonds``, ``diheds``,
-        ``improps``, ``cmap``.
-    term : {'N', 'C'}
-        Which terminus to patch.
+        RTP entry dict with keys ``atoms``, ``bonds``, ``diheds``, ``improps``,
+        ``cmap``.
+    term : {'N', 'C', 'C_amide'}
+        Which terminus / variant to apply.
+    ff, resname : str
+        Both required.  The force field to read the terminus from, and the
+        residue whose (possibly residue-specific) variant is wanted.
 
-    .. note::
-       This function applies **CHARMM36** terminal patches only.
-       AMBER/OPLS terminal modifications are different and not supported here.
+    Raises
+    ------
+    ValueError
+        if *ff* or *resname* is missing, if the force field ships no terminus
+        database, or if it defines no variant for *term*.
     """
-    entr = deepcopy(entr)
-    if term == 'N':
-        ren_atom(entr, 'N',  atype='NH3', q=-0.30)
-        ren_atom(entr, 'CA', atype='CT1', q=0.21)
-        ren_atom(entr, 'HA', atype='HB1', q=0.10)
-        del_atoms(entr, 'HN')
-        del_atoms(entr, '-C')
-        add_atom(entr, 'H1', 'HC', 0.33, after='N')
-        add_atom(entr, 'H2', 'HC', 0.33, after='H1')
-        add_atom(entr, 'H3', 'HC', 0.33, after='H2')
-        entr['bonds'].extend([['N', 'H1'], ['N', 'H2'], ['N', 'H3']])
-    elif term == 'C':
-        ren_atom(entr, 'C', atype='CC',  q=0.34)
-        ren_atom(entr, 'O', new='OT1', atype='OC', q=-0.67)
-        add_atom(entr, 'OT2', 'OC', -0.67, after='OT1')
-        del_atoms(entr, '+N')
-        entr['bonds'].extend([['C', 'OT1'], ['C', 'OT2']])
-        entr['improps'].append(['C', 'CA', 'OT2', 'OT1', ''])
-    return entr
-
-
-# =============================================================================
-# Atom mapping (requires RDKit)
-# =============================================================================
-
-def _reformat_pdb(mdl, strict: bool = False) -> Tuple[str, dict, list]:
-    """Return a PDB-format string, original atom name map, and sigma-hole IDs."""
-    m = deepcopy(mdl)
-    atom_name_id: Dict[int, str] = {}
-    sigma_hole_ids = []
-    sh_counter = 1
-    for a in m.atoms:
-        if 'EP' in a.name or 'LPH' in a.name:
-            a.name = f'HSH{sh_counter}'
-            sh_counter += 1
-            sigma_hole_ids.append(a.id)
-        atom_name_id[a.id] = a.name
-
-    at_len = 3 if strict else 4
-    lines = []
-    for atom in m.atoms:
-        name = atom.name.upper()
-        if 'CL' in name:
-            atom.name = 'CL'
-        elif 'BR' in name:
-            atom.name = 'BR'
-        elif len(atom.name) > at_len:
-            atom.name = atom.name[:at_len]
-        lines.append(str(atom))
-    lines.append('TER\nENDMDL\n')
-    return '\r\n'.join(lines), atom_name_id, sigma_hole_ids
-
-
-def _set_backbone_carbonyl_double(mol, ca_idx: int, c_idx: int) -> bool:
-    """Force the C=O bond type to DOUBLE in an RDKit mol."""
-    c = mol.GetAtomWithIdx(c_idx)
-    o_nbrs = [n for n in c.GetNeighbors() if n.GetSymbol() == 'O']
-    if len(o_nbrs) >= 2:
-        return False
-    if len(o_nbrs) == 1:
-        b = mol.GetBondBetweenAtoms(c_idx, o_nbrs[0].GetIdx())
-        if b:
-            b.SetBondType(Chem.BondType.DOUBLE)
-            return True
-    return False
-
-
-def _force_backbone_pairs(n1: list, n2: list,
-                          backbone1: list, backbone2: list):
-    """Enforce that backbone1[k] maps to backbone2[k] in the atom mapping."""
-    bb12 = dict(zip(backbone1, backbone2))
-    bb21 = dict(zip(backbone2, backbone1))
-
-    m12: Dict[int, int] = {}
-    used2: set = set()
-    for i1, i2 in zip(n1, n2):
-        if i1 in bb12 and bb12[i1] != i2:
-            continue
-        if i2 in bb21 and bb21[i2] != i1:
-            continue
-        if i2 in used2:
-            continue
-        m12[i1] = i2
-        used2.add(i2)
-
-    for i1, i2 in zip(backbone1, backbone2):
-        for k, v in list(m12.items()):
-            if v == i2 and k != i1:
-                del m12[k]
-        m12[i1] = i2
-
-    n1_out = list(m12.keys())
-    return n1_out, [m12[i] for i in n1_out]
-
-
-def domapping(res1, res2, backbone1: list, backbone2: list, term=None):
-    """Compute atom mapping between two residues using MCS + 3-D alignment.
-
-    Uses RDKit for MCS, alignment, and conformer embedding.
-
-    Parameters
-    ----------
-    res1, res2 : Residue-like objects with ``.atoms`` list
-    backbone1, backbone2 : lists of int
-        Paired atom indices that must map to each other (backbone constraints).
-    term : {'N', 'C', None}
-
-    Returns
-    -------
-    n1, n2 : lists of int
-        Paired atom indices in res1 and res2.
-    pdb1, pdb2 : str
-        PDB block strings for the aligned residues.
-    """
-    if not _RDKIT_AVAILABLE:
-        raise RuntimeError(
-            "domapping requires RDKit. Install it with: "
-            "conda install -c conda-forge rdkit")
-
-    res1_block, _, sigma1 = _reformat_pdb(res1)
-    res2_block, _, sigma2 = _reformat_pdb(res2)
-
-    mol1 = Chem.MolFromPDBBlock(res1_block, removeHs=False, sanitize=True)
-    mol2 = Chem.MolFromPDBBlock(res2_block, removeHs=False, sanitize=True)
-
-    _set_backbone_carbonyl_double(mol1, backbone1[1], backbone1[2])
-    _set_backbone_carbonyl_double(mol2, backbone2[1], backbone2[2])
-
-    for mol in (mol1, mol2):
-        try:
-            Chem.SanitizeMol(mol)
-        except Exception:
-            pass
-        try:
-            rdmolops.AssignAtomChiralTagsFromStructure(mol)
-            rdmolops.AssignStereochemistry(mol)
-        except Exception:
-            pass
-
-    og_mol1 = deepcopy(mol1)
-    og_mol2 = deepcopy(mol2)
-
-    has_rings = any(a.IsInRing() for a in mol1.GetAtoms()) and \
-                any(a.IsInRing() for a in mol2.GetAtoms())
-
-    with open(os.devnull, 'w') as dev_null:
-        lig_map = LigandAtomMapping(
-            mol1=mol1, mol2=mol2,
-            molForMcs1=deepcopy(mol1), molForMcs2=deepcopy(mol2),
-            bH2H=True, bH2Hpolar=False, bH2Heavy=False,
-            bdMCS=False, bRingsOnly=False, d=0.05, bChiral=True,
-            sigmaHoleID1=sigma1, sigmaHoleID2=sigma2,
-            timeout=10, logfile=dev_null,
-            bElements=False, bCarbonize=False,
-            commandName='atomMapping',
-            backbone1=backbone1, backbone2=backbone2)
-
-        # MCS pass A: element-matched, modified mols
-        lig_map.bElements, lig_map.bCarbonize, lig_map.bRingsOnly = True, False, False
-        n1A, n2A = lig_map.mcs()
-
-        # MCS pass B: element-matched, original mols
-        lig_map.bCarbonize = False
-        n1B, n2B = lig_map.mcs()
-
-        n1mcs, n2mcs = lig_map._compare_mappings_by_size(mol1, mol2, n1A, n2A, n1B, n2B)
-
-        if has_rings:
-            lig_map.bElements, lig_map.bCarbonize, lig_map.bRingsOnly = False, False, True
-            n1C, n2C = lig_map.mcs()
-            n1mcs, n2mcs = lig_map._compare_mappings_by_size(
-                mol1, mol2, n1mcs, n2mcs, n1C, n2C)
-
-        bMCSfailed = (len(n1mcs) == 0)
-
-        n1align, n2align = [], []
-        if bMCSfailed:
-            lig_map.bRingsOnly = False
-            n1align, n2align, _ = lig_map.alignment()
-
-    n1mcs,  n2mcs  = _force_backbone_pairs(n1mcs,  n2mcs,  backbone1, backbone2)
-    n1align, n2align = _force_backbone_pairs(n1align, n2align, backbone1, backbone2)
-
-    if len(n1align) >= len(n1mcs):
-        n1, n2 = n1align, n2align
-        logger.info("Alignment mapping selected (size %d).", len(n1))
-    else:
-        n1, n2 = n1mcs, n2mcs
-        logger.info("MCS mapping selected (size %d).", len(n1))
-
-    if len(n1) != len(n2):
-        raise RuntimeError("Mapping mismatch: |n1|=%d != |n2|=%d" % (len(n1), len(n2)))
-
-    # Embed 100 conformers and pick the one that best aligns to res1
-    cids = list(EmbedMultipleConfs(og_mol2, numConfs=100))
-    if not cids:
-        raise ValueError("Could not embed conformers for the target residue.")
-
-    weights = [3 / len(n2) if (j in backbone2 and i in backbone1) else 1 / len(n2)
-               for i, j in zip(n1, n2)]
-    best_cid, best_rms = 0, 1e10
-    for cid in cids:
-        rms = AlignMol(og_mol2, og_mol1, prbCid=cid,
-                       atomMap=list(zip(n2, n1)), weights=weights)
-        if rms < best_rms:
-            best_rms, best_cid = rms, cid
-
-    og_mol2_best = Chem.Mol(og_mol2, confId=best_cid)
-    return n1, n2, Chem.MolToPDBBlock(og_mol1), Chem.MolToPDBBlock(og_mol2_best)
+    if ff is None or resname is None:
+        raise ValueError(
+            "_rtp_terminal: a terminal patch needs the force field -- got "
+            f"ff={ff!r}, resname={resname!r} for term={term!r}.  Pass ff= and "
+            "resname= from the caller; there is no force-field-independent "
+            "default and pmx will not guess one.")
+    side = 'N' if term == 'N' else 'C'
+    suffix = 'n.tdb' if side == 'N' else 'c.tdb'
+    path = _tdb_path(ff, side)
+    if path is None:
+        explicit = _explicit_terminal_entry(ff, resname, term)
+        if explicit is not None:
+            return explicit
+        raise ValueError(
+            f"force field '{ff}' ships no {side}-terminus database (expected "
+            f"merged.{suffix} or aminoacids.{suffix} in {get_ff_path(ff)}), so "
+            f"the {term!r} terminus for {resname} cannot be built.  Add the "
+            f"terminus database for this force field.")
+    variants = _parse_tdb(path)
+    vname = _tdb_variant_name(variants, term, resname) if variants else None
+    if vname is None:
+        # No usable tdb variant.  Before failing, check whether this force field
+        # uses the OTHER convention: the terminal form as its own RTP entry
+        # (NALA / CALA).  The plain amber ports ship placeholder .tdb files for
+        # exactly that reason.  The tdb is tried FIRST because the -q- ports have
+        # both, and the tdb patch is their established, validated path.
+        explicit = _explicit_terminal_entry(ff, resname, term)
+        if explicit is not None:
+            return explicit
+        raise ValueError(
+            f"force field '{ff}' defines no {term!r} variant for {resname} in "
+            f"{path} (variants present: {sorted(variants) if variants else 'none'})."
+            f"  Add the variant to that .tdb using THIS force field's own "
+            f"parameters -- pmx will not substitute another force field's.")
+    return _apply_tdb_variant(entr, variants[vname], side)
 
 
 # =============================================================================
@@ -967,9 +976,46 @@ def _rename_model_charmm(m) -> None:
             atom.name = 'HG1'
 
 
+def _unique_dummy_name(name: str, used) -> str:
+    """A <=4-character 'D'-prefixed dummy name for *name*, unused in *used*.
+
+    THE single dummy namer for both directions. pmx.covalent.mutate imports it for the
+    reverse path rather than keeping its own copy -- two implementations of this is how
+    the forward path stayed broken after the reverse one was fixed.
+
+    GROMACS caps atom names at 4 characters, so 'D' + a 4-character name has to lose
+    one, and plain truncation is not injective: hexafluoroleucine's FD11/FD12/FD13 all
+    collapse to DFD1. The colliding atoms are then silently merged -- the residue loses
+    four fluorines, every name stays unique, pdb2gmx and grompp are both happy, and the
+    only symptom is a non-integral end state (qB = +0.484 = 4 x 0.121).
+
+    The legacy name is returned whenever it is free, so this only changes behaviour for
+    residues that were previously built wrong.
+
+    The digit rotation ('1HB2' -> 'D1HB' -> 'DHB1') is legacy nsaa behaviour for
+    PDB-style names that lead with a digit; it is a no-op for every protein heavy atom,
+    which is all this is ever asked for, since hydrogens take the HV counter instead.
+    """
+    if len(name) == 4:
+        cand = 'D' + name[:3]
+        if cand[1].isdigit():
+            cand = cand[0] + cand[2:] + cand[1]
+    else:
+        cand = 'D' + name
+    if cand not in used:
+        return cand
+    for n in range(1, 100):
+        suf = str(n)
+        alt = ('D' + name)[:4 - len(suf)] + suf
+        if alt not in used:
+            return alt
+    raise ValueError('cannot build a unique dummy name for %r' % name)
+
+
 def _merge_molecules(r1, dummies: list) -> None:
     """Append dummy atoms (B-state-only atoms from *dummies*) onto *r1*."""
     dum_h_counter = 1
+    used = {a.name for a in r1.atoms}
     for atom in dummies:
         new = atom.copy()
         new.atomtypeB = new.atomtype
@@ -984,12 +1030,9 @@ def _merge_molecules(r1, dummies: list) -> None:
                                          new.name[1] == 'H'):
             new.name = 'HV' + str(dum_h_counter)
             dum_h_counter += 1
-        elif len(new.name) == 4:
-            new.name = 'D' + new.name[:3]
-            if new.name[1].isdigit():
-                new.name = new.name[0] + new.name[2:] + new.name[1]
         else:
-            new.name = 'D' + atom.name
+            new.name = _unique_dummy_name(new.name, used)
+        used.add(new.name)
         r1.append(new)
         logger.debug("dummy: %s -> %s", atom.name, new.name)
 
@@ -1062,15 +1105,11 @@ def _improps_as_atoms(im: list, r, r2, use_b: bool = False) -> list:
                 new_ii.append(Atom(name=name))
                 continue
             if use_b:
-                if r2.resname in _inverted_aliases:
-                    name = _inverted_aliases[r2.resname].get(name, name)
                 a = next((at for at in r.atoms if at.nameB == name), None)
                 if a is None:
                     logger.debug("Improper B-atom '%s' not found.", name)
                     a = Atom(name=name)
             else:
-                if r.resname in _inverted_aliases:
-                    name = _inverted_aliases[r.resname].get(name, name)
                 found = r.fetch(name)
                 a = found[0] if found else Atom(name=name)
             new_ii.append(a)
@@ -1160,10 +1199,98 @@ def _generate_improp_entries(im1: list, im2: list, r) -> list:
 # File generation
 # =============================================================================
 
+def explicit_terminal_resname(rtp, resname: str, term: str):
+    """Name of *ff*'s explicit terminal residue for (resname, term), or None.
+
+    Two conventions exist among the bundled force fields, and both are legitimate:
+
+    * **tdb style** -- the terminus is a PATCH in ``.n/.c.tdb`` applied to the
+      internal residue (``charmm*``, ``amber*-q-*``).  These ship no ``N<res>`` /
+      ``C<res>`` entries.
+    * **explicit-residue style** -- the terminus is its own RTP entry, ``NALA`` /
+      ``CALA`` and friends (the plain amber ports: ``amber14sbmut``,
+      ``amber19sbmut``, ``amber99sb-star-ildn*``).  Their ``.tdb`` files are
+      deliberate 10-byte placeholders, NOT a gap.
+
+    Nothing has to be patched in the second case -- the terminal form is simply a
+    different RTP entry -- so callers use it directly and skip
+    :func:`_rtp_terminal` entirely.
+    """
+    if not term:
+        return None
+    prefix = 'N' if str(term).upper().startswith('N') else 'C'
+    cand = prefix + resname.upper()
+    return cand if cand in rtp else None
+
+
+def _explicit_terminal_entry(ff: str, resname: str, term: str):
+    """The FF's explicit terminal RTP entry for (resname, term), or None.
+
+    Used only as a FALLBACK when no tdb variant applies -- see
+    :func:`explicit_terminal_resname` for why both conventions exist.  The entry
+    is already the terminal form, so it is returned as-is apart from dropping the
+    inter-residue bond the terminus removes.
+    """
+    try:
+        from .ffparser import load_ff_rtp
+        rtp = load_ff_rtp(ff)
+    except Exception:
+        return None
+    name = explicit_terminal_resname(rtp, resname, term)
+    if not name:
+        return None
+    entr = deepcopy(rtp[name])
+    for k in ('atoms', 'bonds', 'diheds', 'improps', 'cmap'):
+        entr.setdefault(k, [])
+    del_atoms(entr, '-C' if str(term).upper().startswith('N') else '+N')
+    return entr
+
+
+def _rtp_bondedtypes_header(ff: str) -> str:
+    """Return the ``[ bondedtypes ]`` block from *ff*'s OWN main RTP.
+
+    GROMACS requires every ``.rtp`` in one force field to agree on these flags --
+    a mismatch aborts pdb2gmx with e.g. *"Residues in one molecule have a
+    different 'all dihedrals' type: 0 and 1"*.  Copying the block from the force
+    field's own main RTP keeps the generated ``nsaa.rtp`` in step by construction,
+    for ANY force field, instead of picking between two hardcoded CHARMM/AMBER
+    literals that can drift from the port (amber14sb-q's ``aminoacids.rtp`` header
+    has NINE columns, the hardcoded AMBER literal only eight).
+
+    Falls back to the hardcoded literals only when no main RTP can be read.
+    """
+    try:
+        ffp = get_ff_path(ff)
+    except Exception:
+        ffp = None
+    if ffp:
+        for base in ('merged.rtp', 'aminoacids.rtp'):
+            path = os.path.join(ffp, base)
+            if not os.path.isfile(path):
+                continue
+            out, inside = [], False
+            for line in open(path, errors='replace'):
+                st = line.strip()
+                if st.startswith('['):
+                    if inside:
+                        break
+                    inside = st.replace(' ', '') == '[bondedtypes]'
+                    if inside:
+                        out.append(line)
+                    continue
+                if inside:
+                    out.append(line)
+                    if st and not st.startswith(';'):
+                        break            # the single flags row ends the block
+            if len(out) > 1:
+                return ''.join(out)
+    return _CHARMM_RTP_HEADER if 'charmm' in (ff or '').lower() else _AMBER_RTP_HEADER
+
+
 def _make_rtp(r, ii_list: list, dihi_list: list,
               neigh_bonds: list, cmap: list, ff: str) -> List[str]:
     """Generate RTP file content for the hybrid residue *r*."""
-    header = _CHARMM_RTP_HEADER if 'charmm' in ff else _AMBER_RTP_HEADER
+    header = _rtp_bondedtypes_header(ff)
     rtp = [header, f'\n[ {r.resname} ] ; {r.resnA} -> {r.resnB}\n\n']
 
     rtp.append('[ atoms ]\n')
@@ -1332,17 +1459,20 @@ def _write_atp_fnb(fn_atp: str, fn_nb: str, r, ffpath: str) -> None:
 def mutate_nsaa(m, mut_resid: int, mut_resname: str, ff: str,
                 itp: str = None, nonstandardPDB: str = None,
                 mut_chain: str = None, inplace: bool = False,
+                hybrid_name: str = None,
                 verbose: bool = False) -> None:
     """Mutate residue *mut_resid* to a non-standard amino acid.
 
-    Generates a hybrid structure and writes the following files:
+    .. deprecated::
+        This is a thin adapter over the covalent generative engine
+        (:func:`pmx.covalent.mutate`, i.e. ``pmx mutate``), kept so the
+        ``pmx mutate_nsaa`` CLI keeps working.  It maps *nonstandardPDB* to the
+        engine's ``structure`` argument and delegates every front end there.
 
-    * ``<hybrid>.rtp`` — into the FF directory (read by pdb2gmx)
-    * ``<hybrid>.mtp`` — in the working directory (pass to gen_hybrid_top)
-    * ``<hybrid>.arn`` — atom-renaming spec for CHARMM FFs (into FF dir)
-
-    Updates ``atomtypes.atp`` and ``ffnonbonded.itp`` in the FF directory
-    with any new DUM atom types.
+    The engine mutates *m* in place (when *inplace*), writing the hybrid
+    structure into *m* and accumulating the hybrid residue into the force field's
+    ``nsaa.{rtp,mtp}`` (auto-discovered by ``pmx gentop`` -- no ``--extra_mtp``),
+    plus any new DUM atom types into ``atomtypes.atp`` / ``ffnonbonded.itp``.
 
     Parameters
     ----------
@@ -1357,10 +1487,15 @@ def mutate_nsaa(m, mut_resid: int, mut_resname: str, ff: str,
         Force-field name (e.g. ``'charmm36m-mut'``).
     itp : str, optional
         Path to a GROMACS ITP fragment file for the NSAA, parameterized with
-        a CH3 cap at the CA position.
+        a CH3 cap at the CA position.  When given, the build delegates to the
+        covalent generative engine (:func:`pmx.covalent.mutate`) -- the single
+        ITP implementation: geometry is embedded from the ITP bond graph (or
+        overridden by *nonstandardPDB* if supplied) and the hybrid accumulates
+        into the force field's ``nsaa.mtp`` (auto-discovered by ``pmx gentop``).
     nonstandardPDB : str, optional
-        Path to a PDB/GRO file for the NSAA.  If omitted, the NSAA is built
-        from the pmx library (standard residues only).
+        Path to a PDB/GRO file for the NSAA.  Optional with *itp* (overrides the
+        embedded geometry).  Without *itp*: the geometry source, or -- if also
+        omitted -- the NSAA is built from the pmx library (standard residues only).
     mut_chain : str, optional
         Chain ID; required only if the model has multiple chains.
     inplace : bool
@@ -1374,219 +1509,20 @@ def mutate_nsaa(m, mut_resid: int, mut_resname: str, ff: str,
             "mutate_nsaa requires RDKit. Install with:\n"
             "    conda install -c conda-forge rdkit")
 
-    from .builder import build_chain
-
+    # Thin adapter: `pmx mutate_nsaa` is a deprecated alias for the covalent
+    # generative engine (`pmx mutate`).  Every front end -- a target in the FF RTP,
+    # a structure template (``--nsapdb`` -> ``--structure``, optional), the pmx
+    # built-in library, or a capped-ITP fragment -- goes through the SINGLE
+    # orchestrator: it builds the target with the shared Stage-1 builder, maps by
+    # graph-MCS, and accumulates the hybrid into the FF's nsaa.{rtp,mtp} (which
+    # `pmx gentop` auto-discovers -- no ``--extra_mtp``).  This retires the older
+    # 3-D ``domapping`` orchestration in favour of one code path behind both CLIs.
     logger.info("Starting NSAA mutation: res %d -> %s", mut_resid, mut_resname)
-
-    ffpath = get_ff_path(ff)
-    bCharmm = 'charmm' in ff
-
-    m2 = m if inplace else deepcopy(m)
-    if m2.unity == 'nm':
-        m2.nm2a()
-
-    #print(mut_resid,mut_chain)
-    residue1 = m2.fetch_residue(idx=mut_resid, chain=mut_chain)
-    chain    = residue1.chain
-    cterm    = chain.cterminus()
-    nterm    = chain.nterminus()
-    term     = 'C' if residue1 == cterm else ('N' if residue1 == nterm else None)
-
-    # ── Load the target residue ───────────────────────────────────────────────
-    model2 = Model()
-    if nonstandardPDB is None:
-        if mut_resname.upper() not in library._aacids_dic.values():
-            raise ValueError(
-                f"No structure file provided for NSAA '{mut_resname}' and it "
-                "is not in the pmx standard library.")
-        one = library._one_letter.get(mut_resname, mut_resname)
-        ch  = build_chain(one)
-        if term == 'C':
-            ch.add_cterm_charged()
-        model2.residues = ch.residues
-        model2.moltype  = 'protein'
-        model2.atoms    = model2.residues[0].atoms
-        if bCharmm:
-            _rename_model_charmm(model2)
-    else:
-        model2.read(nonstandardPDB)
-    residue2 = model2.residues[0]
-
-    # ── Parse force-field RTP ─────────────────────────────────────────────────
-    try:
-        rtp = __import__('pmx.ffparser', fromlist=['RTPParser']).RTPParser(
-            os.path.join(ffpath, 'merged.rtp'))
-    except Exception:
-        from .ffparser import RTPParser
-        rtp = RTPParser(os.path.join(ffpath, 'aminoacids.rtp'))
-
-    bond_neigh = _assign_rtp_entries(residue1, rtp, term)
-
-    # ── Assign parameters to the target residue ───────────────────────────────
-    if residue2.resname in rtp:
-        logger.info("'%s' found in RTP — using RTP parameters.", residue2.resname)
-        try:
-            _assign_rtp_entries(residue2, rtp, term)
-        except Exception as e:
-            logger.warning("RTP assignment for %s failed: %s", residue2.resname, e)
-    elif itp is not None:
-        logger.info("'%s' not in RTP — using ITP fragment: %s",
-                    residue2.resname, itp)
-        itp_atoms_raw = _parse_itp_atoms(itp)
-        itp_bonds_raw = _parse_itp_bonds(itp)
-        cap_C, cap_Hs, cap_CA, cap_CA_Hs = _find_methyl_cap(itp_atoms_raw,
-                                                             itp_bonds_raw)
-        has_bb = all(any(a.name == n for a in residue2.atoms)
-                     for n in ('N', 'C', 'O'))
-        if not has_bb:
-            if cap_C is None:
-                raise RuntimeError(
-                    "Capped-fragment workflow: residue2 has no backbone N/C/O "
-                    "and no CH3 cap was detected in the ITP.")
-            _prepare_nsaa_fragment(residue2, residue1,
-                                   cap_C, cap_Hs,
-                                   ca_atom_name=cap_CA,
-                                   ca_H_names=cap_CA_Hs,
-                                   term=term)
-        _assign_itp_entries(residue2, itp, rtp,
-                            backbone_resname=residue1.resname)
-    else:
-        logger.warning("'%s' not in RTP and no ITP provided — "
-                       "parameters may be incomplete.", residue2.resname)
-
-    #print("*****")
-    #for i in residue1.atoms:
-    #    print(i)
-    #for i in residue2.atoms:
-    #    print(i)
-
-    _validate_atom_parameters(residue1, 'state A')
-    _validate_atom_parameters(residue2, 'state B')
-    _assign_mass_atp(residue1, residue2,
-                     os.path.join(ffpath, 'atomtypes.atp'), itp_file=itp)
-
-    # ── Backbone index lists for atom mapping ─────────────────────────────────
-    bb_names = ['N', 'CA', 'C']
-    bb_names += (['OT1', 'OT2'] if term == 'C' else ['O'])
-    if (any(a.name == 'CB' for a in residue1.atoms) and
-            any(a.name == 'CB' for a in residue2.atoms)):
-        bb_names.append('CB')
-
-    backbone1, backbone2 = [], []
-    for name in bb_names:
-        i1 = next((c for c, a in enumerate(residue1.atoms) if a.name == name), None)
-        i2 = next((c for c, a in enumerate(residue2.atoms) if a.name == name), None)
-        if i1 is not None and i2 is not None:
-            backbone1.append(i1)
-            backbone2.append(i2)
-    logger.info("Backbone mapping: %s", list(zip(backbone1, backbone2)))
-
-    # ── MCS atom mapping ──────────────────────────────────────────────────────
-    pairs1, pairs2, res1_aligned, res2_aligned = \
-        domapping(residue1, residue2, backbone1, backbone2, term)
-
-    res3 = Model(pdbline=res1_aligned).residues[0]
-    res4 = Model(pdbline=res2_aligned).residues[0]
-    for c, at in enumerate(residue1.atoms):
-        at.x = res3.atoms[c].x
-    for c, at in enumerate(residue2.atoms):
-        at.x = res4.atoms[c].x
-
-    # Ensure polar H is in the mapping
-    hn_name = 'HN' if bCharmm else 'H'
-    for c, a in enumerate(residue1.atoms):
-        if a.name == hn_name:
-            pairs1.append(c)
-            break
-    for c, a in enumerate(residue2.atoms):
-        if a.name == hn_name:
-            pairs2.append(c)
-            break
-
-    # ── Build hybrid residue ──────────────────────────────────────────────────
-    merged_atoms2 = []
-    residue1.batoms = []
-    atom_pairs = []
-    #for i in residue2.atoms:
-    #    print(i.atomtype,i.atomtypeB)
-    for id1, id2 in zip(pairs1, pairs2):
-        at1, at2 = residue1.atoms[id1], residue2.atoms[id2]
-        logger.info("  %s ---> %s", at1.name, at2.name)
-        at1.atomtypeB, at1.qB, at1.mB, at1.nameB = \
-            at2.atomtype, at2.q, at2.m, at2.name
-        residue1.batoms.append(at2)
-        merged_atoms2.append(at2)
-        atom_pairs.append([at1, at2])
-
-    #print()
-    #for a in merged_atoms2:
-    #    print(a.name,a.atomtype)
-
-    #print()
-    #for a in residue2.atoms:
-    #    print(a.name, a.atomtype)
-
-    dummies = [a for a in residue2.atoms if a not in merged_atoms2]
-    #print([(i.name, i.atomtype, i.atomtypeB) for i in dummies])
-    logger.info("Dummy atoms (B-state only): %s", [a.name for a in dummies])
-    _merge_molecules(residue1, dummies)
-    _make_bstate_dummies(residue1)
-
-    _write_atp_fnb('atomtypes.atp', 'ffnonbonded.itp', residue1, ffpath)
-
-    # ── Generate bonded-term entries ──────────────────────────────────────────
-    abdic, badic = _make_transition_dics(atom_pairs, residue1)
-    _update_bond_lists(residue1, badic)
-
-    # Use _rtp_terminal for NSAA target only if it's in RTP
-    entr1 = _rtp_terminal(rtp[residue1.resname], term) if term \
-        else rtp[residue1.resname]
-    if residue2.resname in rtp:
-        entr2 = _rtp_terminal(rtp[residue2.resname], term) if term \
-            else rtp[residue2.resname]
-    else:
-        entr2 = {'atoms': [], 'bonds': [], 'diheds': [], 'improps': [], 'cmap': []}
-
-    dih1 = _improps_as_atoms(entr1['diheds'], residue1, residue2)
-    dih2 = _improps_as_atoms(entr2['diheds'], residue1, residue2, use_b=True)
-    im1  = _improps_as_atoms(entr1['improps'], residue1, residue2)
-    im2  = _improps_as_atoms(entr2['improps'], residue1, residue2, use_b=True)
-
-    cmap      = rtp[residue1.resname].get('cmap', []) if bCharmm else []
-    dihi_list = _generate_dihedral_entries(dih1, dih2, residue1, atom_pairs)
-    ii_list   = _generate_improp_entries(im1, im2, residue1)
-
-    # ── Name and write outputs ────────────────────────────────────────────────
-    one_letter = library._one_letter.get(residue1.resname, residue1.resname[0])
-    hybrid_name = one_letter + '2' + mut_resname.upper()
-    #if one_letter == mut_resname.upper()[0]:
-    #    hybrid_name = one_letter + '2' + mut_resname.upper()[::-1]
-
-    #hybrid_name = residue1.resname[:2] + mut_resname.upper()[:2]
-
-    hybrid_name = hybrid_name[:4] # truncate
-    residue1.resnA, residue1.resnB = residue1.resname, mut_resname
-    residue1.set_resname(hybrid_name)
-
-    rtp_content = _make_rtp(residue1, ii_list, dihi_list, bond_neigh, cmap, ff)
-    mtp_content = _make_mtp(residue1, ii_list, dihi_list, rotations=None)
-
-    list2file(rtp_content, os.path.join(ffpath, f'{hybrid_name}.rtp'))
-    list2file(mtp_content, f'./{hybrid_name}.mtp')
-    if bCharmm:
-        list2file([_ARN_CONTENT], os.path.join(ffpath, f'{hybrid_name}.arn'))
-
-    # Register the hybrid residue name in residuetypes.dat
-    fn_restypes = pmx_data_file('mutff/residuetypes.dat')
-    existing    = _get_residue_types(fn_restypes)
-    mode = 'a' if os.path.isfile(fn_restypes) else 'w'
-    with open(fn_restypes, mode) as f:
-        if hybrid_name not in existing:
-            f.write(f'{hybrid_name:<6} Protein\n')
-
-    logger.info("NSAA mutation complete: hybrid residue '%s' written.", hybrid_name)
-    logger.info("  RTP  -> %s/%s.rtp", ffpath, hybrid_name)
-    logger.info("  MTP  -> ./%s.mtp  (pass to gen_hybrid_top)", hybrid_name)
+    from .covalent import mutate as _covalent_mutate
+    _covalent_mutate(m, mut_resid=mut_resid, target=mut_resname, ff=ff,
+                     structure=nonstandardPDB, itp=itp, mut_chain=mut_chain,
+                     inplace=inplace, hybrid_name=hybrid_name,
+                     verbose=verbose)
 
 
 # =============================================================================
@@ -1666,7 +1602,7 @@ def sanitize_itp(
         'gaff_type': str}}``
     """
     from collections import deque, defaultdict as _dd
-    from .ffparser import RTPParser
+    from .ffparser import RTPParser, load_ff_rtp
 
     if out_itp is None:
         base, ext = os.path.splitext(itp_file)
@@ -1708,10 +1644,7 @@ def sanitize_itp(
     # ── 3. BFS through base-RTP sidechain from CA ────────────────────────────
     BACKBONE = {'N', 'HN', 'H', 'CA', 'HA', 'C', 'O', 'OC1', 'OC2'}
     ffpath   = get_ff_path(ff)
-    rtp_path = os.path.join(ffpath, 'merged.rtp')
-    if not os.path.isfile(rtp_path):
-        rtp_path = os.path.join(ffpath, 'aminoacids.rtp')
-    rtp_entry     = RTPParser(rtp_path)[base_resname]
+    rtp_entry     = load_ff_rtp(ff)[base_resname]
     rtp_atoms_dict = {a[0]: {'type': a[1]} for a in rtp_entry['atoms']}
     rtp_adj: Dict[str, set] = _dd(set)
     for bond in rtp_entry['bonds']:
@@ -1923,7 +1856,7 @@ def prepare_nsaa_ff(
     out_rtp, out_supplement : str, str
         Paths to the written files.
     """
-    from .ffparser import RTPParser
+    from .ffparser import RTPParser, load_ff_rtp
 
     ffpath = get_ff_path(ff)
     bCharmm = 'charmm' in ff.lower()
@@ -1934,10 +1867,7 @@ def prepare_nsaa_ff(
         out_supplement = f'./{new_resname}_bonded.itp'
 
     # ── 1. Base amino acid RTP ───────────────────────────────────────────────
-    rtp_path = os.path.join(ffpath, 'merged.rtp')
-    if not os.path.isfile(rtp_path):
-        rtp_path = os.path.join(ffpath, 'aminoacids.rtp')
-    rtp_parser  = RTPParser(rtp_path)
+    rtp_parser  = load_ff_rtp(ff)
     base_entry  = rtp_parser[base_resname]
     base_atoms  = base_entry['atoms']   # [[name, type, charge, cgnr], ...]
     base_bonds  = base_entry['bonds']
@@ -2031,7 +1961,7 @@ def prepare_nsaa_ff(
         bb_q, sc_q, adj_q, target_charge)
 
     # ── 6. Write RTP ─────────────────────────────────────────────────────────
-    header = _CHARMM_RTP_HEADER if bCharmm else _AMBER_RTP_HEADER
+    header = _rtp_bondedtypes_header(ff)
     max_bb_cgnr = max(int(a[3]) for a in base_atoms)
     rtp_lines = [header, f'\n[ {new_resname} ]\n\n', '[ atoms ]\n']
 

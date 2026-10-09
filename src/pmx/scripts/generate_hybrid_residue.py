@@ -1645,15 +1645,21 @@ def create_hybrid_lib(m1, m2,
     nm1 = m1.residues[0].resname
     nm2 = m2.residues[0].resname
     # Convert 3-letter names to 1-letter ones
-    aa1 = nm1 #library._ext_one_letter[nm1]
-    aa2 = nm2 #library._ext_one_letter[nm2]
+    #aa1 = nm1 #library._ext_one_letter[nm1]
+    #aa2 = nm2 #library._ext_one_letter[nm2]
 
     # determine hybrid residue name (rr_name)
     if moltype == 'protein':
+        aa1 = library._ext_one_letter[nm1]
+        aa2 = library._ext_one_letter[nm2]
         rr_name = aa1 + '2' + aa2
     elif moltype == 'dna':
+        aa1 = nm1 #library._ext_one_letter[nm1]
+        aa2 = nm2 #library._ext_one_letter[nm2]
         rr_name = _dna_mutation_naming(aa1, aa2)
     elif moltype == 'rna':
+        aa1 = nm1 #library._ext_one_letter[nm1]
+        aa2 = nm2 #library._ext_one_letter[nm2]
         rr_name = _rna_mutation_naming(aa1, aa2)
 
     # Get element of all atoms in models
@@ -1699,7 +1705,9 @@ def create_hybrid_lib(m1, m2,
 
     # read rtp file
     logger.info('reading rtp file "%s"' % rtpfile)
-    rtp = RTPParser(rtpfile)
+    # _assign_rtp_entries fetches atoms from r1/r2, whose names were set by
+    # make_long_name (PDB-style, e.g. 1HB); match that with aliased RTP names.
+    rtp = RTPParser(rtpfile, resolve_aliases=True)
     bond_neigh = _assign_rtp_entries(r1, rtp)
     _assign_rtp_entries(r2, rtp)  # FIXME/QUESTION is this line doing anything?
     _assign_mass_atp(r1=r1, r2=r2,
@@ -2089,7 +2097,7 @@ written to new files.
                         help='Whether to allow hydrogen to/from heavy atoms \n'
                         'morphing. Default is True, this flag sets it to '
                         'False.',
-                        default=True,
+                        default=False,
                         action='store_false')
     parser.add_argument('--log',
                         metavar='log',

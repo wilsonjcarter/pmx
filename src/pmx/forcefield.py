@@ -91,6 +91,52 @@ def cpp_parse_file(fn,  itp=False, ffpath=None, cpp_defs=[],
 # ==============================================================================
 # FIXME/QUESTION: is "old" version still needed? If not, we could simplify the
 # code by removing all if statements and arguments related to this
+def _include_path(line):
+    """The file path inside an ``#include`` statement, or '' if `line` is not one.
+
+    :meth:`TopolBase.write_footer` classifies footer includes by the *basename*
+    of this path, against the explicit name lists below.  With GMXLIB set,
+    pdb2gmx writes absolute include paths, so a filter that tests the whole line
+    also tests the directory the user happened to run in.
+    """
+    s = line.strip()
+    if not s.startswith('#include'):
+        return ''
+    if '"' in s:
+        return s.split('"')[1].replace('\\', '/')
+    parts = s.split()
+    return parts[-1].strip('<>').replace('\\', '/') if len(parts) > 1 else ''
+
+
+#: The water topologies GROMACS ships (share/top and every mutff force field).
+#: Matched as exact file names, never as substrings: GROMACS embeds the water
+#: model in the *ion* file name ('ions_tip3p.itp'), so 'tip' in name matches
+#: both classes and cannot separate them.
+WATER_ITPS = frozenset([
+    'spc.itp', 'spce.itp',
+    'tip3p.itp', 'tips3p.itp',
+    'tip4p.itp', 'tip4pew.itp',
+    'tip5p.itp', 'tip5pe.itp',
+    'opc.itp', 'opc3.itp',
+])
+
+
+def _is_water_itp(base):
+    """Whether `base` is one of the water topologies in :data:`WATER_ITPS`."""
+    return base in WATER_ITPS
+
+
+def _is_ion_itp(base):
+    """Whether `base` is an ion topology: 'ions.itp' or 'ions_<model>.itp'.
+
+    That is the GROMACS naming convention; the shipped set is ions.itp plus
+    ions_{spc,spce,opc,opc3,tip3p,tip4pew}.itp.  Matching the 'ions' prefix
+    structurally keeps a water model added by a future GROMACS working.
+    """
+    return base == 'ions.itp' or (base.startswith('ions_')
+                                  and base.endswith('.itp'))
+
+
 class TopolBase:
     """Base class for topology objects. It reads/writes topology files.
     """
@@ -382,10 +428,17 @@ class TopolBase:
         lst = readSection(lines, '[ constraints ]', '[')
         self.constraints = []
         for line in lst:
-            idx = [int(x) for x in line.split()]
-            self.constraints.append([self.atoms[idx[0]-1],
-                                     self.atoms[idx[1]-1],
-                                     idx[2]])
+            if len(line.split()) == 3:
+                idx = [int(x) for x in line.split()]
+                self.constraints.append([self.atoms[idx[0]-1],
+                                         self.atoms[idx[1]-1],
+                                         idx[2]])
+            else:
+                idx = [int(x) for x in line.split()[:3]]
+                b0  = float(line.split()[3])
+                self.constraints.append([self.atoms[idx[0]-1],
+                                         self.atoms[idx[1]-1],
+                                         idx[2],b0])
         if self.constraints:
             self.have_constraints = True
 
@@ -507,7 +560,7 @@ class TopolBase:
             for line in lst:
                 entr = line.split()
                 idx = [int(x) for x in entr[:]]
-                toappend = [self.atoms[x-1] for x in idx] 
+                toappend = [self.atoms[x-1] for x in idx]
                 self.exclusions.append( toappend )
 
     def read_vsites2(self, lines):
@@ -957,6 +1010,7 @@ class TopolBase:
 
         print('', file=fp)
         for itp, where in self.include_itps:
+            print(itp,where)
             if (itp in self.includes) or ('"{0}"'.format(itp) in self.includes): # already included
                 continue
             if where == which:
@@ -985,13 +1039,27 @@ class TopolBase:
             The order of the sections will reflect the order of keywords in
             this list.
         '''
+        # Includes already written, keyed on the include path.  The footer
+        # sections are written one keyword at a time, so without this a file
+        # classified into two sections would be included twice, and grompp
+        # rejects the second copy ("moleculetype SOL is redefined").
+        present = set()
+
+        def _emit(fp, line):
+            """Write `line`, skipping an #include that has already gone out."""
+            inc = _include_path(line)
+            if inc:
+                if inc in present:
+                    return
+                present.add(inc)
+            print(line, file=fp)
 
         def _write_foot_section(fp, keyword):
             '''writes only specific lines/sections of footer.
             '''
             if keyword == 'all':
                 for line in self.footer:
-                    print(line, file=fp)
+                    _emit(fp, line)
 
             # posre for molecule
             elif keyword == 'posre':
@@ -1020,7 +1088,7 @@ class TopolBase:
                         write = True
 
                     if write is True:
-                        print(line, file=fp)
+                        _emit(fp, line)
 
                     if line.strip() == '#endif':
                         write = False
@@ -1028,8 +1096,8 @@ class TopolBase:
             # water params
             elif keyword == 'water':
                 for line in self.footer:
-                    if 'ff' in line and ('tip' in line or 'spc' in line):
-                        print(line, file=fp)
+                    if _is_water_itp(os.path.basename(_include_path(line))):
+                        _emit(fp, line)
 
             # posre for water
             elif keyword == 'posre_water':
@@ -1039,7 +1107,7 @@ class TopolBase:
                         write = True
 
                     if write is True:
-                        print(line, file=fp)
+                        _emit(fp, line)
 
                     if line.strip() == '#endif':
                         write = False
@@ -1047,8 +1115,8 @@ class TopolBase:
             # ion params
             elif keyword == 'ions':
                 for line in self.footer:
-                    if 'ff' in line and 'ion' in line:
-                        print(line, file=fp)
+                    if _is_ion_itp(os.path.basename(_include_path(line))):
+                        _emit(fp, line)
 
             else:
                 raise ValueError('keyword does not exists/not implemented')
@@ -1161,17 +1229,25 @@ class TopolBase:
                         TR('State B has total charge of %g' % round(qB_tot, 5))
                         TR('Applying charge correction to ensure integer charges')
                     latom = _last_perturbed_atom(r)
-                    if verbose is True:
-                        TR('Selecting atom %d-%s (%s) as perturbed atom with highest order'
-                           % (latom.id, latom.name, latom.resname))
-                    newqB = latom.qqB-(qB_tot-target_chargeB)
-                    if verbose is True:
-                        TR('Changing chargeB of atom %s from %g to %g'
-                           % (latom.name, latom.qqB, newqB))
-                    latom.qqB = newqB
-                    qB_tot = sum(map(lambda a: a.qqB, r.atoms))
-                    if verbose is True:
-                        TR('New total charge of B-state is %g' % round(qB_tot, 5))
+                    if latom is None:
+                        # Wholly-dummified residue (terminal deletion target):
+                        # no real atom to carry the residual, B-charge is already
+                        # 0 by construction -- skip the correction.
+                        if verbose is True:
+                            TR('Residue %s is fully dummified; skipping charge '
+                               'correction (B-state charge is 0)' % r.resname)
+                    else:
+                        if verbose is True:
+                            TR('Selecting atom %d-%s (%s) as perturbed atom with highest order'
+                               % (latom.id, latom.name, latom.resname))
+                        newqB = latom.qqB-(qB_tot-target_chargeB)
+                        if verbose is True:
+                            TR('Changing chargeB of atom %s from %g to %g'
+                               % (latom.name, latom.qqB, newqB))
+                        latom.qqB = newqB
+                        qB_tot = sum(map(lambda a: a.qqB, r.atoms))
+                        if verbose is True:
+                            TR('New total charge of B-state is %g' % round(qB_tot, 5))
                 else:
                     if verbose is True:
                         TR('No corrections applied to ensure integer charges')
@@ -1610,13 +1686,20 @@ class TopolBase:
         return round(qB, 3)
 
     def get_hybrid_qA(self):
-        """Returns the charge of state A for hybrid residues only.
+        """Returns the charge of state A for perturbed residues only.
+
+        Iterates the same residues (in the same order) that
+        :meth:`write_atoms` pops ``target_qB`` for -- i.e. residues with
+        morphing atoms -- so the target-charge list aligns positionally.  This
+        is a superset of ``is_hybrid()`` residues: it also covers the
+        name-not-``X2Y`` cases such as a terminal deletion's ``XdeC``/``XdeN``
+        neighbour and its fully-dummified target residue.
         """
         qA = []
         rlist = []
-        # identify hybrid residues
+        # identify perturbed residues (see write_atoms' _is_perturbed_residue)
         for res in self.residues:
-            if res.is_hybrid():
+            if _is_perturbed_residue(res):
                 rlist.append(res)
         # add all atom q of hybrid residues
         for r in rlist:
@@ -1627,13 +1710,16 @@ class TopolBase:
         return qA
 
     def get_hybrid_qB(self):
-        """Returns the charge of state B for hybrid residues only.
+        """Returns the charge of state B for perturbed residues only.
+
+        Mirrors :meth:`get_hybrid_qA`: iterates residues with morphing atoms so
+        the ``target_qB`` list aligns with :meth:`write_atoms`.
         """
         qB = []
         rlist = []
-        # identify hybrid residues
+        # identify perturbed residues
         for res in self.residues:
-            if res.is_hybrid():
+            if _is_perturbed_residue(res):
                 rlist.append(res)
         # add all atom q of hybrid residues
         for r in rlist:
@@ -2253,9 +2339,10 @@ def _last_perturbed_atom(r):
         if _atoms_morphe([atom]) and atom.name not in ['N', 'CA', 'C', 'O', 'H']:
             if not atom.atomtype.startswith('DUM') and not atom.atomtypeB.startswith('DUM'):
                 last_atom = atom
-    if last_atom is None:
-        print('Error: Could not find a perturbed atom to put rest charges on !', file=sys.stderr)
-        sys.exit(1)
+    # A wholly-dummified residue (e.g. a terminal-deletion target, every atom
+    # disappearing) has no real atom to carry a residual charge.  Its B-state
+    # charge is 0 by construction, so there is nothing to correct -- return None
+    # and let the caller skip the correction rather than abort the whole run.
     return last_atom
 
 
@@ -2359,7 +2446,9 @@ def assign_ffamber99sb_params(m):
         c.make_residue_tree()
 
     make_amber_residue_names(m)
-    rtp = RTPParser('ffamber99sb.rtp')
+    # This path matches RTP atoms against a model renamed via make_long_name
+    # (PDB-style names, e.g. 1HB), so it needs the aliased RTP names.
+    rtp = RTPParser('ffamber99sb.rtp', resolve_aliases=True)
     rtp.assign_params(m)
     bo = BondedParser('ffamber99sbbon.itp')
     nb = NBParser('ffamber99sbnb.itp')
@@ -2455,3 +2544,63 @@ def merge_atomtypes(*args):
                         for x in all_atomtypes)]
 
     return unique_atomtypes
+
+
+def fold_moleculetype(host, guest, offset_resnr=True):
+    '''Fold the *guest* moleculetype into *host* so a single ``[ moleculetype ]``
+    holds both molecules.
+
+    This is the assembly step a covalent complex needs: a GROMACS bond cannot
+    span two moleculetypes, so to form a cross-link between a protein and an
+    externally-parameterised ligand (which never passes through ``pdb2gmx``, so
+    ``pdb2gmx -merge`` cannot reach it) the two must live in one moleculetype.
+    After folding, ``gentop --bond`` / :func:`pmx.alchemy._apply_inter_bonds` can
+    form the bond within the single molecule.  (Contrast the ABFE route, which
+    keeps the molecules separate and restrains them via
+    ``[ intermolecular_interactions ]`` -- there is no covalent bond there.)
+
+    *guest*'s atom indices and residue numbers are shifted to continue after
+    *host*.  The bonded terms carry over untouched because pmx stores them as
+    references to ``Atom`` objects, not integer indices -- only the ids they
+    write out change.  Atom types are merged and de-duplicated
+    (:func:`merge_atomtypes`), so the ligand's (e.g. GAFF) types travel with it.
+
+    Parameters
+    ----------
+    host, guest : Topology
+        Single-moleculetype topologies.  *host* is mutated in place and returned;
+        drop *guest* from the master ``[ molecules ]`` list afterwards.
+    offset_resnr : bool
+        Continue *guest*'s residue numbering after *host* (default).  Set False
+        only if the two already use disjoint residue numbers.
+
+    Returns
+    -------
+    Topology
+        *host*, now containing both molecules' atoms and bonded terms.
+    '''
+    na = len(host.atoms)
+    nres = max((a.resnr for a in host.atoms), default=0)
+    for a in guest.atoms:
+        a.id += na
+        if offset_resnr:
+            a.resnr += nres
+    host.atoms.extend(guest.atoms)
+    for sec in ('bonds', 'pairs', 'angles', 'dihedrals', 'cmap'):
+        getattr(host, sec).extend(getattr(guest, sec) or [])
+    host.atomtypes = merge_atomtypes(host.atomtypes or [], guest.atomtypes or [])
+
+    # rebuild the residue grouping from the merged atom list
+    host.residues = []
+    mol = None
+    cur = None
+    for atom in host.atoms:
+        if atom.resnr != cur or mol is None:
+            mol = Molecule()
+            mol.id = atom.resnr
+            mol.resname = atom.resname
+            host.residues.append(mol)
+            cur = atom.resnr
+        mol.atoms.append(atom)
+        atom.molecule = mol
+    return host

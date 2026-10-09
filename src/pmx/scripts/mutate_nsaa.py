@@ -78,6 +78,7 @@ from pmx.model import Model
 from pmx.nsaa import mutate_nsaa
 from pmx.utils import get_ff_path, ff_selection
 from pmx.scripts.cli import check_unknown_cmd
+from pmx.covalent import ptm
 
 
 # =================
@@ -125,8 +126,11 @@ def parse_options():
         type=str,
         required=True,
         help=(
-            "Three-letter name of the target NSAA (e.g. SEP, TPO, PTR).\n"
-            "Must match the residue name in the supplied --itp and --nsapdb files."
+            "Target residue: either a residue name (e.g. SEP, TPO, PTR) or a\n"
+            "PTM shorthand code, case-insensitive (digit required):\n"
+            "  p1/p2   phosphorylation of SER/THR/TYR (monoanion / dianion)\n"
+            "  me1/me2/me3   mono/di/tri-methylation of LYS\n"
+            "A residue name must match the --itp and --nsapdb files, if supplied."
         ),
     )
     parser.add_argument(
@@ -148,8 +152,10 @@ def parse_options():
         default=None,
         help=(
             "GROMACS ITP fragment file for the NSAA, parameterized with a\n"
-            "CH3 cap at the CA position.  Required when --nsapdb is provided\n"
-            "and the residue is not in the pmx built-in library."
+            "CH3 cap at the CA position (for a residue not in the FF RTP).\n"
+            "Geometry is embedded from the ITP bond graph, so --nsapdb is\n"
+            "optional (supply it only to override the embedded geometry).\n"
+            "Delegates to the covalent engine, same as `pmx mutate --itp`."
         ),
     )
     parser.add_argument(
@@ -159,8 +165,10 @@ def parse_options():
         type=str,
         default=None,
         help=(
-            "PDB or GRO file containing the NSAA structure.  If omitted, the\n"
-            "NSAA is taken from the pmx built-in library (standard residues only)."
+            "PDB or GRO file containing the NSAA structure.  Optional: with\n"
+            "--itp it overrides the embedded geometry; without --itp it is the\n"
+            "geometry source (else the NSAA is taken from the pmx built-in\n"
+            "library, standard residues only)."
         ),
     )
     parser.add_argument(
@@ -185,6 +193,21 @@ def parse_options():
         ),
     )
     parser.add_argument(
+        '--hybrid_name',
+        metavar='NAME',
+        dest='hybrid_name',
+        type=str,
+        default=None,
+        help=(
+            "Override the generated 4-character hybrid residue name.  The\n"
+            "default name is built from the source one-letter code plus the\n"
+            "first and last letters of the target, which is not collision-\n"
+            "free: a non-canonical source falls back to its first letter, so\n"
+            "KCR->ALY and LYS->ALY both want K2AY.  The engine refuses to\n"
+            "reuse a name for a different morph and asks for this flag."
+        ),
+    )
+    parser.add_argument(
         '-v', '--verbose',
         dest='verbose',
         action='store_true',
@@ -202,6 +225,17 @@ def parse_options():
 # ============
 
 def main(args):
+    # ── Deprecation notice ────────────────────────────────────────────────────
+    print(
+        "\n*** DEPRECATED: `pmx mutate_nsaa` is superseded by `pmx mutate`, "
+        "which is now generative for any target residue. ***\n"
+        "    Target already in the force field:  pmx mutate ... --script "
+        "'<resid> <RESNAME>'\n"
+        "    Novel residue (capped ITP fragment):  pmx mutate ... --script "
+        "'<resid> <RESNAME>' --itp frag.itp --structure frag.pdb\n"
+        "  The hybrid is written to nsaa.{rtp,mtp}; pmx gentop reads it "
+        "automatically (no --extra_mtp).\n", file=sys.stderr)
+
     # ── Force-field selection ─────────────────────────────────────────────────
     ff = args.ff
     if ff is None:
@@ -230,22 +264,31 @@ def main(args):
         print('log_> Structure loaded: %d residues, %d atoms'
               % (len(m.residues), len(m.atoms)))
 
+    # ── Resolve PTM shorthand (p1/p2, me1/me2/me3) to a target residue ────────
+    target_resname = args.resname
+    if ptm.is_ptm_code(args.resname):
+        wt_res = m.fetch_residue(args.resid, chain=args.chain)
+        target_resname, dq = ptm.resolve(wt_res.resname, args.resname)
+        print("log_> PTM code '%s' on %s%d -> target residue %s"
+              % (args.resname, wt_res.resname, args.resid, target_resname))
+        if dq != 0:
+            print("log_> WARNING: this modification changes the net charge by "
+                  "%+d e.  For FEP, add a co-alchemical counter-ion or apply a "
+                  "finite-size charge correction." % dq)
+
     # ── Run the NSAA mutation ─────────────────────────────────────────────────
-    print('log_> Mutating residue %d to %s ...' % (args.resid, args.resname))
-    print(args.chain)
-    print(args.chain)
-    print(args.chain)
-    print(args.chain)
+    print('log_> Mutating residue %d to %s ...' % (args.resid, target_resname))
 
     mutate_nsaa(
         m=m,
         mut_resid=args.resid,
-        mut_resname=args.resname,
+        mut_resname=target_resname,
         ff=ff,
         itp=args.itp,
         nonstandardPDB=args.nsapdb,
         mut_chain=args.chain,
         inplace=True,
+        hybrid_name=args.hybrid_name,
         verbose=args.verbose,
     )
 
@@ -254,8 +297,10 @@ def main(args):
     print('')
     print('log_> Hybrid structure written to: %s' % args.outfile)
     print('log_> Force-field files updated in: %s' % get_ff_path(ff))
-    print('log_> MTP file written to working directory (pass to '
-          'generate_hybrid_topology via --extra_mtp).')
+    # All front ends now delegate to the covalent engine, which accumulates the
+    # hybrid into the FF's nsaa.{rtp,mtp}; pmx gentop auto-discovers it.
+    print('log_> Hybrid written to the force field\'s nsaa.mtp; '
+          'pmx gentop reads it automatically (no --extra_mtp).')
     print('')
 
 

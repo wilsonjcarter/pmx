@@ -137,7 +137,10 @@ def bb_super(mol1, mol2, use_orig_mc_coords=True):
                 atoms2 = mol2.fetchm(gly_atom_set)
             else:
                 atoms2 = mol2.fetchm(atom_set)
-
+        print("mol1")
+        print([i.name for i in mol1.atoms])
+        print("mol2")
+        print([i.name for i in mol2.atoms])
         assert len(atoms1) == len(atoms2), "%s -> %s" % ('-'.join(map(lambda a: a.name, atoms1)), '-'.join(map(lambda a: a.name, atoms2)))
         for atom1, atom2 in zip(atoms1, atoms2):
             atom2.x = atom1.x

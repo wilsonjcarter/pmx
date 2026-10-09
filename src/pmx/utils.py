@@ -55,9 +55,9 @@ def clean_gromacs_backup_files( path ):
         path where to delete files starting with #
     """
 
-    toclean = glob('{0}/*#'.format(path)) 
+    toclean = glob('{0}/*#'.format(path))
     for clean in toclean:
-        os.remove(clean)     
+        os.remove(clean)
 
 def copy_files_folders( source, target ):
     """Copy files or folders.
@@ -85,7 +85,7 @@ def create_folder( path, fname=False ):
         folder fname will be created in this path
     fname: str, optional
         name of the folder to create
-    """ 
+    """
     if fname==False:
         if not os.path.exists(path):
             os.makedirs(path)
@@ -145,7 +145,7 @@ def ffopen(filename, mode='r', backup=True):
         return open(filename, mode)
 
 # this function echanges netmount with home
-def remove_netmount( string ): 
+def remove_netmount( string ):
     regexp = re.compile('netmount')
     string = regexp.sub('home',string)
     return(string)
@@ -212,6 +212,43 @@ def get_pmxdata(fname):
 
 
 
+def residuetype_from_ff(resname, ffpath):
+    """Looks a residue name up in the force field's own residuetypes.dat.
+
+    pmx classifies residues by the hardcoded name sets in :mod:`pmx.library`,
+    which cannot know about residues the generative engine has built.  The
+    force field already answers the same question for GROMACS, so ask it.
+
+    Parameters
+    ----------
+    resname : str
+        residue name to classify
+    ffpath : str
+        path to the force field directory
+
+    Returns
+    -------
+    moltype : str or None
+        'protein', 'dna' or 'rna' where residuetypes.dat classifies the
+        residue, None where it says nothing about it.
+    """
+    _map = {'protein': 'protein', 'dna': 'dna', 'rna': 'rna'}
+    seen = set()
+    for d in [ffpath, os.path.dirname(ffpath), os.environ.get('GMXLIB', '')]:
+        if not d or d in seen:
+            continue
+        seen.add(d)
+        fn = os.path.join(d, 'residuetypes.dat')
+        if not os.path.isfile(fn):
+            continue
+        with open(fn) as fp:
+            for line in fp:
+                f = line.split()
+                if len(f) >= 2 and f[0] == resname:
+                    return _map.get(f[1].lower())
+    return None
+
+
 def get_mtp_file(residue, ff):
     """Returns the correct mutres mtp file depending on the nature of the
     residue.
@@ -236,12 +273,33 @@ def get_mtp_file(residue, ff):
     # RNA mutation
     elif residue.moltype == 'rna':
         mtp_file = os.path.join(ffpath, 'mutres_rna.mtp')
-    # Protein mutation
+    # Protein mutation.  Disulfide/NOS hybrids historically live in a dedicated
+    # disulfide.mtp; where a force field has consolidated them into mutres.mtp
+    # (no disulfide.mtp present), fall back to mutres.mtp.
+    elif residue.resname in ["C2CD","C2VD","U2CN","CN2U","C2CN","CN2C","K2KN","O2KN","KN2O","KN2K"]:
+        disulfide = os.path.join(ffpath, 'disulfide.mtp')
+        mtp_file = disulfide if os.path.isfile(disulfide) \
+            else os.path.join(ffpath, 'mutres.mtp')
     elif residue.moltype == 'protein':
         mtp_file = os.path.join(ffpath, 'mutres.mtp')
     else:
-        raise(ValueError, 'Cannot undertand mutation type needed '
-                          'from the input strcture provided')
+        # The residue is not in library's hardcoded name sets.  It may still be
+        # one the generative engine built, in which case the force field itself
+        # knows what it is: residuetypes.dat is what GROMACS reads to answer
+        # exactly this question.
+        fftype = residuetype_from_ff(residue.resname, ffpath)
+        if fftype == 'protein':
+            mtp_file = os.path.join(ffpath, 'mutres.mtp')
+        elif fftype == 'dna':
+            mtp_file = os.path.join(ffpath, 'mutres_dna.mtp')
+        elif fftype == 'rna':
+            mtp_file = os.path.join(ffpath, 'mutres_rna.mtp')
+        else:
+            raise ValueError('Cannot understand mutation type needed '
+                             'from the input structure provided: residue '
+                             '%s is in none of pmx\'s residue sets and the '
+                             'force field does not classify it either'
+                             % residue.resname)
     return mtp_file
 
 
@@ -561,4 +619,3 @@ class importError(Exception):
 
     def __str__(self):
         return repr(self.s)
-

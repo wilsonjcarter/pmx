@@ -37,3 +37,17 @@ examples/**/mutres_term.rtp
 examples/**/mutres_term.mtp
 # GROMACS numbered backup files  (#file.ext.N#)
 \#*\#
+
+# Scratch archives (force-field snapshots, ad-hoc zips)
+*.zip
+
+# pmx generative-engine runtime output in mutant force fields — regenerated on
+# demand by `pmx mutate`/`gentop`; never commit (they cause pdb2gmx "defined in
+# two places" collisions when stale).  Curated files (mutres*.rtp/mtp, merged.rtp,
+# aminoacids.rtp, *.tdb) do NOT match these patterns and stay tracked.
+src/pmx/data/mutff/*.ff/nsaa.rtp
+src/pmx/data/mutff/*.ff/nsaa.mtp
+src/pmx/data/mutff/*.ff/nsaa.arn
+src/pmx/data/mutff/*.ff/?2??.rtp
+src/pmx/data/mutff/*.ff/?2??.arn
+src/pmx/data/mutff/*.ff/?2??.mtp

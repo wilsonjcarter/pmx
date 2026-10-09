@@ -93,7 +93,7 @@ mutate, and after having passed that mutated structure through pdb2gmx.
                         dest='scale_mass',
                         help='Scale the masses of dummy atoms by multiplying '
                         'with scale_mass factor',
-                        default=0.33, #TODO: need a function to check for oscillation period: need to ensure 2*pi*sqrt(m1*m2/((m1+m2)*k)) > 10*dt
+                        default=1.0, #TODO: need a function to check for oscillation period: need to ensure 2*pi*sqrt(m1*m2/((m1+m2)*k)) > 10*dt
                         action='store')
     parser.add_argument('--scale_dih',
                         dest='scale_dih',
@@ -129,6 +129,35 @@ mutate, and after having passed that mutated structure through pdb2gmx.
                         'cross-boundary AMBER<->GAFF bonded terms and ITP-internal '
                         'GAFF terms needed when filling B states for NSAA hybrids.')
 
+    parser.add_argument('--decouple-dummies',
+                        dest='decouple_dummies',
+                        default=False,
+                        action='store_true',
+                        help='Opt-in Boresch dummy-atom decoupling corrections. '
+                        'Removes factorization-breaking bonded terms at '
+                        'physical/dummy junctions that the default "naive" '
+                        'symmetric dummy treatment leaves in place (Fleck, '
+                        'Wieder, Boresch, JCTC 2021, 17, 4403).  Deletes '
+                        'Urey-Bradley (CHARMM func-5) terms on 2-physical/'
+                        '1-dummy angles, and prunes redundant dihedrals at '
+                        'terminal dummy junctions (keeping one physical anchor). '
+                        'Off by default (does not change existing behaviour).')
+
+    parser.add_argument('--bond',
+                        dest='bond',
+                        action='append',
+                        default=None,
+                        metavar='"r1[:atom]-r2[:atom]"',
+                        help='Explicitly form a cross-residue bond between two '
+                        'atoms, e.g. "72:NZ-73:OD" (chain optional: "A/72:NZ-'
+                        'A/73:OD").  Deterministic override/addition to the '
+                        'distance auto-detection -- the reliable path when the '
+                        'reacting atoms are far apart in the starting state '
+                        '(alchemical formation) or to force a specific pairing. '
+                        'Repeat for multiple bonds (e.g. the two N-O bonds of a '
+                        'SONOS bridge).  The plain atom name maps to its bound '
+                        'branch (NZ -> NZ2).')
+
     args, unknown = parser.parse_known_args()
     check_unknown_cmd(unknown)
 
@@ -142,6 +171,33 @@ mutate, and after having passed that mutated structure through pdb2gmx.
 # ====
 # Main
 # ====
+def _parse_gentop_bond(spec):
+    """Parse a --bond spec "r1[:atom]-r2[:atom]" (chain optional "A/72:NZ").
+
+    Returns {resid_a, chain_a, atom_a, resid_b, chain_b, atom_b, mode='form'}.
+    The reacting atom defaults to SG (disulfide) when omitted.
+    """
+    try:
+        left, right = spec.split('-')
+    except ValueError:
+        raise ValueError("--bond must be 'r1:atom-r2:atom', got %r" % spec)
+
+    def one(side):
+        chain = None
+        if '/' in side:
+            chain, side = side.split('/', 1)
+        if ':' in side:
+            resid, atom = side.split(':')
+        else:
+            resid, atom = side, 'SG'
+        return int(resid), chain, atom.strip()
+
+    ra, ca, aa = one(left)
+    rb, cb, ab = one(right)
+    return {'resid_a': ra, 'chain_a': ca, 'atom_a': aa,
+            'resid_b': rb, 'chain_b': cb, 'atom_b': ab, 'mode': 'form'}
+
+
 def main(args):
 
     top_file = args.intop
@@ -151,6 +207,8 @@ def main(args):
     scale_mass = float(args.scale_mass)
     recursive = args.recursive
     scaleDih = float(args.scale_dih)
+    inter_bonds = ([_parse_gentop_bond(s) for s in args.bond]
+                   if getattr(args, 'bond', None) else None)
 
     # if input is itp but output is else, rename output
     if top_file_ext == 'itp' and outfile.split('.')[-1] != 'itp':
@@ -164,7 +222,9 @@ def main(args):
     pmxtop, pmxitps = gen_hybrid_top(topol=topol, recursive=recursive,
                                      verbose=True, scaleDih=scaleDih,
                                      extra_mtp_files=args.extra_mtp,
-                                     supplement_bonded_files=args.supplement_bonded)
+                                     supplement_bonded_files=args.supplement_bonded,
+                                     inter_bonds=inter_bonds,
+                                     decouple_dummies=args.decouple_dummies)
 
     # get the base path for the .itp file output
     basepath = os.path.abspath(outfile).rsplit('/',1)[0]

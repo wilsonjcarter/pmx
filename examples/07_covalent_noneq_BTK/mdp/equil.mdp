@@ -1,0 +1,20 @@
+; equilibrate the well-defined state B (bonded thioether)
+integrator=md
+dt=0.001
+nsteps=NSTEPS_EQ
+constraints=none
+cutoff-scheme=Verlet
+coulombtype=cutoff
+rcoulomb=1.2
+rvdw=1.2
+pbc=xyz
+tcoupl=v-rescale
+tc-grps=System
+tau-t=0.5
+ref-t=300
+gen-vel=yes
+gen-temp=300
+gen-seed=-1
+nstxout-compressed=NSTOUT
+free-energy=yes
+init-lambda=1
