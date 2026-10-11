@@ -643,12 +643,35 @@ def hybrid_name(source, target, reverse=False, term=None):
             "YP2; a morph between two of them cannot be spelled.  Pass an explicit "
             "hybrid_name= of at most 4 characters."
             % (src, tgt, s_code, t_code))
+    # An NSAA/PTM residue as state A -- the inverse of a PTM install, e.g. a
+    # demethylation or deacylation ladder.  `letter` falls back to src[:1], which
+    # collapses MLZ/MLY/M3L all onto 'M': forward named every methyl-Lys->LYS
+    # hybrid 'M2LS' and reverse named all ten acyl/methyl-Lys->LYS hybrids 'LYS2'.
+    # Spell the source with its two-character first+last code against the target's
+    # one-character canonical code, which fits exactly: MZ2K / MY2K / ML2K.  Only
+    # this case changes; canonical<->canonical, canonical->NSAA and NSAA->NSAA all
+    # keep their existing spelling, so no name already on disk moves.
+    _src2 = None
+    if s_code is None and t_code and len(t_code) == 1:
+        _c = _target_code(src)
+        if len(_c) + len(t_code) + 1 <= 4:
+            _src2 = _c
+
     if reverse:
         # A reverse hybrid is the inverse mutation, so it is the forward name with the
         # endpoints swapped.  Where that is not available, front-load the state-A
-        # residue: delegating would send MLZ->LYS to 'M2LS', already MET->LYS.
-        return t_code + '2' + s_code if _fits else (tgt + '2' + letter)[:4]
-    return s_code + '2' + t_code if _fits else (letter + '2' + _target_code(tgt))[:4]
+        # residue.
+        if _fits:
+            return t_code + '2' + s_code
+        if _src2:
+            # reverse(MLZ->LYS) IS the morph LYS->MLZ, whose forward name is 'K2MZ'.
+            return t_code + '2' + _src2
+        return (tgt + '2' + letter)[:4]
+    if _fits:
+        return s_code + '2' + t_code
+    if _src2:
+        return _src2 + '2' + t_code
+    return (letter + '2' + _target_code(tgt))[:4]
 
 
 _protein_residues_incl_pmx_mut = (
