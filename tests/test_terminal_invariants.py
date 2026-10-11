@@ -289,8 +289,17 @@ def test_generated_topology_invariants(ff, op, target, dq, tmp_path):
                 f"{ff}/{op}: atom {r[4]} res{r[2]} state {st} has bogus atomtype {t!r}"
             assert t in known, f"{ff}/{op}: atomtype {t!r} absent from ffnonbonded"
         if hasB:
-            assert abs(float(r[7]) - float(r[10])) < 1e-3, \
-                f"{ff}/{op}: atom {r[4]} mass differs between states: {r[7]} vs {r[10]}"
+            # A mass change between states is LEGITIMATE: an element-changing map
+            # is standard pmx practice, and upstream's own mutres library does it
+            # 112 times for C<->O alone (S2C maps OG mass 16.000 -> SG 32.060).
+            # What must never happen is the bug this guards -- an atom whose mass
+            # was silently filled in from somewhere other than its own type -- so
+            # require that a mass change comes WITH a type change.
+            if abs(float(r[7]) - float(r[10])) >= 1e-3:
+                assert tA != tB, (
+                    f"{ff}/{op}: atom {r[4]} mass changed {r[7]} -> {r[10]} but "
+                    f"its atomtype did not ({tA}); a silent mass change is the "
+                    f"OC1/OC2-OT1/OT2 bug class, an element change is not")
 
     for q, st in ((qa, "A"), (qb, "B")):
         assert min(abs(q - round(q)), abs(q / 0.75 - round(q / 0.75))) < 2e-3, \
