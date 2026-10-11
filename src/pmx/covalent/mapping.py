@@ -257,9 +257,11 @@ _COST_CROSS_ELEMENT = 10.0
 _COST_CARBON_FOR_HETERO = 5.0
 _COST_NAME_MISMATCH = 1.0
 _COST_DEGREE = 0.1
-# PMX_MAP_RING_ATTACH=1 lets the ring ATTACHMENT atom map across a ring-size
-# change, which is what upstream does (PHE CG -> TRP CG, CA -> CY in F2W).
-_attach_across_rings = os.environ.get("PMX_MAP_RING_ATTACH") == "1"
+# The ring ATTACHMENT atom may map across a ring-size change, which is what
+# upstream does (PHE CG -> TRP CG, CA -> CY in F2W).  Measured: it resolves
+# exactly the 16 aromatic pairs, 1 atom and 2 dummies cheaper each, with the
+# three mapping invariants still holding on all 380 ordered pairs.
+_attach_across_rings = True
 
 
 def _is_ring_attachment(res, i, mapped, ringsz) -> bool:
@@ -631,7 +633,8 @@ def map_residues(res1, res2, method: str = "auto",
         Objects with an ``.atoms`` list of pmx :class:`~pmx.atom.Atom`.  For the
         graph method both must carry connectivity (``atom.bonds``); see
         :func:`attach_bonds_from_rtp`.
-    method : {'auto', 'graph', 'name'}
+    method : {'auto', 'anchored', 'graph', 'name'}
+        ``'anchored'`` -- rooted shell matcher from CA (the default via ``'auto'``).
         ``'graph'`` -- MCS on the molecular graph (safe; requires RDKit + bonds).
         ``'name'``  -- name+element anchor only (unsafe against name collisions).
         ``'auto'``  -- graph when possible, else name with a warning.
@@ -650,10 +653,14 @@ def map_residues(res1, res2, method: str = "auto",
             "residues; attach bonds (e.g. attach_bonds_from_rtp) or use "
             "method='name'.")
 
-    # PROTOTYPE opt-in: PMX_MAPPER=anchored selects the rooted shell matcher
-    # instead of FindMCS, so both can be measured through the existing harnesses
-    # without changing any call site.  Default is unchanged.
-    if method == "auto" and os.environ.get("PMX_MAPPER") == "anchored":
+    # 'auto' prefers the rooted shell matcher.  It beats FindMCS on every measure
+    # we have: agreement with the shipped library 198 -> 16 differing hybrids of
+    # 650, identical in both force fields, with end states 380/380, reverse
+    # symmetry 380/380 and the three mapping invariants clean.  FindMCS optimises
+    # substructure SIZE, which is the wrong objective once the backbone is forced
+    # and depth is constrained, and it cannot express "prefer the same element,
+    # allow a different one" at all.  Pass method='graph' for FindMCS explicitly.
+    if method == "auto" and can_graph:
         method = "anchored"
 
     if method == "anchored" and not (_has_anchor(res1) and _has_anchor(res2)):
