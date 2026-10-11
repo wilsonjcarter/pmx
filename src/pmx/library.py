@@ -67,6 +67,28 @@ def pmx_data_file(filename, verbose=False):
         return data_file
 
 
+def ff_data_file(ffpath, filename):
+    """A GMXLIB-root data file, resolved next to *ffpath* when it lives there.
+
+    ``residuetypes.dat`` is read by GROMACS from the GMXLIB *root*, not from the
+    ``.ff`` subdirectory, so a hybrid registered while writing into
+    ``<GMXLIB>/<ff>.ff`` belongs in ``<GMXLIB>/residuetypes.dat``.
+    :func:`pmx_data_file` cannot do this: it resolves against the installed
+    package directory and never consults GMXLIB, so an overridden GMXLIB (a
+    scratch force-field tree, a bundle, a parallel build) had its registrations
+    written back into the pmx checkout -- or, with an unforced PYTHONPATH, into
+    whichever pmx happened to be imported.
+
+    Falls back to the packaged copy when *ffpath* has no such sibling, so the
+    default layout (GMXLIB == the packaged ``mutff``) is unchanged: there the
+    sibling IS the packaged file.
+    """
+    sibling = os.path.join(os.path.dirname(os.path.abspath(ffpath)), filename)
+    if os.path.isfile(sibling):
+        return sibling
+    return pmx_data_file(os.path.join('mutff', filename))
+
+
 def pmx_aamut_pairs(lst):
     """Create an array with all possible combinations of protein residue
     mutants. e.g. A2D, A2E, E2A, D2A etc etc

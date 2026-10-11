@@ -350,7 +350,7 @@ def decouple_mutate(model, resid, target, ff, react_atom, chain=None,
     import warnings
     from copy import deepcopy
     from ..utils import list2file
-    from ..library import pmx_data_file
+    from ..library import ff_data_file, pmx_data_file
     from ..nsaa import (_assign_rtp_entries, _get_residue_types, _ARN_CONTENT,
                         _write_atp_fnb, _assign_mass_atp)
     from .mutate import _load_rtp, _upsert_entry, _split_rtp_header
@@ -437,7 +437,7 @@ def decouple_mutate(model, resid, target, ff, react_atom, chain=None,
             arn = os.path.join(ffpath, "nsaa.arn")
             if not os.path.isfile(arn):
                 list2file([_ARN_CONTENT], arn)
-        fn_restypes = pmx_data_file("mutff/residuetypes.dat")
+        fn_restypes = ff_data_file(ffpath, "residuetypes.dat")
         if name not in _get_residue_types(fn_restypes):
             need_nl = (os.path.isfile(fn_restypes)
                        and os.path.getsize(fn_restypes) > 0

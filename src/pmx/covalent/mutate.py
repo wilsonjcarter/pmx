@@ -34,7 +34,7 @@ from .. import library
 from ..model import Model
 from ..ffparser import RTPParser, load_ff_rtp
 from ..utils import get_ff_path, list2file
-from ..library import pmx_data_file
+from ..library import ff_data_file, pmx_data_file
 
 from .mapping import map_residues, attach_bonds_from_rtp, _element_of
 from .target import TargetResidue, complete_target_from_structure
@@ -463,7 +463,7 @@ def _accumulate_hybrid(ffpath, hybrid_name, rtp_text, mtp_text, bCharmm):
         arn = os.path.join(ffpath, "nsaa.arn")
         if not os.path.isfile(arn):
             list2file([_ARN_CONTENT], arn)
-    fn_restypes = pmx_data_file("mutff/residuetypes.dat")
+    fn_restypes = ff_data_file(ffpath, "residuetypes.dat")
     existing = _get_residue_types(fn_restypes)
     if hybrid_name not in existing:
         # residuetypes.dat may lack a trailing newline; GROMACS rejects a
