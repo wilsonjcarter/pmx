@@ -8,8 +8,35 @@ from pmx.covalent import ptm
 def test_phospho_protonation_states():
     assert ptm.resolve("SER", "p1") == ("SP1", -1)
     assert ptm.resolve("SER", "p2") == ("SP2", -2)
-    assert ptm.resolve("THR", "p1") == ("TP1", -1)
+    # THP1/THP2, NOT TP1/TP2: CHARMM's TP1/TP2 are phospho-TYROSINE under
+    # different atom naming, so 'T p1' used to install an aromatic ring.
+    assert ptm.resolve("THR", "p1") == ("THP1", -1)
+    assert ptm.resolve("THR", "p2") == ("THP2", -2)
     assert ptm.resolve("TYR", "p2") == ("YP2", -2)
+
+
+@pytest.mark.parametrize("wt,code", [("SER", "p1"), ("SER", "p2"),
+                                     ("THR", "p1"), ("THR", "p2"),
+                                     ("TYR", "p1"), ("TYR", "p2")])
+def test_phospho_target_is_the_right_chemistry(wt, code):
+    """Phosphorylation adds a phosphate (P + 3 O) and NOTHING else.
+
+    Asserting the table against itself cannot catch a mis-wired target -- that is
+    how 'THR p1' came to point at TP1, a phospho-tyrosine whose ring adds eleven
+    heavy atoms.  Compare the built residues instead.
+    """
+    pytest.importorskip("rdkit")
+    from pmx.gmx import set_gmxlib
+    from pmx.covalent import TargetResidue
+    set_gmxlib()
+    target, _ = ptm.resolve(wt, code)
+    heavy = lambda rn: sum(
+        1 for a in TargetResidue.from_rtp(rn, "charmm36m-mut").residue.atoms
+        if a.m > 2.0)
+    assert heavy(target) - heavy(wt) == 4, (
+        f"{wt} + {code} -> {target} changes the heavy-atom count by "
+        f"{heavy(target) - heavy(wt)}, not 4 (P + 3 O); the target is not a "
+        f"phosphorylated {wt}")
 
 
 def test_methylation_degrees():

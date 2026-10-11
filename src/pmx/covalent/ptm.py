@@ -33,7 +33,11 @@ from .. import library
 # (WT residue) -> {code: target residue name}, per modification family.
 _PHOSPHO = {
     "SER": {"p1": "SP1", "p2": "SP2"},     # phospho-serine
-    "THR": {"p1": "TP1", "p2": "TP2"},     # phospho-threonine
+    # phospho-threonine is THP1/THP2.  CHARMM's TP1/TP2 are phospho-TYROSINE
+    # under different atom naming (ring CG/CD1/CE1/CZ/OH + phosphate), which is
+    # why library.phospho_protonation_states lists THP1/THP2 for T and leaves
+    # TP1/TP2 out.  Pointing T at TP1 installed a phospho-tyrosine.
+    "THR": {"p1": "THP1", "p2": "THP2"},   # phospho-threonine
     "TYR": {"p1": "YP1", "p2": "YP2"},     # phospho-tyrosine
 }
 _METHYL = {
