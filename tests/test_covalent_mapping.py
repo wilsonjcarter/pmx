@@ -112,7 +112,9 @@ def _built_residues():
 def test_ser_to_sep_graph_maps_hn_and_isolates_phosphate():
     ser, sep = _built_residues()
     m = map_residues(ser, sep)          # auto -> graph (from_rtp carries bonds)
-    assert "mcs" in set(m.method.values())
+    # a graph-derived label, i.e. NOT the unsafe name-only fallback.  Either
+    # matcher qualifies: "mcs" (FindMCS) or "anchored" (the rooted matcher).
+    assert {"mcs", "anchored"} & set(m.method.values())
     mapped = dict(m.named_pairs())
     assert mapped["HN"] == "HN" and mapped["OG"] == "OG" and mapped["CB"] == "CB"
     assert {sep.atoms[j].name for j in m.appear} == {"P", "O1P", "O2P", "O3P", "H3T"}

@@ -34,6 +34,7 @@ from __future__ import annotations
 
 import logging
 import os
+import os
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Tuple
 
@@ -185,8 +186,183 @@ def _index_of(res, atom) -> Optional[int]:
     return None
 
 
+def _heavy_neighbors(res, i) -> List[int]:
+    """Indices of *i*'s heavy-atom neighbours in *res*."""
+    out = []
+    for b in getattr(res.atoms[i], "bonds", []):
+        k = _index_of(res, b)
+        if k is not None and not _is_h(res.atoms[k]):
+            out.append(k)
+    return out
+
+
+def _ring_size(res, i) -> int:
+    """Size of the SMALLEST cycle through heavy atom *i*; 0 if acyclic.
+
+    Membership alone is too weak a constraint: PHE's CD1/CE1/CZ sit in a
+    six-ring and TRP's CD1/NE1/CE2 in the fused five-ring, so an "is it in a
+    ring" test let them pair -- including a carbon onto a nitrogen -- which would
+    put both a 5-cycle and a 6-cycle in the hybrid's single bond list and make
+    ring connectivity state-dependent.
+    """
+    nb = _heavy_neighbors(res, i)
+    best = 0
+    for a in range(len(nb) - 1):
+        for b in range(a + 1, len(nb)):
+            # shortest path nb[a] -> nb[b] avoiding i, by BFS
+            start, goal = nb[a], nb[b]
+            seen, frontier, dist = {i, start}, [start], 1
+            while frontier and not best or frontier:
+                nxt = []
+                for cur in frontier:
+                    if cur == goal:
+                        cyc = dist + 1
+                        best = cyc if not best else min(best, cyc)
+                        nxt = []
+                        break
+                    for k in _heavy_neighbors(res, cur):
+                        if k != i and k not in seen:
+                            seen.add(k)
+                            nxt.append(k)
+                else:
+                    frontier, dist = nxt, dist + 1
+                    continue
+                break
+    return best
+
+
+# ── prototype: anchored shell matcher ─────────────────────────────────────────
+# An alternative to FindMCS for the RESIDUE case, where a backbone anchor exists.
+# Our problem is not maximum-common-substructure: the backbone is forced, a pair
+# must sit at equal bond depth from CA, and a pair's parents must correspond, so
+# the correspondence is determined shell by shell outward from CA and each shell
+# has a handful of candidates (TRP, the largest side chain, has 10 heavy atoms).
+#
+# FindMCS optimises substructure SIZE, which is the wrong objective here: for
+# PHE->TRP it matched PHE's six-ring onto TRP's benzo ring (6 atoms, a legal
+# complete-ring match, beating the correct CB+CG=2) and _enforce_anchor_depth then
+# had to discard the lot, taking CB with it.  It also cannot express the preference
+# we want -- its element handling is binary (CompareElements forbids a
+# cross-element map, CompareAny is indifferent) -- whereas upstream pmx maps
+# C<->O, C<->S, O<->S and N<->O when no same-element candidate exists at that
+# position.  A cost says "prefer same element, allow different" in one line.
+#
+# Every term is swap-invariant, so the matching is identical in both directions.
+_COST_CROSS_ELEMENT = 10.0
+# Carbon-onto-heteroatom is a bigger chemical change than heteroatom-onto-
+# heteroatom, and without separating them the two tie: THR has OG1 and CG2 at
+# depth 2 against CYS's SG, and a flat cross-element cost let CG2->SG (methyl
+# carbon onto thiol sulfur) win on the name/degree tiebreak.  Upstream maps
+# OG1->SG -- hydroxyl oxygen onto thiol sulfur, both bearing their H.
+_COST_CARBON_FOR_HETERO = 5.0
+_COST_NAME_MISMATCH = 1.0
+_COST_DEGREE = 0.1
+# PMX_MAP_RING_ATTACH=1 lets the ring ATTACHMENT atom map across a ring-size
+# change, which is what upstream does (PHE CG -> TRP CG, CA -> CY in F2W).
+_attach_across_rings = os.environ.get("PMX_MAP_RING_ATTACH") == "1"
+
+
+def _is_ring_attachment(res, i, mapped, ringsz) -> bool:
+    """*i* is a ring atom whose mapped neighbours are all ACYCLIC."""
+    nb = [p for p in _heavy_neighbors(res, i) if p in mapped]
+    return bool(nb) and all(not ringsz.get(p) for p in nb)
+
+
+def _has_anchor(res) -> bool:
+    """Does *res* carry the CA the rooted matcher roots on?"""
+    return any(_canon_name(a.name) == _ANCHOR for a in res.atoms)
+
+
+def _anchored_pairs(res1, res2, method):
+    """Rooted shell-by-shell heavy-atom correspondence, CA outward."""
+    d1, d2 = _graph_depth(res1), _graph_depth(res2)
+    if not d1 or not d2:
+        return []
+
+    pairs = _force_backbone(res1, res2, [], method)      # anchor, by name
+    mapped = dict(pairs)
+    used2 = set(mapped.values())
+
+    heavy1 = [i for i, a in enumerate(res1.atoms) if not _is_h(a)]
+    heavy2 = [j for j, a in enumerate(res2.atoms) if not _is_h(a)]
+    ring1 = {i: _ring_size(res1, i) for i in heavy1}
+    ring2 = {j: _ring_size(res2, j) for j in heavy2}
+
+    depths = sorted({d for d in d1.values() if d is not None and d > 0})
+    for d in depths:
+        while True:
+            rev = {j: i for i, j in mapped.items()}
+            c1 = [i for i in heavy1 if i not in mapped and d1.get(i) == d]
+            c2 = [j for j in heavy2 if j not in used2 and d2.get(j) == d]
+            if not c1 or not c2:
+                break
+
+            def cost(i, j):
+                # HARD: smallest-ring size must agree (0 == acyclic).  A hybrid
+                # carries one bond list, so pairing a five-ring atom with a
+                # six-ring atom would make ring connectivity state-dependent.
+                if ring1[i] != ring2[j]:
+                    # Exception, opt-in: the ring ATTACHMENT atom, whose only
+                    # mapped neighbour is acyclic (CB).  Upstream maps PHE CG
+                    # onto TRP CG across a six-/five-ring change; the bond that
+                    # persists is CG-CB, which is outside both rings.
+                    if not (_attach_across_rings
+                            and ring1[i] and ring2[j]
+                            and _is_ring_attachment(res1, i, mapped, ring1)
+                            and _is_ring_attachment(res2, j,
+                                                    {v: k for k, v in mapped.items()},
+                                                    ring2)):
+                        return None
+                # HARD: the parents must already correspond, which is what keeps
+                # the mapping connected to CA and the dummies terminal.
+                p1 = [p for p in _heavy_neighbors(res1, i) if p in mapped]
+                if not any(mapped[p] in _heavy_neighbors(res2, j) for p in p1):
+                    return None
+                n1 = _canon_name(res1.atoms[i].name)
+                n2 = _canon_name(res2.atoms[j].name)
+                e1 = _element_of(res1.atoms[i])
+                e2 = _element_of(res2.atoms[j])
+                c = 0.0
+                if e1 != e2:
+                    c += _COST_CROSS_ELEMENT
+                    if ('C' in (e1, e2)) and not {e1, e2} <= {'C'}:
+                        c += _COST_CARBON_FOR_HETERO
+                if n1 != n2:
+                    c += _COST_NAME_MISMATCH
+                c += _COST_DEGREE * abs(len(_heavy_neighbors(res1, i))
+                                        - len(_heavy_neighbors(res2, j)))
+                return (c, tuple(sorted((n1, n2))))
+
+            opts = {}
+            for i in c1:
+                for j in c2:
+                    k = cost(i, j)
+                    if k is not None:
+                        opts[(i, j)] = k
+            if not opts:
+                break
+            best1, best2 = {}, {}
+            for (i, j), k in sorted(opts.items(), key=lambda t: (t[1], t[0])):
+                best1.setdefault(i, (k, j))
+                best2.setdefault(j, (k, i))
+            took = False
+            for i, (k, j) in sorted(best1.items()):
+                if best2.get(j, (None, None))[1] != i:
+                    continue                      # not mutually best -> symmetric
+                if i in mapped or j in used2:
+                    continue
+                mapped[i] = j
+                used2.add(j)
+                method[i] = ("isosteric" if _element_of(res1.atoms[i])
+                             != _element_of(res2.atoms[j]) else "anchored")
+                took = True
+            if not took:
+                break
+    return sorted(mapped.items())
+
+
 def _graph_heavy_pairs(res1, res2) -> List[Tuple[int, int]]:
-    """Heavy-atom correspondence from a 2-D MCS, disambiguated by atom name."""
+    """Heavy-atom correspondence from a 2-D MCS, disambiguated by position."""
     mol1, heavy1 = _heavy_mol(res1)
     mol2, heavy2 = _heavy_mol(res2)
     if mol1.GetNumAtoms() == 0 or mol2.GetNumAtoms() == 0:
@@ -210,18 +386,31 @@ def _graph_heavy_pairs(res1, res2) -> List[Tuple[int, int]]:
     if not matches1 or not matches2:
         return []
 
-    # choose the (match1, match2) alignment maximizing atom-name agreement
-    def name_score(m1, m2):
-        return sum(
-            1 for a, b in zip(m1, m2)
-            if _canon_name(res1.atoms[heavy1[a]].name)
-            == _canon_name(res2.atoms[heavy2[b]].name)
-        )
+    # Choose the (match1, match2) alignment by DEPTH agreement first, name second.
+    # Depth from CA is the positional prior and must outrank the label: with the
+    # backbone excluded from the MCS there is no N-CA anchor left to pin the side
+    # chain, so a pure name score picks a target atom that merely reuses a name at
+    # a different graph position (WT N-CA-CB vs target N-CA-CG-CB would align
+    # CB<->CB rather than the positionally correct CB<->CG).  Scoring depth first
+    # restores the "map by position, not by name" guarantee, and name agreement
+    # still breaks ties among equal-depth alignments (symmetric substituents).
+    dd1, dd2 = _graph_depth(res1), _graph_depth(res2)
 
-    best, best_score = None, -1
+    def align_score(m1, m2):
+        depth = name = 0
+        for a, b in zip(m1, m2):
+            i, j = heavy1[a], heavy2[b]
+            if dd1.get(i) is not None and dd1.get(i) == dd2.get(j):
+                depth += 1
+            if (_canon_name(res1.atoms[i].name)
+                    == _canon_name(res2.atoms[j].name)):
+                name += 1
+        return (depth, name)
+
+    best, best_score = None, (-1, -1)
     for m1 in matches1:
         for m2 in matches2:
-            s = name_score(m1, m2)
+            s = align_score(m1, m2)
             if s > best_score:
                 best_score, best = s, (m1, m2)
     m1, m2 = best
@@ -244,7 +433,17 @@ def _force_backbone(res1, res2, heavy_pairs, method):
             forced.append((n1[nm], n2[nm]))
     fi = {i for i, _ in forced}
     fj = {j for _, j in forced}
-    kept = [(i, j) for i, j in heavy_pairs if i not in fi and j not in fj]
+    # A backbone atom must never map onto a NON-backbone one, and vice versa.
+    # _force_backbone can only pin a name present in BOTH residues, so a target
+    # supplied as a capped side-chain fragment (SFR: CA, CB, OG + a CH3 stand-in,
+    # no N/C/O) leaves the WT's C and O free, and the MCS slid the backbone onto
+    # the fragment -- C onto CB, O onto OG.  Depth cannot see it either, because
+    # the cap makes the two branches off CA symmetric.  One rule, no new machinery.
+    def _cross_class(i, j):
+        return ((_canon_name(res1.atoms[i].name) in _BACKBONE)
+                != (_canon_name(res2.atoms[j].name) in _BACKBONE))
+    kept = [(i, j) for i, j in heavy_pairs
+            if i not in fi and j not in fj and not _cross_class(i, j)]
     for i, _ in forced:
         method[i] = "backbone"
     return forced + kept
@@ -314,6 +513,36 @@ def _enforce_anchor_depth(res1, res2, heavy_pairs, method):
             kept.append((i, j))
         else:
             dropped.append((i, j, a, b))
+
+    # Dropping a pair can orphan the ones beyond it: PHE->TRP keeps the slid ring
+    # tip (CZ/CE2/CD2) after its root is discarded, leaving a mapped island whose
+    # only route to CA runs through a dummy.  A dummy carries full bonded terms, so
+    # the molecule is not severed, but a real fragment tethered by a ghost is not a
+    # chemically sensible end state and it breaks the "dummies are terminal" rule.
+    # Sweep them, repeatedly, so the mapped set is always connected to CA.
+    ca = next((i for i, a in enumerate(res1.atoms)
+               if _canon_name(a.name) == _ANCHOR), None)
+    if ca is not None:
+        while True:
+            mp = {i for i, _ in kept}
+            if ca not in mp:
+                break
+            seen, stack = {ca}, [ca]
+            while stack:
+                for k in _heavy_neighbors(res1, stack.pop()):
+                    if k in mp and k not in seen:
+                        seen.add(k)
+                        stack.append(k)
+            orphans = {i for i in mp
+                       if i not in seen and not _is_h(res1.atoms[i])}
+            if not orphans:
+                break
+            for i, j in [p for p in kept if p[0] in orphans]:
+                logger.warning("map_residues:   orphan %s dropped (reaches %s "
+                               "only through a dummy)", res1.atoms[i].name, _ANCHOR)
+                dropped.append((i, j, -1, -1))
+                method.pop(i, None)
+            kept = [p for p in kept if p[0] not in orphans]
 
     if dropped:
         logger.warning(
@@ -408,7 +637,6 @@ def map_residues(res1, res2, method: str = "auto",
         ``'auto'``  -- graph when possible, else name with a warning.
     element_guard : bool
         For the name path, require matched names to share an element.
-
     Returns
     -------
     ResidueMapping
@@ -421,6 +649,34 @@ def map_residues(res1, res2, method: str = "auto",
             "method='graph' requires RDKit and bond connectivity on both "
             "residues; attach bonds (e.g. attach_bonds_from_rtp) or use "
             "method='name'.")
+
+    # PROTOTYPE opt-in: PMX_MAPPER=anchored selects the rooted shell matcher
+    # instead of FindMCS, so both can be measured through the existing harnesses
+    # without changing any call site.  Default is unchanged.
+    if method == "auto" and os.environ.get("PMX_MAPPER") == "anchored":
+        method = "anchored"
+
+    if method == "anchored" and not (_has_anchor(res1) and _has_anchor(res2)):
+        # No CA on one side, so there is no root and no depth coordinate: a GFP
+        # chromophore (CRO has CA1/CA2/CA3 and no CA, because it replaces the
+        # backbone) or an arbitrary ligand.  The rooted matcher would decouple
+        # everything, and maximum-common-substructure is genuinely the right
+        # primitive for an UNANCHORED pair, so hand those back to FindMCS.
+        logger.info("map_residues: no %s anchor on both residues (%s -> %s); "
+                    "using the MCS path", _ANCHOR,
+                    getattr(res1, "resname", "?"), getattr(res2, "resname", "?"))
+        method = "auto"
+
+    if method == "anchored":
+        pairs = _anchored_pairs(res1, res2, method_used)
+        pairs = pairs + _map_hydrogens(res1, res2, pairs, method_used)
+        matched1 = {i for i, _ in pairs}
+        matched2 = {j for _, j in pairs}
+        return ResidueMapping(
+            res1=res1, res2=res2, pairs=pairs,
+            disappear=[i for i in range(len(res1.atoms)) if i not in matched1],
+            appear=[j for j in range(len(res2.atoms)) if j not in matched2],
+            method=method_used)
 
     use_graph = (method == "graph") or (method == "auto" and can_graph)
 
