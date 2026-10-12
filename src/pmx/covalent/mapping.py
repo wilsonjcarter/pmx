@@ -572,10 +572,27 @@ def _h_neighbors(res, i) -> List[int]:
     return out
 
 
-def _map_hydrogens(res1, res2, heavy_pairs, method):
-    """Attach hydrogens to their mapped heavy parent, paired by canonical name."""
+def _map_hydrogens(res1, res2, heavy_pairs, method,
+                   map_cross_element_h: bool = False):
+    """Attach hydrogens to their mapped heavy parent, paired by canonical name.
+
+    By default a parent pair that CHANGES ELEMENT does not carry its hydrogens
+    across: they disappear and appear on their own sides instead.  A hydrogen's
+    chemistry is its parent's, so mapping one across a change of element means
+    morphing e.g. SER's hydroxyl proton (type H, q +0.43) into an aliphatic CH
+    (type HA2, q +0.09) in `S2E`, or a CH2 hydrogen onto the guanidinium N-H in
+    `K2R`.  Measured over the 650 library hybrids, allowing it mapped 48 such
+    hydrogens; the 232 same-element C-H maps, which are the real win, are
+    untouched by this rule.
+
+    Pass *map_cross_element_h* to allow them (fewer dummies, larger per-atom
+    perturbation).
+    """
     h_pairs = []
     for i, j in heavy_pairs:
+        if not map_cross_element_h and _element_of(res1.atoms[i]) != _element_of(
+                res2.atoms[j]):
+            continue
         h1 = _h_neighbors(res1, i)
         h2 = _h_neighbors(res2, j)
         used = set()
