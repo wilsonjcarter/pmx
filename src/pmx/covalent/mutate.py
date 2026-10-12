@@ -36,7 +36,8 @@ from ..ffparser import RTPParser, load_ff_rtp
 from ..utils import get_ff_path, list2file
 from ..library import ff_data_file, pmx_data_file
 
-from .mapping import map_residues, attach_bonds_from_rtp, _element_of
+from .mapping import (map_residues, attach_bonds_from_rtp, _element_of,
+                      _canon_name, _heavy_neighbors, _is_h)
 from .target import TargetResidue, complete_target_from_structure
 
 # Reuse the battle-tested emit + ITP-fragment helpers from nsaa (import, do not
@@ -67,6 +68,84 @@ def _kabsch(P: np.ndarray, Q: np.ndarray):
     R = Vt.T @ np.diag([1.0, 1.0, d]) @ U.T
     t = Q.mean(0) - R @ P.mean(0)
     return R, t
+
+
+_CHIRAL_REF = ("N", "C", "CB")      # with CA as the centre
+
+
+def _signed_volume(res, centre, three):
+    """Triple product of *centre*'s bonds to *three*, or None if an atom is absent."""
+    ix = {_canon_name(a.name): i for i, a in enumerate(res.atoms)}
+    if centre not in ix or any(n not in ix for n in three):
+        return None
+    c = np.array(list(res.atoms[ix[centre]].x), float)
+    v = [np.array(list(res.atoms[ix[n]].x), float) - c for n in three]
+    return float(np.dot(np.cross(v[0], v[1]), v[2]))
+
+
+def _match_chirality(residue1, residue2, pairs) -> bool:
+    """Reflect the target when its CA configuration mirrors the WT's.
+
+    An RTP is a bond graph and carries no stereochemistry, so the embedding in
+    ``TargetResidue.from_rtp`` picks a configuration blind to L versus D: measured
+    over a nine-residue peptide, SIX of nine came out as the D-enantiomer.  Only
+    APPEARING atoms take their coordinates from the target, so a mirrored template
+    is merely a poor starting geometry for a plain branch -- but for a stereocentre
+    built out of appearing atoms it is the wrong diastereomer, and minimisation
+    cannot repair that (the two are separated by a bond-breaking barrier).
+
+    The WT is the reference because it comes from a real structure and is therefore
+    L by construction.  Comparing against it needs no convention table and holds for
+    any force field or atom-naming scheme.
+
+    Returns True if the target was reflected.
+    """
+    s1 = _signed_volume(residue1, "CA", _CHIRAL_REF)
+    s2 = _signed_volume(residue2, "CA", _CHIRAL_REF)
+    if s1 is None or s2 is None:
+        # glycine on either side: no CB, so CA is not a centre and there is no
+        # reference triple.  A GLY WT leaves the target unchecked -- see the
+        # module docstring note.
+        return False
+    if abs(s1) < 1e-6 or abs(s2) < 1e-6 or (s1 > 0) == (s2 > 0):
+        return False
+
+    # Reflect in a plane through the target's centroid: bond lengths and angles
+    # are preserved, only the configuration flips.
+    pts = np.array([list(a.x) for a in residue2.atoms], float)
+    pts[:, 2] = 2.0 * float(pts[:, 2].mean()) - pts[:, 2]
+    for a, row in zip(residue2.atoms, pts):
+        a.x = [float(row[0]), float(row[1]), float(row[2])]
+    logger.info("mutate: reflected %s -- its built CA configuration was the mirror "
+                "of %s's (signed volume %+.2f vs %+.2f)",
+                getattr(residue2, "resname", "?"),
+                getattr(residue1, "resname", "?"), s2, s1)
+
+    # A reflection inverts EVERY centre, so any other one that corresponds to a WT
+    # centre may now disagree.  Report it rather than silently trading one wrong
+    # configuration for another.
+    mp = dict(pairs)
+    for i, j in pairs:
+        if _is_h(residue1.atoms[i]) or _canon_name(residue1.atoms[i].name) == "CA":
+            continue
+        nb1 = [p for p in _heavy_neighbors(residue1, i) if p in mp]
+        if len(nb1) < 3:
+            continue
+        n1 = [_canon_name(residue1.atoms[p].name) for p in nb1[:3]]
+        n2 = [_canon_name(residue2.atoms[mp[p]].name) for p in nb1[:3]]
+        a = _signed_volume(residue1, _canon_name(residue1.atoms[i].name), n1)
+        b = _signed_volume(residue2, _canon_name(residue2.atoms[j].name), n2)
+        if a is None or b is None or abs(a) < 1e-6 or abs(b) < 1e-6:
+            continue
+        if (a > 0) != (b > 0):
+            logger.warning(
+                "mutate: %s %s is now the mirror of %s %s after the CA correction; "
+                "this residue has a second stereocentre and the two cannot both be "
+                "satisfied by reflecting. Supply the target geometry explicitly "
+                "(structure=/itp=) if the configuration matters.",
+                getattr(residue2, "resname", "?"), residue2.atoms[j].name,
+                getattr(residue1, "resname", "?"), residue1.atoms[i].name)
+    return True
 
 
 def _superpose_target(residue1, residue2, pairs) -> None:
@@ -192,6 +271,9 @@ def build_hybrid_residue(residue1, residue2, ff: str, mut_resname: str,
     # --- graph-MCS mapping (replaces domapping + polar-H patch) ---
     mapping = map_residues(residue1, residue2)
     pairs1, pairs2 = mapping.pairs1(), mapping.pairs2()
+
+    # force the target's CA configuration to match the WT's before placing it
+    _match_chirality(residue1, residue2, list(zip(pairs1, pairs2)))
 
     # place the target (and its dummies) in the WT frame
     _superpose_target(residue1, residue2, list(zip(pairs1, pairs2)))
