@@ -28,14 +28,18 @@ set -euo pipefail
 
 FF=charmm36m-mut
 WATER=tip3p
-INPUT=input/1AOT_A.pdb
-REF_INPUT=input/1AOT_peptide.pdb  # Tyr-peptide extracted from 1AOT (biological SH2 ligand, free in water)
+INPUT=input/1AOT_complex.pdb      # SH2 domain (chain F) + ligand peptide (chain P)
+REF_INPUT=input/1AOT_peptide.pdb  # the same ligand peptide, free in water
 
-# Target Tyr residue in pmx 1-based sequential numbering.
-# Run `bash input/fetch_input.sh` to see the available tyrosines.
-MUT_RESID=63       # adjust to your target Tyr
+# The SAME tyrosine is phosphorylated in both legs -- that is what closes the
+# cycle and makes the result a ddG of binding.  It is the LIGAND's Tyr, not one
+# of the SH2 domain's own: chain P is EPQEEIPIYL, so Tyr is peptide residue 9,
+# which in the complex (chain F's 106 residues come first) is residue 115.
+# Both numbers are in pmx 1-based sequential numbering; run
+# `bash input/fetch_input.sh` to print them for yourself.
+MUT_RESID=115      # ligand Tyr within the complex
 MUT_CODE=P1        # P1 = monoanionic YP1 (Y2P1); use P2 for dianionic YP2 (Y2P2)
-REF_RESID=1        # residue number of Tyr in the reference peptide
+REF_RESID=9        # the same Tyr in the free peptide
 
 # ── 0. Fetch input if not present ──────────────────────────────────────────
 if [[ ! -f "$INPUT" ]]; then
@@ -62,26 +66,14 @@ gmx pdb2gmx \
 
 # ── 3. Build hybrid structure ───────────────────────────────────────────────
 echo ">>> pmx mutate: Tyr${MUT_RESID} -> YP1 ..."
-printf "%s %s\n" "$MUT_RESID" "$MUT_CODE" | pmx mutate \
+printf "%s %s\n" "$MUT_RESID" "$MUT_CODE" > mut.txt
+pmx mutate \
     -f      wt.gro \
     -o      mutant.pdb \
+    --script mut.txt \
     -ff     "$FF"
+rm -f mut.txt
 rm -f wt.gro wt.top
-
-# ── 4. Hybrid topology ──────────────────────────────────────────────────────
-echo ">>> gmx pdb2gmx (protein mutant) ..."
-gmx pdb2gmx \
-    -f      mutant.pdb \
-    -o      processed.gro \
-    -p      topol.top \
-    -ff     "$FF" \
-    -water  "$WATER"
-
-echo ">>> pmx gentop (protein) ..."
-pmx gentop \
-    -p  topol.top \
-    -o  pmxtop.top \
-    -ff "$FF"
 
 # ════════════════════════════════════════════════════════════════════════════
 # REFERENCE LEG — same Y2P1 hybrid applied to the free Tyr-peptide in water
@@ -101,44 +93,52 @@ gmx pdb2gmx \
     -water  "$WATER" \
     -ignh
 
-echo ">>> pmx mutate: peptide Tyr${REF_RESID} -> YP1 ..."
-printf "%s %s\n" "$REF_RESID" "$MUT_CODE" | pmx mutate \
+echo ">>> pmx mutate: peptide YP1 -> Tyr${REF_RESID}, REVERSED ..."
+printf "%s %s\n" "$REF_RESID" "$MUT_CODE" > ref_mut.txt
+pmx mutate \
     -f      ref_wt.gro \
     -o      ref_mutant.pdb \
+    --script ref_mut.txt \
+    --reverse \
     -ff     "$FF"
+rm -f ref_mut.txt
 rm -f ref_wt.gro ref_wt.top
 
-echo ">>> gmx pdb2gmx (reference mutant) ..."
-gmx pdb2gmx \
-    -f      ref_mutant.pdb \
-    -o      ref_processed.gro \
-    -p      ref_topol.top \
-    -ff     "$FF" \
-    -water  "$WATER"
-
-echo ">>> pmx gentop (reference) ..."
-pmx gentop \
-    -p  ref_topol.top \
-    -o  ref_pmxtop.top \
-    -ff "$FF"
-
 # ════════════════════════════════════════════════════════════════════════════
-# DOUBLEBOX — combine protein and reference in one charge-neutral box
+# DOUBLEBOX — complex and free peptide in one charge-neutral box
+#
+# ORDER MATTERS: doublebox the two MUTANT STRUCTURES, then run pdb2gmx ONCE on
+# the combined file.  That is what produces a single topology covering both
+# legs; building a topology per leg and trying to merge them afterwards is the
+# problem this ordering avoids entirely.
 # ════════════════════════════════════════════════════════════════════════════
 
 echo ">>> pmx doublebox ..."
 pmx doublebox \
-    -f1 processed.gro \
-    -f2 ref_processed.gro \
-    -o  doublebox.gro \
+    -f1 mutant.pdb \
+    -f2 ref_mutant.pdb \
+    -o  doublebox.pdb \
     -r  2.5 \
     -d  1.5
 
-# Combine topologies: the doublebox.top includes both protein and reference
-# [ molecules ] sections.  Merge pmxtop.top + ref_pmxtop.top manually or
-# with a wrapper script before solvating.
-# NOTE: topology merging for protein+protein doublebox is not yet automated;
-#       see README.md §Step 5c for guidance.
+# ── Generate ONE topology covering both legs ────────────────────────────────
+# Do NOT pass -ignh: the phosphate atoms placed by pmx mutate must be kept.
+# Three chains (SH2 domain, bound peptide, free peptide) -> three terminus
+# selection pairs.
+echo ">>> gmx pdb2gmx (doubleboxed system) ..."
+printf '0\n0\n0\n0\n0\n0\n' | gmx pdb2gmx \
+    -f      doublebox.pdb \
+    -o      doublebox.gro \
+    -p      topol.top \
+    -ff     "$FF" \
+    -water  "$WATER" \
+    -ter
+
+echo ">>> pmx gentop ..."
+pmx gentop \
+    -p  topol.top \
+    -o  pmxtop.top \
+    -ff "$FF"
 
 echo ">>> gmx solvate ..."
 gmx solvate \
