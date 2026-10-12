@@ -117,6 +117,18 @@ def mutate(m, mut_resid, mut_resname, ff, mut_chain=None,
         if moltype != 'protein':
             raise RuntimeError("Terminal deletion is only supported for "
                                "protein residues")
+        if reverse:
+            # delete_terminal has no insertion direction: the target is
+            # dummified in state B unconditionally.  Accepting the flag and
+            # dropping it would silently leave both legs of a double-system
+            # single-box deleting, so the box charge would not balance.
+            raise ValueError(
+                "--reverse is not supported for a terminal deletion: there is "
+                "no insertion direction, so the reference leg of a "
+                "double-system-single-box cannot be built this way. Only a "
+                "deletion that removes a CHARGED side chain needs a balancing "
+                "reverse leg; for one, run a single box with charge-scaled "
+                "(ECC) ions instead.")
         from .covalent import delete_terminal
         delete_terminal(m2, del_resid=mut_resid, ff=ff, del_chain=mut_chain,
                         inplace=True, verbose=verbose)
