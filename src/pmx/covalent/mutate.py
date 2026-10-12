@@ -20,6 +20,7 @@ Two entry points:
 
 from __future__ import annotations
 
+import collections
 import glob
 import logging
 import os
@@ -404,6 +405,7 @@ def build_hybrid_residue(residue1, residue2, ff: str, mut_resname: str,
                 a.name = _unique_dummy_name(base, used)
             used.add(a.name)
 
+    _auto_named = hybrid_name is None
     if hybrid_name is None:
         # Central namer (library.hybrid_name).  Internal: L2<first+last of target>
         # so prefix-sharing PTM targets stay distinct (MLZ->K2MZ vs MLY->K2MY vs
@@ -419,6 +421,15 @@ def build_hybrid_residue(residue1, residue2, ff: str, mut_resname: str,
         residue1.resnA, residue1.resnB = mut_resname, residue1.resname
     else:
         residue1.resnA, residue1.resnB = residue1.resname, mut_resname
+    if _auto_named and write_ff_types and _library_owns(ffpath, hybrid_name)[0]:
+        # The generated name is one the curated library already uses.  That is
+        # only a problem when OUR hybrid differs from theirs -- an identical one
+        # may keep the spelling and reuse the shipped entry.  _make_mtp is pure,
+        # so probe with it before committing to a name.
+        _probe = "".join(_make_mtp(residue1, ii_list, dihi_list, rotations=None))
+        if _differs_from_curated(ffpath, hybrid_name, _probe):
+            hybrid_name = _generative_name(ffpath, hybrid_name,
+                                           (residue1.resnA, residue1.resnB))
     residue1.set_resname(hybrid_name)
 
     rtp_text = "".join(_make_rtp(residue1, ii_list, dihi_list,
@@ -514,6 +525,111 @@ def _entry_morph(text, name):
     m = re.search(r'^\[\s*' + re.escape(name) + r'\s*\]\s*;\s*(\S+)\s*->\s*(\S+)',
                   text, re.MULTILINE)
     return (m.group(1), m.group(2)) if m else None
+
+
+def _library_owns(ffpath, name):
+    """-> ((resnA, resnB), basename) if a CURATED rtp (not nsaa.*) defines *name*."""
+    for other in sorted(glob.glob(os.path.join(ffpath, "*.rtp"))):
+        if os.path.basename(other).startswith("nsaa."):
+            continue
+        morph = _entry_morph(open(other, errors="replace").read(), name)
+        if morph:
+            return morph, os.path.basename(other)
+    return None, None
+
+
+def _split_named_blocks(text):
+    """-> {NAME: block_text} for a multi-entry mtp/rtp.
+
+    Top-level entries are spelled ``[ NAME ]`` in upper case/digits; the
+    subsections inside one (``[ atoms ]``, ``[ bonds ]``, ...) are lower case, so
+    an upper-case-only lookahead splits entries without splitting their guts.
+    """
+    out = {}
+    for part in re.split(r'\n(?=\[\s*[A-Z0-9]+\s*\])', text):
+        m = re.match(r'\[\s*([A-Z0-9]+)\s*\]', part.strip())
+        if m:
+            out[m.group(1)] = part
+    return out
+
+
+def _mtp_atom_rows(block):
+    """(typeA, qA, mA, typeB, qB, mB) per atom of an mtp ``[ atoms ]`` section.
+
+    Atom NAMES are excluded on purpose: the curation and the engine may pick
+    different members of a set of equivalent hydrogens and spell H names
+    differently (1HB vs HB1), which is not a chemical difference.
+    """
+    rows, inseg = [], False
+    for line in block.splitlines():
+        t = line.split(';')[0].strip()
+        if t.startswith('[ atoms'):
+            inseg = True
+            continue
+        if inseg and t.startswith('['):
+            break
+        f = t.split()
+        if inseg and len(f) >= 8:
+            try:
+                rows.append((f[1], round(float(f[2]), 4), round(float(f[4]), 3),
+                             f[5], round(float(f[6]), 4), round(float(f[7]), 3)))
+            except ValueError:
+                pass
+    return collections.Counter(rows)
+
+
+def _differs_from_curated(ffpath, name, mtp_text):
+    """True when the hybrid just built is NOT the curated entry of the same name.
+
+    Only then does it need a name of its own: an identical hybrid can safely keep
+    the library's spelling and reuse the shipped entry, which is what
+    _accumulate_hybrid already does.
+    """
+    mine = _mtp_atom_rows(mtp_text)
+    for other in sorted(glob.glob(os.path.join(ffpath, "*.mtp"))):
+        if os.path.basename(other).startswith("nsaa."):
+            continue
+        block = _split_named_blocks(open(other, errors="replace").read()).get(name)
+        if block is not None:
+            return _mtp_atom_rows(block) != mine
+    # the name is curated in an rtp but has no mtp entry to compare against --
+    # cannot prove the two are the same, so do not risk shadowing it
+    return True
+
+
+def _generative_name(ffpath, name, morph):
+    """A name of its own for a generative hybrid that differs from the library.
+
+    The forward namer deliberately reproduces the library's spelling, so a
+    generative build of a *canonical* morph lands on the name mutres.rtp already
+    uses.  Where the two are genuinely different objects -- a different mapping,
+    a different dummy count -- pdb2gmx would glob ``*.rtp``, pick the curated
+    entry and leave the written structure unmatched by it (``Atom HV1 in residue
+    C2S was not found in rtp entry C2S``).  Mark ours with a trailing ``G``
+    instead, inside the 4-character residue-name cap: ``C2S`` -> ``C2SG``.
+
+    A candidate already holding THIS morph in nsaa.rtp is reused, so rebuilding
+    the same hybrid is idempotent; one held by a DIFFERENT morph is skipped
+    (``CM2I`` cannot take ``CM2G``, which is the library's CYM->GLY).
+    """
+    up = lambda t: tuple(x.upper() for x in t)
+    cands = (["%sG" % name] if len(name) < 4 else []) + \
+            [name[:3] + "G", name[:2] + "G" + name[-1], "G" + name[:3]]
+    nsaa = os.path.join(ffpath, "nsaa.rtp")
+    have = open(nsaa, errors="replace").read() if os.path.isfile(nsaa) else ""
+    for c in cands:
+        if _library_owns(ffpath, c)[0]:
+            continue
+        mine = _entry_morph(have, c)
+        if mine is None or up(mine) == up(morph):
+            logger.info("generative %s->%s differs from the curated %s; naming it "
+                        "%s so it does not shadow the library entry",
+                        morph[0], morph[1], name, c)
+            return c
+    raise ValueError(
+        "cannot find a free generative name for %s->%s near '%s' (tried %s); "
+        "pass an explicit hybrid_name=" % (morph[0], morph[1], name,
+                                           ", ".join(cands)))
 
 
 def _accumulate_hybrid(ffpath, hybrid_name, rtp_text, mtp_text, bCharmm):
