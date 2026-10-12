@@ -13,14 +13,16 @@ This example computes the free energy cost of truncating a C-terminal residue (A
 | **Hybrid** | `VdeC` (on Val4) |
 | **State A** | Val4 + Asp5 (fully interacting); charge −3 |
 | **State B** | Val4 as new C-terminus; Asp5 dummified; charge −2 |
-| **Charge shift** | −3 → −2 (+1) — **doublebox required** (see below) |
+| **Charge shift** | −3 → −2 (+1), because Asp's side-chain carboxylate is lost |
 | **Special steps** | None — the `VdeC` hybrid is generated on the fly by `pmx mutate` |
 
 ```bash
 # Unique mutation step — see run.sh for the full pipeline
-printf "5 DEL\n" | pmx mutate \
+printf "5 DEL\n" > mut.txt
+pmx mutate \
     -f  wt.gro \
     -o  mutant.pdb \
+    --script mut.txt \
     -ff charmm36m-mut
 ```
 
@@ -51,15 +53,21 @@ gmx pdb2gmx \
 Target the residue to be **deleted** with the code `DEL`. `pmx` detects that Asp5 is the C-terminus and, through the generative covalent engine (`covalent.delete_terminal`), builds the deletion on the fly: the neighbour Val4 morphs internal → C-terminus (emitted as the `VdeC` hybrid into the force field's `nsaa.rtp`/`nsaa.mtp`, exactly like any other mutation), a dummy oxygen `DOT2` is placed on Val4, and Asp5 stays physically in the structure to be dummified later. No pre-generated `mutres_term` files are needed.
 
 ```bash
-printf "5 DEL\n" | pmx mutate \
+printf "5 DEL\n" > mut.txt
+pmx mutate \
     -f      wt.gro \
     -o      mutant.pdb \
+    --script mut.txt \
     -ff     charmm36m-mut
 ```
 
 ---
 
 ## Step 3 — Build the hybrid topology
+
+> Steps 3 and 4 show the single-system case, which is what you want if you are
+> running one leg on its own. For the doublebox in Step 5 they happen **once**, on
+> the combined structure — see 5b. Do not do both.
 
 `pmx mutate` already wrote the `VdeC` hybrid into the force field's `nsaa.rtp`, so `pdb2gmx` resolves it directly. Do **not** pass `-ignh` — the dummy atom `DOT2` placed by `pmx mutate` must be preserved.
 
@@ -76,7 +84,7 @@ gmx pdb2gmx \
 
 ## Step 4 — Fill B-state bonded terms
 
-`pmx gentop` locates the `VdeC` hybrid (auto-discovered in the FF's `nsaa.mtp`), dummifies Asp5 in state B, and zeroes B-state force constants on dihedrals crossing the Val4–Asp5 boundary. The charge change (−3 → −2, Δq = +1) requires the doublebox approach described in the next step.
+`pmx gentop` locates the `VdeC` hybrid (auto-discovered in the FF's `nsaa.mtp`), dummifies Asp5 in state B, and zeroes B-state force constants on dihedrals crossing the Val4–Asp5 boundary. The charge change (−3 → −2, Δq = +1) is discussed in the next step.
 
 ```bash
 pmx gentop \
@@ -101,26 +109,38 @@ log_> Zeroed B-state for 13 dihedrals
 
 ---
 
-## Step 5 — Charge-neutral setup with pmx doublebox
+## Step 5 — The doublebox, and why it does not balance here
 
-Deleting Asp5 shifts the system charge from −3 to −2 (Δq = +1, net loss of the two C-terminal
-carboxylates of Asp minus the one gained by Val becoming the new C-terminus). In a periodic
-box this charge change introduces finite-size artefacts. The correct approach is the
-**single-box double-system** method:
+Deleting Asp5 shifts the system charge from −3 to −2 (Δq = +1). The terminal carboxylate
+itself cancels — Val4 gains one as it becomes the new C-terminus — so the shift comes
+entirely from **Asp's charged side chain**. Delete a neutral terminal residue and there is
+no charge problem at all.
+
+The textbook remedy is the **single-box double-system** method, in which the reference leg
+runs the morph backwards so the two charge changes cancel inside one box:
 
 ```
                           alchemical λ: 0 → 1
-  complex in box:  MEEVD (bound) ──────────────────────►  MEEV (bound)    Δq = +1
-  peptide in box:  MEEV  (free)  ──────────────────────►  MEEVD (free)    Δq = −1
-  ──────────────────────────────────────────────────────────────────────────────────
-  net charge change in box:                                                     0  ✓
+  complex in box:  MEEVD (bound) ──────────────────►  MEEV (bound)    Δq = +1
+  peptide in box:  MEEV  (free)  ──────────────────►  MEEVD (free)    Δq = −1
+  ───────────────────────────────────────────────────────────────────────
+  net charge change in box:                                                     0
 ```
+
+> ⚠ **That second line is not currently buildable.** `MEEV → MEEVD` is an *insertion*, and
+> `delete_terminal` has no insertion direction — `pmx mutate --reverse` now **raises** on a
+> `DEL` target rather than silently ignoring the flag, which is what it used to do. Both
+> legs of this example therefore delete, and the measured charges are state A = −6,
+> state B = −4, i.e. Δq = **+2**, not 0.
+>
+> For a charge-changing terminal deletion today, run a **single box with charge-scaled
+> (ECC) ions** instead; that is what the terminal showcase does. The doublebox below is
+> kept because it is the right construction for a *neutral* deletion, where both legs
+> shift nothing and the box balances trivially.
 
 The reference is the **MEEVD peptide itself** (the same `1ELR_peptide.pdb`) free in water —
 not a minimal dipeptide. The protein leg uses the **full co-chaperone complex** (TPR domain +
-MEEVD peptide from 1ELR). The combined ΔΔG directly gives the binding free energy difference
-between MEEV and MEEVD for the co-chaperone: how much does losing the C-terminal Asp cost in
-binding affinity?
+MEEVD peptide from 1ELR).
 
 #### 5a — Prepare the reference leg (MEEVD peptide free in water)
 
@@ -134,9 +154,11 @@ gmx pdb2gmx \
     -water  tip3p \
     -ignh
 
-printf "5 DEL\n" | pmx mutate \
+printf "5 DEL\n" > mut.txt
+pmx mutate \
     -f      ref_wt.gro \
     -o      ref_mutant.pdb \
+    --script mut.txt \
     -ff     charmm36m-mut
 rm -f ref_wt.gro ref_wt.top
 
@@ -153,18 +175,37 @@ pmx gentop \
     -ff charmm36m-mut
 ```
 
-#### 5b — Combine into one box
+#### 5b — Combine into one box, then build ONE topology
+
+**Order matters.** Doublebox the two *mutant structures*, then run `pdb2gmx` once on the
+combined file. A topology built per leg describes only half the system, so `grompp` would
+reject it against the doubleboxed coordinates — there is nothing to merge afterwards if
+you build it this way round.
 
 ```bash
 pmx doublebox \
-    -f1 processed.gro \
-    -f2 ref_processed.gro \
-    -o  doublebox.gro \
+    -f1 mutant.pdb \
+    -f2 ref_mutant.pdb \
+    -o  doublebox.pdb \
     -r  2.5 \
     -d  1.5
+
+# one topology covering both legs; two chains -> two terminus selection pairs
+printf '0\n0\n0\n0\n' | gmx pdb2gmx \
+    -f      doublebox.pdb \
+    -o      doublebox.gro \
+    -p      topol.top \
+    -ff     charmm36m-mut \
+    -water  tip3p \
+    -ter
+
+pmx gentop \
+    -p  topol.top \
+    -o  pmxtop.top \
+    -ff charmm36m-mut
 ```
 
-#### 5c — Merge topologies, solvate, and add ions
+#### 5c — Solvate and add ions
 
 ```bash
 gmx solvate -cp doublebox.gro -cs spc216.gro \

@@ -18,9 +18,11 @@ This example computes the phosphorylation ΔΔG (Tyr → monoanionic phosphotyro
 
 ```bash
 # Unique mutation step — see run.sh for the full pipeline
-printf "63 P1\n" | pmx mutate \
+printf "115 P1\n" > mut.txt
+pmx mutate \
     -f  wt.gro \
     -o  mutant.pdb \
+    --script mut.txt \
     -ff charmm36m-mut
 ```
 
@@ -33,12 +35,12 @@ printf "63 P1\n" | pmx mutate \
 Download 1AOT (Lck SH2 domain), then run `pdb2gmx` to normalise atom names. `wt.top` is discarded; only `wt.gro` feeds into `pmx mutate`.
 
 ```bash
-bash input/fetch_input.sh   # downloads 1AOT, extracts chain A, prints Tyr positions
+bash input/fetch_input.sh   # downloads 1AOT, writes the complex + peptide, prints Tyr positions
 
 eval "$(python3 -c 'from pmx.gmx import set_gmxlib; import os; set_gmxlib(); print("export GMXLIB="+os.environ["GMXLIB"])')"
 
 gmx pdb2gmx \
-    -f      input/1AOT_A.pdb \
+    -f      input/1AOT_complex.pdb \
     -o      wt.gro \
     -p      wt.top \
     -ff     charmm36m-mut \
@@ -46,18 +48,30 @@ gmx pdb2gmx \
     -ignh
 ```
 
-Check the Tyr list printed by `fetch_input.sh` to confirm the pmx-renumbered position of your target residue (the script uses 1-based sequential numbering matching pmx's convention).
+1AOT contains **chain F** (the SH2 domain, 106 residues) and **chain P** (the ligand
+peptide EPQEEIPIYL). There is no chain A. `fetch_input.sh` writes both
+`1AOT_complex.pdb` (F+P, the binding-competent system) and `1AOT_peptide.pdb` (P alone,
+the free reference), and prints the tyrosine positions in pmx 1-based sequential
+numbering: the ligand Tyr is **peptide residue 9**, which inside the complex — where
+chain F's 106 residues come first — is **residue 115**.
+
+The **same** tyrosine is phosphorylated in both legs. That is what closes the cycle and
+makes the result a ΔΔG of binding; phosphorylating one of the SH2 domain's own
+tyrosines in one leg and the ligand's in the other would not.
 
 ---
 
 ### Step 2 — Build the hybrid structure
 
-Mutation code `P1` selects the `Y2P1` hybrid (Tyr → monoanionic phosphotyrosine). Replace `63` with the residue number identified in Step 1.
+Mutation code `P1` selects the `Y2P1` hybrid (Tyr → monoanionic phosphotyrosine). Residue
+115 is the ligand tyrosine within the complex.
 
 ```bash
-printf "63 P1\n" | pmx mutate \
+printf "115 P1\n" > mut.txt
+pmx mutate \
     -f      wt.gro \
     -o      mutant.pdb \
+    --script mut.txt \
     -ff     charmm36m-mut
 ```
 
@@ -66,6 +80,9 @@ printf "63 P1\n" | pmx mutate \
 ---
 
 ### Step 3 — Build the hybrid topology
+
+> Steps 3 and 4 show the single-system case. For the doublebox in Step 5 they
+> happen **once**, on the combined structure — see 5b. Do not do both.
 
 `pdb2gmx` reads the `Y2P1` residue definition from `mutres.rtp` in `charmm36m-mut` and generates a standard GROMACS topology.
 
@@ -93,7 +110,7 @@ pmx gentop \
 
 Expected output:
 ```
-log_> Hybrid Residue -> 63 | Y2P1
+log_> Hybrid Residue -> 115 | Y2P1
 log_> Making bonds for state B -> ...
 log_> Total charge of state A =  0
 log_> Total charge of state B = -1
@@ -132,7 +149,6 @@ preference of the SH2 domain for the phosphorylated vs. unphosphorylated form of
 ligand (see `input/fetch_input.sh` to extract the peptide from 1AOT).
 
 ```bash
-# Reference: Tyr-peptide extracted from 1AOT (provide as input/1AOT_peptide.pdb)
 gmx pdb2gmx \
     -f      input/1AOT_peptide.pdb \
     -o      ref_wt.gro \
@@ -141,42 +157,56 @@ gmx pdb2gmx \
     -water  tip3p \
     -ignh
 
-printf "1 P1\n" | pmx mutate \
-    -f      ref_wt.gro \
-    -o      ref_mutant.pdb \
-    -ff     charmm36m-mut
-
-gmx pdb2gmx \
-    -f      ref_mutant.pdb \
-    -o      ref_processed.gro \
-    -p      ref_topol.top \
-    -ff     charmm36m-mut \
-    -water  tip3p
-
-pmx gentop \
-    -p  ref_topol.top \
-    -o  ref_pmxtop.top \
-    -ff charmm36m-mut
+# residue 9 is the peptide's tyrosine; --reverse makes this leg run pTyr -> Tyr,
+# opposite the complex's Tyr -> pTyr, so the two charge changes cancel in one box
+printf "9 P1\n" > ref_mut.txt
+pmx mutate \
+    -f       ref_wt.gro \
+    -o       ref_mutant.pdb \
+    --script ref_mut.txt \
+    --reverse \
+    -ff      charmm36m-mut
 ```
 
-#### 5b — Combine into one box
+The reverse hybrid is named `P12Y` (the namer front-loads the target so a reverse hybrid
+never collides with its forward counterpart), against `Y2P1` in the complex. Both states
+then carry the same total charge, which is what makes the box neutral across the
+transition.
+
+#### 5b — Combine into one box, then build ONE topology
+
+**Order matters.** Doublebox the two *mutant structures*, then run `pdb2gmx` once on the
+combined file. That single call produces one topology covering both legs, so there is
+nothing to merge afterwards — merging per-leg topologies by hand is exactly the step this
+ordering removes.
 
 ```bash
 pmx doublebox \
-    -f1 processed.gro \
-    -f2 ref_processed.gro \
-    -o  doublebox.gro \
+    -f1 mutant.pdb \
+    -f2 ref_mutant.pdb \
+    -o  doublebox.pdb \
     -r  2.5 \
     -d  1.5
+
+# three chains (SH2 domain, bound peptide, free peptide) -> three terminus pairs
+printf '0\n0\n0\n0\n0\n0\n' | gmx pdb2gmx \
+    -f      doublebox.pdb \
+    -o      doublebox.gro \
+    -p      topol.top \
+    -ff     charmm36m-mut \
+    -water  tip3p \
+    -ter
+
+pmx gentop \
+    -p  topol.top \
+    -o  pmxtop.top \
+    -ff charmm36m-mut
 ```
 
-This places the protein and reference peptide in a single rectangular box separated by at
+This places the complex and the free peptide in a single rectangular box separated by at
 least 2.5 nm, with 1.5 nm to the box wall.
 
-#### 5c — Merge topologies, solvate, and add ions
-
-Combine the two topology files by appending the reference molecule section to the protein
-topology. Then solvate the combined box and neutralise with `gmx genion`:
+#### 5c — Solvate and add ions
 
 ```bash
 # Solvate the combined box

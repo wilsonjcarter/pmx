@@ -1,4 +1,4 @@
-# Alchemical disulfide formation: C2CD hybrid residues (1ERT thioredoxin)
+# Alchemical disulfide formation: Cys32-Cys35 (1ERT thioredoxin)
 
 <p align="center">
   <img src="../imgs/schematic_p3.png" alt="disulfide thermocycle" width="800"/>
@@ -6,20 +6,24 @@
 
 ## TLDR
 
-This example computes the alchemical free energy of disulfide bond formation between Cys32 and Cys35 in thioredoxin, where both partner cysteines must be mutated simultaneously to the `C2CD` hybrid. The transformation is charge-neutral (both states 0→0), and `pmx gentop` automatically inserts the cross-residue Sγ–Sγ bond along with all flanking angle and dihedral terms.
+This example computes the alchemical free energy of disulfide bond formation between Cys32 and Cys35 in thioredoxin. Bond formation is a **generative** operation, not a pre-built library hybrid: `pmx mutate --react SG` splits each cysteine so that Sγ is clawed back from the decoupled side chain and survives into state B, and `pmx gentop --bond` morphs the cross-residue Sγ–Sγ bond and its flanking angles and dihedrals from k=0 in state A to their full values in state B. The transformation is charge-neutral (both states 0→0).
+
+> The retired `C2CD` pre-built hybrid, and the `_add_disulfide_bonded_terms()` helper that used to inject the bond, no longer exist. This is the route that replaces them.
 
 | Property | Value |
 |---|---|
-| Hybrid | C2CD (applied to both Cys32 and Cys35) |
-| State A | Two free thiols (SG type S, HG1 present) |
-| State B | Disulfide (SG→SM, HG1→DUM_HS on each Cys) |
+| Endpoint | `CYS2`, the cystine residue shipped in `merged.rtp` |
+| State A | Two free thiols, no Sγ–Sγ bond (k=0) |
+| State B | Disulfide formed; thiol protons dummified |
 | Charge shift | 0 → 0 (none) |
-| Special steps | Must mutate two residues; `pmx gentop` inserts the Sγ–Sγ bond |
+| Special steps | `--react SG` on both sites in ONE call; `gentop --bond "32:SG-35:SG"` |
 
 ```bash
-# Unique mutation steps for this example — both cysteines must be mutated
-printf "32 CD\n" | pmx mutate -f wt.gro -o mutant_step1.pdb -ff charmm36m-mut
-printf "35 CD\n" | pmx mutate -f mutant_step1.pdb -o mutant.pdb -ff charmm36m-mut
+# Unique steps for this example — both cysteines in ONE call, then form the bond
+printf "32 CYS2\n35 CYS2\n" > mut.txt
+pmx mutate -f wt.gro -o mutant.pdb --script mut.txt --react SG,SG -ff charmm36m-mut
+# ... pdb2gmx ...
+pmx gentop -p topol.top -o pmxtop.top -ff charmm36m-mut --bond "32:SG-35:SG" 
 
 # See run.sh for the complete workflow (Steps 1–9)
 ```
@@ -46,25 +50,25 @@ gmx pdb2gmx \
 
 ---
 
-### Step 2 — Apply both C2CD mutations
+### Step 2 — Split both cysteines, clawing back Sγ
 
-Each `pmx mutate` call takes the output of the previous step so that the two mutations do not overwrite each other.
+Both sites go in a **single** call, so the two hybrids are built against each other.
+`--react` names the atom that must survive the side-chain decoupling, because it is the
+atom carrying the bond that will form.
 
 ```bash
-# Cys32 → C2CD
-printf "32 CD\n" | pmx mutate \
-    -f  wt.gro \
-    -o  mutant_step1.pdb \
-    -ff charmm36m-mut
-
-# Cys35 → C2CD  (applied on top of the first mutant)
-printf "35 CD\n" | pmx mutate \
-    -f  mutant_step1.pdb \
-    -o  mutant.pdb \
-    -ff charmm36m-mut
+printf "32 CYS2\n35 CYS2\n" > mut.txt
+pmx mutate \
+    -f       wt.gro \
+    -o       mutant.pdb \
+    --script mut.txt \
+    --react  SG,SG \
+    -ff      charmm36m-mut
 ```
 
-The mutation code `CD` selects the `C2CD` hybrid; both Cys32 and Cys35 are labelled `C2CD` in the output PDB, with B-state dummy atoms placed for each.
+`CYS2` is the bound-state (cystine) residue shipped in the force field's `merged.rtp`.
+Each cysteine becomes a split hybrid whose side chain is dummified in state B except for
+Sγ, which is retained so the new bond has something to attach to.
 
 ---
 
@@ -79,7 +83,7 @@ gmx pdb2gmx \
     -water  tip3p
 ```
 
-Do **not** pass `-ignh`; `pmx mutate` has already positioned all hydrogens and dummy atoms. Because the residues are named `C2CD` (not `CYS`), `pdb2gmx` will not attempt to form a standard (non-alchemical) disulfide bond.
+Do **not** pass `-ignh`; `pmx mutate` has already positioned all hydrogens and dummy atoms. Because the residues are named `C2CY` (not `CYS`), `pdb2gmx` will not attempt to form a standard (non-alchemical) disulfide bond.
 
 ---
 
@@ -87,17 +91,19 @@ Do **not** pass `-ignh`; `pmx mutate` has already positioned all hydrogens and d
 
 ```bash
 pmx gentop \
-    -p  topol.top \
-    -o  pmxtop.top \
-    -ff charmm36m-mut
+    -p     topol.top \
+    -o     pmxtop.top \
+    -ff    charmm36m-mut \
+    --bond "32:SG-35:SG"
 ```
 
-`pmx gentop` finds both `C2CD` hybrid residues and automatically injects the cross-residue Sγ–Sγ bond, all flanking angles and dihedrals, and dummy atom parameters for state B.
+`pmx gentop` fills the B states of both split cysteines. `--bond` is what adds the cross-residue Sγ–Sγ bond together with its flanking angles and dihedrals, as a morph: k=0 in state A, full value in state B. It reports how many terms it added.
 
 Expected output:
 ```
-log_> Hybrid Residue -> 32 | C2CD
-log_> Hybrid Residue -> 35 | C2CD
+log_> Hybrid Residue -> 32 | C2CY
+log_> Hybrid Residue -> 35 | C2CY
+log_> gentop --bond: 1 bond(s) mode=form -> 10 terms
 log_> Making bonds for state B -> 32 bonds with perturbed atoms
 log_> Making angles for state B -> 66 angles with perturbed atoms
 log_> Making dihedrals for state B -> 58 dihedrals with perturbed atoms

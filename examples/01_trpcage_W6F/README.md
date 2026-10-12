@@ -18,7 +18,8 @@ This is a standard amino acid substitution (W6F) in the Trp Cage miniprotein —
 
 ```bash
 # Unique mutation step for this example
-printf "6 F\n" | pmx mutate -f wt.gro -o mutant.pdb -ff charmm36m-mut
+printf "6 F\n" > mut.txt
+pmx mutate -f wt.gro -o mutant.pdb --script mut.txt -ff charmm36m-mut
 
 # See run.sh for the complete workflow (Steps 1–9)
 ```
@@ -48,9 +49,11 @@ gmx pdb2gmx \
 ### Step 2 — Build the hybrid structure
 
 ```bash
-printf "6 F\n" | pmx mutate \
+printf "6 F\n" > mut.txt
+pmx mutate \
     -f      wt.gro \
     -o      mutant.pdb \
+    --script mut.txt \
     -ff     charmm36m-mut
 ```
 

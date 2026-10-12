@@ -18,7 +18,8 @@ This example computes the pKa shift of an active-site cysteine by alchemically r
 
 ```bash
 # Unique mutation step for this example
-printf "32\nCM\n" | pmx mutate -f wt.pdb -o mutant.pdb -ff charmm36m-mut
+printf "32\nCM\n" > mut.txt
+pmx mutate -f wt.pdb -o mutant.pdb --script mut.txt -ff charmm36m-mut
 
 # See run.sh for the complete workflow (Steps 1–9)
 ```
@@ -48,9 +49,11 @@ gmx pdb2gmx \
 ### Step 2 — Build the hybrid structure
 
 ```bash
-printf "32\nCM\nn\n" | pmx mutate \
+printf "32\nCM\nn\n" > mut.txt
+pmx mutate \
     -f      wt.pdb \
     -o      mutant.pdb \
+    --script mut.txt \
     -ff     charmm36m-mut
 ```
 
@@ -69,9 +72,11 @@ printf '3\n4\n' | gmx pdb2gmx \
     -ter \
     -ignh
 
-printf "3\nC\nn\n" | pmx mutate \
+printf "3\nC\nn\n" > mut.txt
+pmx mutate \
     -f      ref_wt.pdb \
     -o      ref_mutant.pdb \
+    --script mut.txt \
     -ff     charmm36m-mut
 ```
 
