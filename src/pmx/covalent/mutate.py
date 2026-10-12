@@ -70,6 +70,32 @@ def _kabsch(P: np.ndarray, Q: np.ndarray):
     return R, t
 
 
+def _h_count(res, i) -> int:
+    return sum(1 for b in getattr(res.atoms[i], "bonds", [])
+               for o in res.atoms if o is b and _is_h(o))
+
+
+def _is_stereocentre(res, i) -> bool:
+    """Four substituents, all distinguishable.
+
+    Substituent COUNT alone is not enough.  Requiring only three mapped heavy
+    neighbours fired on every planar sp2 carbon -- ASN ``CG``, ASP ``CG``, GLN
+    ``CD`` are amide and carboxyl carbons with three substituents and no fourth --
+    and on centres whose branches are equivalent, such as VAL ``CB`` with its two
+    identical methyls.  Distinctness is judged by each substituent's
+    (element, heavy degree, attached hydrogens) signature, which separates ILE's
+    ``CG1`` (C,2,2) from ``CG2`` (C,1,3) while collapsing VAL's two methyls.
+    """
+    nb = _heavy_neighbors(res, i)
+    nh = _h_count(res, i)
+    if len(nb) + nh != 4 or len(nb) < 3:
+        return False
+    sig = [(_element_of(res.atoms[p]), len(_heavy_neighbors(res, p)),
+            _h_count(res, p)) for p in nb]
+    sig += [("H", 0, 0)] * nh
+    return len(set(sig)) == 4
+
+
 _CHIRAL_REF = ("N", "C", "CB")      # with CA as the centre
 
 
@@ -127,6 +153,8 @@ def _match_chirality(residue1, residue2, pairs) -> bool:
     mp = dict(pairs)
     for i, j in pairs:
         if _is_h(residue1.atoms[i]) or _canon_name(residue1.atoms[i].name) == "CA":
+            continue
+        if not _is_stereocentre(residue1, i):
             continue
         nb1 = [p for p in _heavy_neighbors(residue1, i) if p in mp]
         if len(nb1) < 3:
