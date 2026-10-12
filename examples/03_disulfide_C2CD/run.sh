@@ -1,16 +1,20 @@
 #!/usr/bin/env bash
 # =============================================================================
-# Example 3 — Thioredoxin disulfide formation: C2CD pair
+# Example 3 — Thioredoxin disulfide formation: Cys32-Cys35
 #
 # System  : 1ERT E. coli thioredoxin (reduced form)
-# Mutation: Cys32 + Cys35 -> both C2CD  (disulfide formation hybrid)
+# Mutation: Cys32 + Cys35 -> CYS2  (disulfide formation)
 # FF      : charmm36m-mut
 #
-# State A: both cysteines reduced (free -SH thiols, SG type S)
-# State B: Cys32–Cys35 disulfide bond formed (-S-S-, SG type SM)
+# State A: both cysteines reduced (free -SH thiols)
+# State B: Cys32-Cys35 disulfide bond formed (-S-S-)
 #
-# The SG-SG cross-residue bond + flanking angles/dihedrals are added
-# automatically by pmx gentop via _add_disulfide_bonded_terms().
+# Bond formation is a GENERATIVE operation, not a pre-built library hybrid:
+#   pmx mutate --react SG   splits each cysteine so SG is clawed back from the
+#                           dummified side chain and survives into state B
+#   pmx gentop  --bond      morphs the cross-residue SG-SG bond and its
+#                           flanking angles/dihedrals from k=0 (A) to full (B)
+# This replaces the retired pre-built C2CD hybrid.
 # =============================================================================
 set -euo pipefail
 
@@ -37,27 +41,20 @@ gmx pdb2gmx \
     -water  "$WATER" \
     -ignh
 
-# ── 3a. Mutate Cys32 -> C2CD ───────────────────────────────────────────────
-# The pmx extended code for the disulfide hybrid target is 'CD'.
-echo ">>> pmx mutate: Cys32 -> C2CD ..."
-printf "32 CD\n" > mut.txt
+# ── 3. Split both cysteines, clawing back SG ───────────────────────────────
+# CYS2 is the bound-state (cystine) residue shipped in merged.rtp.  --react names
+# the atom that must survive the side-chain decoupling, because it carries the
+# bond being formed; both sites are done in ONE call so the two hybrids are
+# built against each other.
+echo ">>> pmx mutate: Cys32 + Cys35 -> CYS2 (reacting atom SG) ..."
+printf "32 CYS2\n35 CYS2\n" > mut.txt
 pmx mutate \
     -f      wt.gro \
-    -o      mutant_step1.pdb \
-    --script mut.txt \
-    -ff     "$FF"
-
-# ── 3b. Mutate Cys35 -> C2CD ───────────────────────────────────────────────
-# Apply second mutation on top of the first output.
-echo ">>> pmx mutate: Cys35 -> C2CD ..."
-printf "35 CD\n" > mut.txt
-pmx mutate \
-    -f      mutant_step1.pdb \
     -o      mutant.pdb \
     --script mut.txt \
+    --react  SG,SG \
     -ff     "$FF"
-
-rm -f mut.txt mutant_step1.pdb wt.gro wt.top
+rm -f mut.txt wt.gro wt.top
 
 # ── 4. Generate GROMACS topology for the hybrid structure ──────────────────
 # After both pmx mutate steps, Cys32 and Cys35 are named C2CD — they are read
@@ -74,15 +71,16 @@ gmx pdb2gmx \
 
 # ── 5. Fill hybrid B states ─────────────────────────────────────────────────
 # gentop:
-#   - detects the two C2CD residues (both satisfy is_hybrid())
-#   - calls _add_disulfide_bonded_terms() to inject the cross-residue
-#     SG32-SG35 bond, CB-SG-SG' and SG-SG'-CB' angles, and proper dihedrals
-#   - dummifies HG1 (-> DUM_HS) in state B for both cysteines
+#   - fills the B states of both split cysteines
+#   - --bond adds the cross-residue SG32-SG35 bond and its flanking angles and
+#     dihedrals as a morph: k=0 in state A (no bond), full value in state B
+#   - dummifies the thiol protons in state B for both cysteines
 echo ">>> pmx gentop ..."
 pmx gentop \
-    -p  topol.top \
-    -o  pmxtop.top \
-    -ff "$FF"
+    -p    topol.top \
+    -o    pmxtop.top \
+    -ff   "$FF" \
+    --bond "32:SG-35:SG"
 
 # ── 6. Define box, solvate, and add ions ───────────────────────────────────
 # editconf must be called before solvate to define the box vectors.
