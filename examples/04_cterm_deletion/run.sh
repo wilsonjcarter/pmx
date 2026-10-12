@@ -69,26 +69,6 @@ pmx mutate \
     -ff     "$FF"
 rm -f mut.txt wt.gro wt.top
 
-# ── 4. Generate GROMACS topology for the hybrid structure ──────────────────
-# pmx mutate wrote VdeC into the FF's nsaa.rtp, so pdb2gmx resolves it directly.
-# Do NOT pass -ignh: the dummy atom DOT2 placed by pmx mutate must be
-# preserved; pdb2gmx would not know how to re-add it from HDB.
-echo ">>> gmx pdb2gmx (mutant) ..."
-gmx pdb2gmx \
-    -f      mutant.pdb \
-    -o      processed.gro \
-    -p      topol.top \
-    -ff     "$FF" \
-    -water  "$WATER"
-
-# ── 5. Fill hybrid B states ─────────────────────────────────────────────────
-# gentop auto-discovers the VdeC entry in the FF's nsaa.mtp -- no --extra_mtp.
-echo ">>> pmx gentop ..."
-pmx gentop \
-    -p          topol.top \
-    -o          pmxtop.top \
-    -ff         "$FF"
-
 # ════════════════════════════════════════════════════════════════════════════
 # REFERENCE LEG — same VdeC deletion applied to the MEEVD peptide free in water
 # The reference is the biological peptide itself, not a minimal dipeptide.
@@ -105,37 +85,50 @@ gmx pdb2gmx \
     -ignh
 
 echo ">>> pmx mutate: reference Asp5 -> DEL ..."
-printf "5 DEL\n" | pmx mutate \
+printf "5 DEL\n" > ref_mut.txt
+pmx mutate \
     -f      ref_wt.gro \
     -o      ref_mutant.pdb \
+    --script ref_mut.txt \
     -ff     "$FF"
-rm -f ref_wt.gro ref_wt.top
-
-echo ">>> gmx pdb2gmx (reference mutant) ..."
-gmx pdb2gmx \
-    -f      ref_mutant.pdb \
-    -o      ref_processed.gro \
-    -p      ref_topol.top \
-    -ff     "$FF" \
-    -water  "$WATER"
-
-echo ">>> pmx gentop (reference) ..."
-pmx gentop \
-    -p          ref_topol.top \
-    -o          ref_pmxtop.top \
-    -ff         "$FF"
+rm -f ref_mut.txt ref_wt.gro ref_wt.top
 
 # ════════════════════════════════════════════════════════════════════════════
 # DOUBLEBOX — combine complex and free-peptide legs in one charge-neutral box
+#
+# ORDER MATTERS: doublebox the two MUTANT STRUCTURES first, then run pdb2gmx
+# ONCE on the combined file.  A topology built per leg describes only half the
+# system, so grompp would reject it against the doubleboxed coordinates.
 # ════════════════════════════════════════════════════════════════════════════
 
 echo ">>> pmx doublebox ..."
 pmx doublebox \
-    -f1 processed.gro \
-    -f2 ref_processed.gro \
-    -o  doublebox.gro \
+    -f1 mutant.pdb \
+    -f2 ref_mutant.pdb \
+    -o  doublebox.pdb \
     -r  2.5 \
     -d  1.5
+
+# ── Generate ONE topology covering both legs ────────────────────────────────
+# Do NOT pass -ignh: the dummy atoms placed by pmx mutate must be preserved;
+# pdb2gmx would not know how to re-add them from HDB.  Two chains means two
+# terminus selections (pmx mutate already set the C-termini), hence the stdin.
+echo ">>> gmx pdb2gmx (doubleboxed system) ..."
+printf '0\n0\n0\n0\n' | gmx pdb2gmx \
+    -f      doublebox.pdb \
+    -o      doublebox.gro \
+    -p      topol.top \
+    -ff     "$FF" \
+    -water  "$WATER" \
+    -ter
+
+# ── Fill hybrid B states ────────────────────────────────────────────────────
+# gentop auto-discovers the VdeC entry in the FF's nsaa.mtp -- no --extra_mtp.
+echo ">>> pmx gentop ..."
+pmx gentop \
+    -p          topol.top \
+    -o          pmxtop.top \
+    -ff         "$FF"
 
 echo ">>> gmx solvate ..."
 gmx solvate \
@@ -163,8 +156,14 @@ echo "Protein leg  (complex) — State A: full MEEVD bound to co-chaperone (char
 echo "                       — State B: truncated MEEV, Asp5 dummies   (charge -2)"
 echo "Reference leg (free)   — State A: full MEEVD free in water        (charge -3)"
 echo "                       — State B: truncated MEEV, Asp5 dummies    (charge -2)"
-echo "                         [reference runs reverse: MEEV→MEEVD, Δq = -1]"
 echo ""
-echo "Net box charge change during NEQ transitions: 0"
+echo "⚠  BOX CHARGE IS NOT BALANCED IN THIS SETUP."
+echo "   Both legs delete, so both shift the charge the same way: measured"
+echo "   state A = -6, state B = -4, i.e. dq = +2 rather than 0."
+echo "   Balancing a DSSB needs the reference leg to run the REVERSE morph, and"
+echo "   delete_terminal has no reverse direction -- --reverse is accepted by the"
+echo "   CLI and silently ignored for a deletion.  Until that exists, run a"
+echo "   charge-changing terminal deletion in a SINGLE box with charge-scaled"
+echo "   (ECC) ions rather than as a doublebox."
 echo "Combined ΔΔG = ΔG(deletion in complex) − ΔG(deletion of free peptide)"
 echo "             = ΔΔG of co-chaperone binding: MEEV vs MEEVD"
