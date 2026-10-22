@@ -7,7 +7,14 @@ or
   pip install .
 """
 
+import os
+import sys
+
 from setuptools import setup, Extension
+
+# PEP 517 builds exec this script without the source root on sys.path,
+# so the vendored versioneer has to be found explicitly.
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import versioneer
 
 
@@ -62,7 +69,6 @@ setup(name='pmx',
       include_package_data=True,
       zip_safe=False,
       ext_modules=extensions,
-      setup_requires=["setuptools~=46.0.0"],
       tests_require=['pytest'],
       install_requires=['numpy', 'scipy', 'matplotlib', 'future'],
       python_requires=">=3.6",
