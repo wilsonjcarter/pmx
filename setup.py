@@ -12,7 +12,7 @@ import versioneer
 
 
 def readme():
-    with open('README.rst') as f:
+    with open('README.md') as f:
         return f.read()
 
 # ----------
@@ -45,6 +45,7 @@ setup(name='pmx',
       description='Toolkit for free-energy calculation setup/analysis '
                   'and biomolecular structure handling',
       long_description=readme(),
+      long_description_content_type='text/markdown',
       classifiers=[
         'Development Status :: Beta',
         'License :: OSI Approved :: GNU General Public License (LGPL)',
