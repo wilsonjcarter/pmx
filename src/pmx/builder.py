@@ -301,7 +301,7 @@ def make_residue(key, hydrogens=True, chirality='L'):
             a.id = i+1
             a.name = entry[0]
             a.symbol = a.name[0]
-            a.x = entry[1]
+            a.x = list(entry[1])
             a.occ = 1.
             a.resname = key
             a.m = library._atommass[a.symbol]
